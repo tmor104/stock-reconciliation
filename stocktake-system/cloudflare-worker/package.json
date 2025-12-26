@@ -1,0 +1,26 @@
+{
+  "name": "stocktake-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for stocktake reconciliation system",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "keywords": [
+    "stocktake",
+    "inventory",
+    "reconciliation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "itty-router": "^4.0.0",
+    "xlsx": "^0.18.5",
+    "jose": "^5.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

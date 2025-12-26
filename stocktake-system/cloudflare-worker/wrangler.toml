@@ -1,0 +1,22 @@
+name = "stocktake-worker"
+main = "index.js"
+compatibility_date = "2024-01-01"
+node_compat = true
+
+[vars]
+# Replace these with your actual values
+BARCODE_SHEET_ID = "YOUR_GOOGLE_SHEETS_BARCODE_MAPPING_ID"
+COUNT_SHEETS_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"
+
+[[kv_namespaces]]
+binding = "STOCKTAKE_KV"
+# Run: wrangler kv:namespace create "STOCKTAKE_KV"
+# Then paste the ID here:
+id = "YOUR_KV_NAMESPACE_ID"
+
+# Secrets (set via CLI):
+# wrangler secret put GOOGLE_SERVICE_ACCOUNT_KEY
+# wrangler secret put INITIAL_ADMIN_PASSWORD
+
+[env.production]
+name = "stocktake-worker"

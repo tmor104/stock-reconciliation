@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stocktake System - Demo Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #2563eb; }
+        h2 { color: #64748b; margin-top: 30px; }
+        .demo-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th {
+            background: #f1f5f9;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .positive { background: #dcfce7; color: #16a34a; font-weight: 600; }
+        .negative { background: #fee2e2; color: #dc2626; font-weight: 600; }
+        .no-barcode { background: #e0e7ff; }
+        .uncounted { background: #fef3c7; }
+        pre {
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .note {
+            background: #fef3c7;
+            padding: 15px;
+            border-left: 4px solid #d97706;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Stocktake Reconciliation System - Demo Data</h1>
+    
+    <div class="note">
+        <strong>Note:</strong> This is a demonstration of how your data will look in the system. 
+        The actual system will be interactive and allow filtering, sorting, and editing.
+    </div>
+
+    <div class="demo-section">
+        <h2>1. HnL Export Sample (What You Upload)</h2>
+        <p>This is the weird Excel format from HnL with merged cells and categories:</p>
+        <pre>
+Process Stock Take Report - JVREG Mainbar
+(Items counted only)
+
+                    Stock Description       Unit        Avg Cost    Qty Entered  Qty at Stocktake   Qty Diff    $ Variance
+
+Stock Group No: 1 Beer Keg
+
+119                 Balter XPA Keg 49.5L    Keg 49.5L   458.0303    7.05         9                  -1.95       -893.16
+278                 Balter XPA Tank Per 1L  Litre       9.05        0            -270.8666          270.8666    2451.34
+294                 Better Beer Zero        Keg 49.5L   282.9246    1.5          2.1567             -0.6567     -185.80
+
+Stock Group No: 300 Cider/Seltzer Keg
+
+632                 Byron Bay Lemon Squash  Keg 49.5L   472.8099    1.9          1.8913             0.0087      4.11
+        </pre>
+        <p><strong>What the system extracts:</strong></p>
+        <ul>
+            <li>Category: "1 Beer Keg", "300 Cider/Seltzer Keg"</li>
+            <li>Product Code: Often empty (uses description)</li>
+            <li>Description: "Balter XPA Keg 49.5L"</li>
+            <li>Unit: "Keg 49.5L", "Litre"</li>
+            <li>Unit Cost: $458.03, $9.05</li>
+            <li>Theoretical Qty: 7.05, 0, 1.5</li>
+        </ul>
+    </div>
+
+    <div class="demo-section">
+        <h2>2. Barcode Mapping Sheet</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Barcode</th>
+                    <th>Product</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>9320000500579</td>
+                    <td>Great Northern Original 4.2% 330mL Bottle</td>
+                </tr>
+                <tr>
+                    <td>9313419522225</td>
+                    <td>Hahn Super Dry 4.6% 330mL</td>
+                </tr>
+                <tr>
+                    <td>93497466</td>
+                    <td>Heineken 330mL Bottle</td>
+                </tr>
+                <tr>
+                    <td>9350709001046</td>
+                    <td>Balter Cerveza 355mL</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="demo-section">
+        <h2>3. Count Sheet (From Your Count Program)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Barcode</th>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Location</th>
+                    <th>User</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>9320000500579</td>
+                    <td>Great Northern Original 4.2% 330mL Bottle</td>
+                    <td>24</td>
+                    <td>Cooler 1</td>
+                    <td>John</td>
+                    <td>2025-12-26 14:30</td>
+                </tr>
+                <tr>
+                    <td>9320000500579</td>
+                    <td>Great Northern Original 4.2% 330mL Bottle</td>
+                    <td>12</td>
+                    <td>Cooler 2</td>
+                    <td>Sarah</td>
+                    <td>2025-12-26 14:35</td>
+                </tr>
+                <tr>
+                    <td>9313419522225</td>
+                    <td>Hahn Super Dry 4.6% 330mL</td>
+                    <td>18</td>
+                    <td>Cooler 1</td>
+                    <td>John</td>
+                    <td>2025-12-26 14:32</td>
+                </tr>
+            </tbody>
+        </table>
+        <p><strong>System automatically sums:</strong> Great Northern = 24 + 12 = 36 total</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>4. Variance Report (What You See)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Unit</th>
+                    <th>Unit Cost</th>
+                    <th>Theoretical</th>
+                    <th>Counted</th>
+                    <th>Qty Var</th>
+                    <th>$ Var</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="positive">
+                    <td>560 Heavy - Pack beer</td>
+                    <td>Great Northern Original 4.2% 330mL Bottle</td>
+                    <td>Carton</td>
+                    <td>$42.50</td>
+                    <td>30</td>
+                    <td>36</td>
+                    <td class="positive">+6</td>
+                    <td class="positive">+$255.00</td>
+                </tr>
+                <tr class="negative">
+                    <td>560 Heavy - Pack beer</td>
+                    <td>Hahn Super Dry 4.6% 330mL</td>
+                    <td>Carton</td>
+                    <td>$45.00</td>
+                    <td>24</td>
+                    <td>18</td>
+                    <td class="negative">-6</td>
+                    <td class="negative">-$270.00</td>
+                </tr>
+                <tr class="uncounted">
+                    <td>560 Heavy - Pack beer</td>
+                    <td>Heineken 330mL Bottle</td>
+                    <td>Carton</td>
+                    <td>$48.00</td>
+                    <td>12</td>
+                    <td>0</td>
+                    <td>-12</td>
+                    <td>-$576.00</td>
+                </tr>
+                <tr class="no-barcode">
+                    <td>1 Beer Keg</td>
+                    <td>Balter XPA Keg 49.5L</td>
+                    <td>Keg</td>
+                    <td>$458.03</td>
+                    <td>7.05</td>
+                    <td>0</td>
+                    <td>-7.05</td>
+                    <td>-$3,229.11</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <h3>Color Coding Legend:</h3>
+        <table>
+            <tr class="positive"><td>Green Background</td><td>Positive variance (counted more than theoretical)</td></tr>
+            <tr class="negative"><td>Red Background</td><td>Negative variance (counted less than theoretical)</td></tr>
+            <tr class="uncounted"><td>Yellow Background</td><td>Has barcode but not counted yet (qty = 0)</td></tr>
+            <tr class="no-barcode"><td>Blue Background</td><td>No barcode - requires manual entry</td></tr>
+        </table>
+    </div>
+
+    <div class="demo-section">
+        <h2>5. DAT File Export (For HnL Import)</h2>
+        <p>This is what gets exported for importing back into HnL:</p>
+        <pre>
+9320000500579   36
+9313419522225   18
+</pre>
+        <p><strong>Format Rules:</strong></p>
+        <ul>
+            <li>Barcode starts at position 1</li>
+            <li>Count starts at position 17 (padded with spaces)</li>
+            <li>Only includes items with barcodes</li>
+            <li>Only includes items with non-zero counts</li>
+            <li>Excludes items without barcodes (like kegs)</li>
+        </ul>
+    </div>
+
+    <div class="demo-section">
+        <h2>6. Manual Entry List</h2>
+        <p>Text file listing items without barcodes that need manual counting:</p>
+        <pre>
+MANUAL ENTRY LIST
+================================================================================
+
+The following items do not have barcodes and must be counted manually:
+
+1 Beer Keg
+--------------------------------------------------------------------------------
+1. Balter XPA Keg 49.5L
+   Product Code: 119
+   Unit: Keg 49.5L
+   Theoretical Qty: 7.05
+   Count: ___________
+
+2. Balter XPA Tank Per 1L
+   Product Code: 278
+   Unit: Litre
+   Theoretical Qty: 0
+   Count: ___________
+
+================================================================================
+Total items requiring manual entry: 2
+        </pre>
+    </div>
+
+    <div class="demo-section">
+        <h2>7. Audit Trail</h2>
+        <p>Automatic tracking of all manual adjustments:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Old Count</th>
+                    <th>New Count</th>
+                    <th>Reason</th>
+                    <th>User</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Heineken 330mL Bottle</td>
+                    <td>0</td>
+                    <td>6</td>
+                    <td>Found in back cooler</td>
+                    <td>admin</td>
+                    <td>2025-12-26 15:45:23</td>
+                </tr>
+                <tr>
+                    <td>Balter XPA Keg 49.5L</td>
+                    <td>0</td>
+                    <td>9</td>
+                    <td>Manual keg count</td>
+                    <td>admin</td>
+                    <td>2025-12-26 15:50:12</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="demo-section">
+        <h2>Key System Behaviors</h2>
+        <ul>
+            <li><strong>Negative Theoretical:</strong> Handled normally (e.g., -270.87 becomes +270.87 variance if counted as 0)</li>
+            <li><strong>Multiple Scans:</strong> Automatically summed by barcode (24 + 12 = 36)</li>
+            <li><strong>No Barcode:</strong> Shown in blue, excluded from .dat export</li>
+            <li><strong>Manual Override:</strong> Latest manual entry replaces scanned counts</li>
+            <li><strong>Real-time:</strong> Updates immediately when you click save</li>
+        </ul>
+    </div>
+
+    <div class="note">
+        <strong>Ready to Deploy?</strong><br>
+        Follow the steps in docs/SETUP_GUIDE.md to get this running!<br>
+        Estimated setup time: 2 hours
+    </div>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stocktake Reconciliation System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+        <div class="login-container">
+            <h1>Stocktake System</h1>
+            <form id="login-form">
+                <input type="text" id="username" placeholder="Username" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <button type="submit">Login</button>
+                <div id="login-error" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-screen" class="screen">
+        <div class="header">
+            <h1>Admin Dashboard</h1>
+            <button id="logout-btn" class="btn-secondary">Logout</button>
+        </div>
+        
+        <div class="admin-content">
+            <div class="admin-section">
+                <h2>Stocktake Management</h2>
+                <div class="admin-actions">
+                    <button id="start-stocktake-btn" class="btn-primary">Start New Stocktake</button>
+                    <button id="finish-stocktake-btn" class="btn-warning">Finish Current Stocktake</button>
+                    <button id="view-variance-btn" class="btn-primary">View Variance Report</button>
+                </div>
+                
+                <div id="current-stocktake-info" class="info-box">
+                    <p><strong>Current Stocktake:</strong> <span id="current-stocktake-name">None</span></p>
+                    <p><strong>Started:</strong> <span id="current-stocktake-date">-</span></p>
+                    <p><strong>Status:</strong> <span id="current-stocktake-status">-</span></p>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h2>User Management</h2>
+                <div class="user-management">
+                    <div class="add-user-form">
+                        <input type="text" id="new-username" placeholder="Username">
+                        <input type="password" id="new-password" placeholder="Password">
+                        <select id="new-user-role">
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <button id="add-user-btn" class="btn-primary">Add User</button>
+                    </div>
+                    <div id="users-list" class="users-list"></div>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h2>Historical Stocktakes</h2>
+                <div id="stocktake-history" class="stocktake-history"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Stocktake Modal -->
+    <div id="start-stocktake-modal" class="modal">
+        <div class="modal-content">
+            <h2>Start New Stocktake</h2>
+            <form id="start-stocktake-form">
+                <div class="form-group">
+                    <label>Upload HnL Export (Excel):</label>
+                    <input type="file" id="hnl-file" accept=".xls,.xlsx" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Select Count Sheet:</label>
+                    <select id="count-sheet-select" required>
+                        <option value="">Loading...</option>
+                    </select>
+                    <button type="button" id="refresh-sheets-btn" class="btn-secondary">Refresh</button>
+                </div>
+
+                <div class="form-group">
+                    <label>Stocktake Name:</label>
+                    <input type="text" id="stocktake-name" placeholder="e.g., December 2025" required>
+                </div>
+
+                <div id="upload-progress" class="progress-container" style="display: none;">
+                    <div class="progress-bar">
+                        <div id="progress-fill" class="progress-fill"></div>
+                    </div>
+                    <p id="progress-text">Uploading...</p>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn-primary">Create Stocktake</button>
+                    <button type="button" id="cancel-start-btn" class="btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Variance Report Screen -->
+    <div id="variance-screen" class="screen">
+        <div class="header">
+            <h1>Variance Report</h1>
+            <div class="header-actions">
+                <button id="export-variance-btn" class="btn-primary">Export Report</button>
+                <button id="export-manual-btn" class="btn-primary">Export Manual Entry List</button>
+                <button id="back-to-admin-btn" class="btn-secondary">Back to Admin</button>
+                <button id="logout-variance-btn" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+
+        <div class="filters-container">
+            <div class="filter-group">
+                <label>Category:</label>
+                <select id="category-filter">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Sort By:</label>
+                <select id="sort-by">
+                    <option value="desc-abs">Highest Absolute $ Variance</option>
+                    <option value="desc-pos">Highest Positive $ Variance</option>
+                    <option value="desc-neg">Highest Negative $ Variance</option>
+                    <option value="qty-abs">Highest Absolute Qty Variance</option>
+                    <option value="qty-pos">Highest Positive Qty Variance</option>
+                    <option value="qty-neg">Highest Negative Qty Variance</option>
+                    <option value="name">Product Name (A-Z)</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>
+                    <input type="checkbox" id="hide-zero-variance">
+                    Hide Zero Variance Items
+                </label>
+            </div>
+
+            <div class="filter-group">
+                <label>Search:</label>
+                <input type="text" id="search-box" placeholder="Search products...">
+            </div>
+
+            <div class="filter-group">
+                <button id="refresh-variance-btn" class="btn-secondary">Refresh Data</button>
+            </div>
+        </div>
+
+        <div class="stats-container">
+            <div class="stat-box">
+                <h3>Total $ Variance</h3>
+                <p id="total-dollar-variance" class="stat-value">$0.00</p>
+            </div>
+            <div class="stat-box">
+                <h3>Items Counted</h3>
+                <p id="items-counted" class="stat-value">0 / 0</p>
+            </div>
+            <div class="stat-box">
+                <h3>Positive Variances</h3>
+                <p id="positive-count" class="stat-value">0</p>
+            </div>
+            <div class="stat-box">
+                <h3>Negative Variances</h3>
+                <p id="negative-count" class="stat-value">0</p>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="variance-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Product Code</th>
+                        <th>Description</th>
+                        <th>Unit</th>
+                        <th>Unit Cost</th>
+                        <th>Theoretical Qty</th>
+                        <th>Counted Qty</th>
+                        <th>Qty Variance</th>
+                        <th>Variance %</th>
+                        <th>$ Variance</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="variance-tbody">
+                    <tr>
+                        <td colspan="11" class="loading">Loading data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Edit Count Modal -->
+    <div id="edit-count-modal" class="modal">
+        <div class="modal-content">
+            <h2>Edit Count</h2>
+            <div id="edit-product-info" class="info-box"></div>
+            <form id="edit-count-form">
+                <div class="form-group">
+                    <label>New Count:</label>
+                    <input type="number" id="edit-count-input" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Reason (optional):</label>
+                    <textarea id="edit-reason" rows="3" placeholder="Why are you adjusting this count?"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-primary">Save</button>
+                    <button type="button" id="cancel-edit-btn" class="btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

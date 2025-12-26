@@ -1,7 +1,18 @@
-// Configuration
+// Configuration - MUST be updated before deployment
 const CONFIG = {
-    WORKER_URL: 'YOUR_CLOUDFLARE_WORKER_URL', // Replace with your Cloudflare Worker URL
+    WORKER_URL: window.location.hostname === 'localhost'
+        ? 'http://localhost:8787'
+        : 'YOUR_CLOUDFLARE_WORKER_URL', // Replace with your Cloudflare Worker URL
     BARCODE_SHEET_ID: 'YOUR_BARCODE_SHEET_ID', // Replace with your barcode mapping sheet ID
+    PASSWORD_ITERATIONS: 100000, // PBKDF2 iterations for password hashing
+};
+
+// Constants
+const CONSTANTS = {
+    DECIMAL_PLACES: 2,
+    MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+    ALLOWED_FILE_TYPES: ['.xls', '.xlsx'],
+    TOKEN_EXPIRY_HOURS: 24,
 };
 
 // State Management
@@ -14,6 +25,46 @@ const state = {
 };
 
 // Utility Functions
+// Secure password hashing using PBKDF2 (better than SHA-256)
+const hashPassword = async (password, salt = null) => {
+    const encoder = new TextEncoder();
+    const passwordBuffer = encoder.encode(password);
+
+    // Generate or use provided salt
+    const saltBuffer = salt
+        ? encoder.encode(salt)
+        : crypto.getRandomValues(new Uint8Array(16));
+
+    // Import password as key material
+    const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        passwordBuffer,
+        'PBKDF2',
+        false,
+        ['deriveBits']
+    );
+
+    // Derive key using PBKDF2
+    const hashBuffer = await crypto.subtle.deriveBits(
+        {
+            name: 'PBKDF2',
+            salt: saltBuffer,
+            iterations: CONFIG.PASSWORD_ITERATIONS,
+            hash: 'SHA-256'
+        },
+        keyMaterial,
+        256
+    );
+
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const saltHex = Array.from(new Uint8Array(saltBuffer))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+
+    return { hash: hashHex, salt: saltHex };
+};
+
+// For backward compatibility with existing SHA-256 hashes
 const sha256 = async (message) => {
     const msgBuffer = new TextEncoder().encode(message);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -28,8 +79,38 @@ const formatCurrency = (value) => {
     }).format(value);
 };
 
-const formatNumber = (value, decimals = 2) => {
+const formatNumber = (value, decimals = CONSTANTS.DECIMAL_PLACES) => {
     return Number(value).toFixed(decimals);
+};
+
+// HTML sanitization to prevent XSS
+const sanitizeHTML = (str) => {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+};
+
+// Create element safely
+const createElement = (tag, attributes = {}, children = []) => {
+    const element = document.createElement(tag);
+    Object.entries(attributes).forEach(([key, value]) => {
+        if (key === 'className') {
+            element.className = value;
+        } else if (key.startsWith('on')) {
+            // Don't allow inline event handlers via attributes
+            console.warn('Use addEventListener instead of inline handlers');
+        } else {
+            element.setAttribute(key, value);
+        }
+    });
+    children.forEach(child => {
+        if (typeof child === 'string') {
+            element.appendChild(document.createTextNode(child));
+        } else {
+            element.appendChild(child);
+        }
+    });
+    return element;
 };
 
 const showScreen = (screenId) => {
@@ -48,7 +129,7 @@ const hideModal = (modalId) => {
 const showError = (elementId, message) => {
     const el = document.getElementById(elementId);
     if (el) {
-        el.textContent = message;
+        el.textContent = sanitizeHTML(message);
         el.style.display = 'block';
     }
 };
@@ -59,6 +140,49 @@ const hideError = (elementId) => {
         el.textContent = '';
         el.style.display = 'none';
     }
+};
+
+// Input validation
+const validation = {
+    isValidEmail: (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
+    isValidUsername: (username) => /^[a-zA-Z0-9_-]{3,20}$/.test(username),
+    isValidPassword: (password) => password.length >= 8,
+    isValidNumber: (value) => !isNaN(parseFloat(value)) && isFinite(value),
+    isValidFileType: (filename, allowedTypes) => {
+        const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
+        return allowedTypes.includes(ext);
+    },
+    isValidFileSize: (size, maxSize) => size <= maxSize,
+};
+
+// Better error handling with toast notifications
+const showToast = (message, type = 'info') => {
+    const toast = createElement('div', {
+        className: `toast toast-${type}`,
+        role: 'alert'
+    }, [message]);
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('show');
+    }, 10);
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+};
+
+// Confirmation dialog (better than alert)
+const confirm = (message) => {
+    return new Promise((resolve) => {
+        if (window.confirm(message)) {
+            resolve(true);
+        } else {
+            resolve(false);
+        }
+    });
 };
 
 // API Functions
@@ -318,20 +442,43 @@ async function loadUsers() {
     try {
         const users = await api.getUsers(state.currentUser.token);
         const usersList = document.getElementById('users-list');
-        
-        usersList.innerHTML = users.map(user => `
-            <div class="user-item">
-                <div class="user-info">
-                    <strong>${user.username}</strong>
-                    <span class="user-badge ${user.role}">${user.role}</span>
-                </div>
-                ${user.username !== state.currentUser.username ? 
-                    `<button class="btn-danger" onclick="deleteUser('${user.username}')">Delete</button>` : 
-                    ''}
-            </div>
-        `).join('');
+
+        // Clear existing content
+        usersList.innerHTML = '';
+
+        // Create user items safely without innerHTML to prevent XSS
+        users.forEach(user => {
+            const userItem = document.createElement('div');
+            userItem.className = 'user-item';
+
+            const userInfo = document.createElement('div');
+            userInfo.className = 'user-info';
+
+            const username = document.createElement('strong');
+            username.textContent = user.username; // Safe - no HTML parsing
+
+            const badge = document.createElement('span');
+            badge.className = `user-badge ${user.role}`;
+            badge.textContent = user.role;
+
+            userInfo.appendChild(username);
+            userInfo.appendChild(badge);
+            userItem.appendChild(userInfo);
+
+            // Add delete button if not current user
+            if (user.username !== state.currentUser.username) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn-danger';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.addEventListener('click', () => handleDeleteUser(user.username));
+                userItem.appendChild(deleteBtn);
+            }
+
+            usersList.appendChild(userItem);
+        });
     } catch (error) {
         console.error('Failed to load users:', error);
+        showToast('Failed to load users', 'error');
     }
 }
 
@@ -339,18 +486,51 @@ async function loadStocktakeHistory() {
     try {
         const history = await api.getStocktakeHistory(state.currentUser.token);
         const historyContainer = document.getElementById('stocktake-history');
-        
-        historyContainer.innerHTML = history.map(st => `
-            <div class="stocktake-item" onclick="viewStocktake('${st.id}')">
-                <h3>${st.name}</h3>
-                <p>Created: ${new Date(st.createdAt).toLocaleDateString()}</p>
-                <p>Items: ${st.itemCount || 0}</p>
-                <p>Total Variance: ${formatCurrency(st.totalVariance || 0)}</p>
-                <span class="stocktake-status ${st.status}">${st.status}</span>
-            </div>
-        `).join('');
+
+        // Clear existing content
+        historyContainer.innerHTML = '';
+
+        if (history.length === 0) {
+            const emptyMsg = document.createElement('p');
+            emptyMsg.textContent = 'No stocktake history yet.';
+            emptyMsg.className = 'empty-message';
+            historyContainer.appendChild(emptyMsg);
+            return;
+        }
+
+        // Create stocktake items safely
+        history.forEach(st => {
+            const item = document.createElement('div');
+            item.className = 'stocktake-item';
+            item.addEventListener('click', () => handleViewStocktake(st.id));
+
+            const name = document.createElement('h3');
+            name.textContent = st.name;
+
+            const created = document.createElement('p');
+            created.textContent = `Created: ${new Date(st.createdAt).toLocaleDateString()}`;
+
+            const items = document.createElement('p');
+            items.textContent = `Items: ${st.itemCount || 0}`;
+
+            const variance = document.createElement('p');
+            variance.textContent = `Total Variance: ${formatCurrency(st.totalVariance || 0)}`;
+
+            const status = document.createElement('span');
+            status.className = `stocktake-status ${st.status}`;
+            status.textContent = st.status;
+
+            item.appendChild(name);
+            item.appendChild(created);
+            item.appendChild(items);
+            item.appendChild(variance);
+            item.appendChild(status);
+
+            historyContainer.appendChild(item);
+        });
     } catch (error) {
         console.error('Failed to load stocktake history:', error);
+        showToast('Failed to load stocktake history', 'error');
     }
 }
 
@@ -359,34 +539,46 @@ document.getElementById('add-user-btn').addEventListener('click', async () => {
     const username = document.getElementById('new-username').value.trim();
     const password = document.getElementById('new-password').value;
     const role = document.getElementById('new-user-role').value;
-    
+
+    // Validation
     if (!username || !password) {
-        alert('Please enter username and password');
+        showToast('Please enter username and password', 'error');
         return;
     }
-    
+
+    if (!validation.isValidUsername(username)) {
+        showToast('Username must be 3-20 characters (letters, numbers, _ or -)', 'error');
+        return;
+    }
+
+    if (!validation.isValidPassword(password)) {
+        showToast('Password must be at least 8 characters', 'error');
+        return;
+    }
+
     try {
         await api.addUser(state.currentUser.token, username, password, role);
         document.getElementById('new-username').value = '';
         document.getElementById('new-password').value = '';
         await loadUsers();
-        alert('User added successfully');
+        showToast('User added successfully', 'success');
     } catch (error) {
-        alert('Failed to add user: ' + error.message);
+        showToast('Failed to add user: ' + error.message, 'error');
     }
 });
 
-async function deleteUser(username) {
-    if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
+async function handleDeleteUser(username) {
+    const confirmed = await confirm(`Are you sure you want to delete user "${sanitizeHTML(username)}"?`);
+    if (!confirmed) {
         return;
     }
-    
+
     try {
         await api.deleteUser(state.currentUser.token, username);
         await loadUsers();
-        alert('User deleted successfully');
+        showToast('User deleted successfully', 'success');
     } catch (error) {
-        alert('Failed to delete user: ' + error.message);
+        showToast('Failed to delete user: ' + error.message, 'error');
     }
 }
 
@@ -402,33 +594,61 @@ async function loadCountSheets() {
     try {
         const sheets = await api.getAvailableCountSheets(state.currentUser.token);
         const select = document.getElementById('count-sheet-select');
-        
-        select.innerHTML = '<option value="">Select a count sheet...</option>' +
-            sheets.map(sheet => `<option value="${sheet.id}">${sheet.name}</option>`).join('');
+
+        // Clear and rebuild select options safely
+        select.innerHTML = '';
+
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Select a count sheet...';
+        select.appendChild(defaultOption);
+
+        sheets.forEach(sheet => {
+            const option = document.createElement('option');
+            option.value = sheet.id;
+            option.textContent = sheet.name;
+            select.appendChild(option);
+        });
     } catch (error) {
         console.error('Failed to load count sheets:', error);
-        alert('Failed to load count sheets');
+        showToast('Failed to load count sheets', 'error');
     }
 }
 
 document.getElementById('start-stocktake-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     const file = document.getElementById('hnl-file').files[0];
     const countSheetId = document.getElementById('count-sheet-select').value;
-    const stocktakeName = document.getElementById('stocktake-name').value;
-    
+    const stocktakeName = document.getElementById('stocktake-name').value.trim();
+
+    // Validation
     if (!file || !countSheetId || !stocktakeName) {
-        alert('Please fill in all fields');
+        showToast('Please fill in all fields', 'error');
         return;
     }
-    
+
+    if (!validation.isValidFileType(file.name, CONSTANTS.ALLOWED_FILE_TYPES)) {
+        showToast('Please upload an Excel file (.xls or .xlsx)', 'error');
+        return;
+    }
+
+    if (!validation.isValidFileSize(file.size, CONSTANTS.MAX_FILE_SIZE)) {
+        showToast(`File size must be less than ${CONSTANTS.MAX_FILE_SIZE / 1024 / 1024}MB`, 'error');
+        return;
+    }
+
+    if (stocktakeName.length < 3) {
+        showToast('Stocktake name must be at least 3 characters', 'error');
+        return;
+    }
+
     const progressContainer = document.getElementById('upload-progress');
     const progressFill = document.getElementById('progress-fill');
     const progressText = document.getElementById('progress-text');
-    
+
     progressContainer.style.display = 'block';
-    
+
     try {
         await api.uploadHnLFile(
             state.currentUser.token,
@@ -440,16 +660,16 @@ document.getElementById('start-stocktake-form').addEventListener('submit', async
                 progressText.textContent = `Processing: ${Math.round(percent)}%`;
             }
         );
-        
+
         hideModal('start-stocktake-modal');
         progressContainer.style.display = 'none';
         progressFill.style.width = '0%';
-        
+
         await loadAdminDashboard();
-        alert('Stocktake created successfully!');
+        showToast('Stocktake created successfully!', 'success');
     } catch (error) {
         progressContainer.style.display = 'none';
-        alert('Failed to create stocktake: ' + error.message);
+        showToast('Failed to create stocktake: ' + error.message, 'error');
     }
 });
 
@@ -460,10 +680,10 @@ document.getElementById('cancel-start-btn').addEventListener('click', () => {
 // View Variance Report
 document.getElementById('view-variance-btn').addEventListener('click', async () => {
     if (!state.currentStocktake) {
-        alert('No active stocktake');
+        showToast('No active stocktake', 'warning');
         return;
     }
-    
+
     await loadVarianceReport();
     showScreen('variance-screen');
 });
@@ -475,7 +695,7 @@ document.getElementById('back-to-admin-btn').addEventListener('click', () => {
 async function loadCurrentStocktake() {
     const stocktake = await api.getCurrentStocktake(state.currentUser.token);
     if (!stocktake) {
-        alert('No active stocktake');
+        showToast('No active stocktake', 'warning');
         return;
     }
     state.currentStocktake = stocktake;
@@ -484,28 +704,40 @@ async function loadCurrentStocktake() {
 
 async function loadVarianceReport() {
     try {
-        document.getElementById('variance-tbody').innerHTML = 
+        document.getElementById('variance-tbody').innerHTML =
             '<tr><td colspan="11" class="loading">Loading data...</td></tr>';
-        
+
         const data = await api.getVarianceData(
             state.currentUser.token,
             state.currentStocktake.id
         );
-        
+
         state.varianceData = data.items;
         state.barcodeMapping = new Map(data.barcodeMapping);
-        
-        // Populate category filter
+
+        // Populate category filter safely
         const categories = [...new Set(data.items.map(item => item.category))].sort();
         const categoryFilter = document.getElementById('category-filter');
-        categoryFilter.innerHTML = '<option value="">All Categories</option>' +
-            categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
-        
+
+        categoryFilter.innerHTML = '';
+
+        const allOption = document.createElement('option');
+        allOption.value = '';
+        allOption.textContent = 'All Categories';
+        categoryFilter.appendChild(allOption);
+
+        categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            option.textContent = cat;
+            categoryFilter.appendChild(option);
+        });
+
         applyFilters();
         updateStats();
     } catch (error) {
         console.error('Failed to load variance data:', error);
-        alert('Failed to load variance data');
+        showToast('Failed to load variance data', 'error');
     }
 }
 
@@ -551,43 +783,91 @@ function applyFilters() {
 
 function renderVarianceTable() {
     const tbody = document.getElementById('variance-tbody');
-    
+
     if (state.filteredData.length === 0) {
         tbody.innerHTML = '<tr><td colspan="11" class="loading">No items found</td></tr>';
         return;
     }
-    
-    tbody.innerHTML = state.filteredData.map(item => {
+
+    // Clear table
+    tbody.innerHTML = '';
+
+    // Create rows safely without innerHTML to prevent XSS
+    state.filteredData.forEach(item => {
         const hasBarcode = state.barcodeMapping.has(item.productCode);
         const isCounted = item.countedQty !== 0 || item.manuallyEntered;
         const varianceClass = item.qtyVariance > 0 ? 'positive-variance' :
                               item.qtyVariance < 0 ? 'negative-variance' : '';
         const rowClass = !hasBarcode ? 'no-barcode' : (!isCounted ? 'uncounted' : varianceClass);
-        
-        return `
-            <tr class="${rowClass}">
-                <td>${item.category}</td>
-                <td>${item.productCode || '-'}</td>
-                <td>${item.description}</td>
-                <td>${item.unit}</td>
-                <td>${formatCurrency(item.unitCost)}</td>
-                <td>${formatNumber(item.theoreticalQty)}</td>
-                <td>${formatNumber(item.countedQty)}</td>
-                <td class="${item.qtyVariance > 0 ? 'variance-positive' : 
-                           item.qtyVariance < 0 ? 'variance-negative' : 'variance-zero'}">
-                    ${formatNumber(item.qtyVariance)}
-                </td>
-                <td>${formatNumber(item.variancePercent)}%</td>
-                <td class="${item.dollarVariance > 0 ? 'variance-positive' : 
-                           item.dollarVariance < 0 ? 'variance-negative' : 'variance-zero'}">
-                    ${formatCurrency(item.dollarVariance)}
-                </td>
-                <td>
-                    <button class="btn-edit" onclick="editCount('${item.productCode}')">Edit</button>
-                </td>
-            </tr>
-        `;
-    }).join('');
+
+        const row = document.createElement('tr');
+        row.className = rowClass;
+
+        // Category
+        const categoryCell = document.createElement('td');
+        categoryCell.textContent = item.category;
+        row.appendChild(categoryCell);
+
+        // Product Code
+        const codeCell = document.createElement('td');
+        codeCell.textContent = item.productCode || '-';
+        row.appendChild(codeCell);
+
+        // Description
+        const descCell = document.createElement('td');
+        descCell.textContent = item.description;
+        row.appendChild(descCell);
+
+        // Unit
+        const unitCell = document.createElement('td');
+        unitCell.textContent = item.unit;
+        row.appendChild(unitCell);
+
+        // Unit Cost
+        const costCell = document.createElement('td');
+        costCell.textContent = formatCurrency(item.unitCost);
+        row.appendChild(costCell);
+
+        // Theoretical Qty
+        const theoreticalCell = document.createElement('td');
+        theoreticalCell.textContent = formatNumber(item.theoreticalQty);
+        row.appendChild(theoreticalCell);
+
+        // Counted Qty
+        const countedCell = document.createElement('td');
+        countedCell.textContent = formatNumber(item.countedQty);
+        row.appendChild(countedCell);
+
+        // Qty Variance
+        const qtyVarianceCell = document.createElement('td');
+        qtyVarianceCell.className = item.qtyVariance > 0 ? 'variance-positive' :
+                                     item.qtyVariance < 0 ? 'variance-negative' : 'variance-zero';
+        qtyVarianceCell.textContent = formatNumber(item.qtyVariance);
+        row.appendChild(qtyVarianceCell);
+
+        // Variance %
+        const percentCell = document.createElement('td');
+        percentCell.textContent = formatNumber(item.variancePercent) + '%';
+        row.appendChild(percentCell);
+
+        // Dollar Variance
+        const dollarVarianceCell = document.createElement('td');
+        dollarVarianceCell.className = item.dollarVariance > 0 ? 'variance-positive' :
+                                        item.dollarVariance < 0 ? 'variance-negative' : 'variance-zero';
+        dollarVarianceCell.textContent = formatCurrency(item.dollarVariance);
+        row.appendChild(dollarVarianceCell);
+
+        // Actions
+        const actionsCell = document.createElement('td');
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn-edit';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => handleEditCount(item.productCode));
+        actionsCell.appendChild(editBtn);
+        row.appendChild(actionsCell);
+
+        tbody.appendChild(row);
+    });
 }
 
 function updateStats() {
@@ -611,32 +891,64 @@ document.getElementById('sort-by').addEventListener('change', applyFilters);
 document.getElementById('refresh-variance-btn').addEventListener('click', loadVarianceReport);
 
 // Edit Count
-function editCount(productCode) {
+function handleEditCount(productCode) {
     const item = state.varianceData.find(i => i.productCode === productCode);
     if (!item) return;
-    
-    document.getElementById('edit-product-info').innerHTML = `
-        <p><strong>Product:</strong> ${item.description}</p>
-        <p><strong>Current Count:</strong> ${formatNumber(item.countedQty)}</p>
-        <p><strong>Theoretical:</strong> ${formatNumber(item.theoreticalQty)}</p>
-    `;
-    
+
+    // Safely populate product info without innerHTML
+    const infoBox = document.getElementById('edit-product-info');
+    infoBox.innerHTML = ''; // Clear first
+
+    const productP = document.createElement('p');
+    const productStrong = document.createElement('strong');
+    productStrong.textContent = 'Product: ';
+    productP.appendChild(productStrong);
+    productP.appendChild(document.createTextNode(item.description));
+    infoBox.appendChild(productP);
+
+    const currentP = document.createElement('p');
+    const currentStrong = document.createElement('strong');
+    currentStrong.textContent = 'Current Count: ';
+    currentP.appendChild(currentStrong);
+    currentP.appendChild(document.createTextNode(formatNumber(item.countedQty)));
+    infoBox.appendChild(currentP);
+
+    const theoreticalP = document.createElement('p');
+    const theoreticalStrong = document.createElement('strong');
+    theoreticalStrong.textContent = 'Theoretical: ';
+    theoreticalP.appendChild(theoreticalStrong);
+    theoreticalP.appendChild(document.createTextNode(formatNumber(item.theoreticalQty)));
+    infoBox.appendChild(theoreticalP);
+
     document.getElementById('edit-count-input').value = item.countedQty;
     document.getElementById('edit-reason').value = '';
-    
+
     // Store product code for submission
     document.getElementById('edit-count-form').dataset.productCode = productCode;
-    
+
     showModal('edit-count-modal');
 }
 
 document.getElementById('edit-count-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     const productCode = e.target.dataset.productCode;
-    const newCount = parseFloat(document.getElementById('edit-count-input').value);
-    const reason = document.getElementById('edit-reason').value;
-    
+    const newCountValue = document.getElementById('edit-count-input').value;
+    const reason = document.getElementById('edit-reason').value.trim();
+
+    // Validation
+    if (!validation.isValidNumber(newCountValue)) {
+        showToast('Please enter a valid number', 'error');
+        return;
+    }
+
+    const newCount = parseFloat(newCountValue);
+
+    if (newCount < 0) {
+        showToast('Count cannot be negative', 'error');
+        return;
+    }
+
     try {
         await api.updateCount(
             state.currentUser.token,
@@ -645,11 +957,12 @@ document.getElementById('edit-count-form').addEventListener('submit', async (e) 
             newCount,
             reason
         );
-        
+
         hideModal('edit-count-modal');
         await loadVarianceReport();
+        showToast('Count updated successfully', 'success');
     } catch (error) {
-        alert('Failed to update count: ' + error.message);
+        showToast('Failed to update count: ' + error.message, 'error');
     }
 });
 
@@ -664,14 +977,16 @@ document.getElementById('export-variance-btn').addEventListener('click', async (
             state.currentUser.token,
             state.currentStocktake.id
         );
-        
+
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `variance-report-${state.currentStocktake.name}.xlsx`;
         a.click();
+        window.URL.revokeObjectURL(url); // Clean up
+        showToast('Variance report exported successfully', 'success');
     } catch (error) {
-        alert('Failed to export variance report: ' + error.message);
+        showToast('Failed to export variance report: ' + error.message, 'error');
     }
 });
 
@@ -681,56 +996,61 @@ document.getElementById('export-manual-btn').addEventListener('click', async () 
             state.currentUser.token,
             state.currentStocktake.id
         );
-        
+
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `manual-entry-list-${state.currentStocktake.name}.txt`;
         a.click();
+        window.URL.revokeObjectURL(url); // Clean up
+        showToast('Manual entry list exported successfully', 'success');
     } catch (error) {
-        alert('Failed to export manual entry list: ' + error.message);
+        showToast('Failed to export manual entry list: ' + error.message, 'error');
     }
 });
 
 // Finish Stocktake
 document.getElementById('finish-stocktake-btn').addEventListener('click', async () => {
     if (!state.currentStocktake) {
-        alert('No active stocktake');
+        showToast('No active stocktake', 'warning');
         return;
     }
-    
-    if (!confirm('Are you sure you want to finish this stocktake? This will lock it and generate the .dat export file.')) {
+
+    const confirmed = await confirm('Are you sure you want to finish this stocktake? This will lock it and generate the .dat export file.');
+    if (!confirmed) {
         return;
     }
-    
+
     try {
-        const result = await api.finishStocktake(
+        await api.finishStocktake(
             state.currentUser.token,
             state.currentStocktake.id
         );
-        
+
         // Download .dat file
         const blob = await api.exportDatFile(
             state.currentUser.token,
             state.currentStocktake.id
         );
-        
+
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `stocktake-${state.currentStocktake.name}.dat`;
         a.click();
-        
-        alert('Stocktake finished successfully! .dat file has been downloaded.');
+        window.URL.revokeObjectURL(url); // Clean up
+
+        showToast('Stocktake finished successfully! .dat file has been downloaded.', 'success');
         await loadAdminDashboard();
     } catch (error) {
-        alert('Failed to finish stocktake: ' + error.message);
+        showToast('Failed to finish stocktake: ' + error.message, 'error');
     }
 });
 
 // Helper function for viewing historical stocktakes
-function viewStocktake(stocktakeId) {
-    // This would load a historical stocktake in read-only mode
+function handleViewStocktake(stocktakeId) {
+    // TODO: Implement viewing historical stocktakes in read-only mode
+    // This would be similar to loadVarianceReport but for a specific historical stocktake
+    showToast('Viewing historical stocktakes - feature coming soon', 'info');
     console.log('View stocktake:', stocktakeId);
-    // Implementation would be similar to loadVarianceReport but for a specific stocktake
 }

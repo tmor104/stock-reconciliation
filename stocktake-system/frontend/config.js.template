@@ -1,0 +1,26 @@
+// Configuration Template
+// Copy this file to config.js and update with your values
+// Then update app.js to import this configuration
+
+const CONFIG = {
+    // Cloudflare Worker URL (get this after deploying your worker)
+    WORKER_URL: 'https://your-worker-name.your-subdomain.workers.dev',
+
+    // Google Sheets IDs
+    BARCODE_SHEET_ID: 'YOUR_BARCODE_SHEET_ID',
+
+    // Password hashing configuration
+    PASSWORD_ITERATIONS: 100000,
+};
+
+const CONSTANTS = {
+    DECIMAL_PLACES: 2,
+    MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+    ALLOWED_FILE_TYPES: ['.xls', '.xlsx'],
+    TOKEN_EXPIRY_HOURS: 24,
+};
+
+// Export if using modules, otherwise these will be global
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { CONFIG, CONSTANTS };
+}

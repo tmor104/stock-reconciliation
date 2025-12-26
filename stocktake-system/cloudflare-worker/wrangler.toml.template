@@ -1,0 +1,29 @@
+# Cloudflare Workers Configuration Template
+# Copy this to wrangler.toml and fill in your values
+
+name = "stocktake-reconciliation"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# KV Namespace for storing data
+# Create with: wrangler kv:namespace create "STOCKTAKE_KV"
+[[kv_namespaces]]
+binding = "STOCKTAKE_KV"
+id = "YOUR_KV_NAMESPACE_ID_HERE"  # Replace with your KV namespace ID
+
+[vars]
+# Google Sheets Configuration
+BARCODE_SHEET_ID = "YOUR_BARCODE_SHEET_ID"  # Replace with your barcode mapping Google Sheet ID
+COUNT_SHEETS_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # Replace with your Google Drive folder ID for count sheets
+
+# CORS - Add your GitHub Pages URL
+ALLOWED_ORIGINS = "https://yourusername.github.io,http://localhost:8787,http://localhost:3000"
+
+# Secrets (set via CLI - do NOT put in this file)
+# Run these commands after creating your wrangler.toml:
+# wrangler secret put GOOGLE_SERVICE_ACCOUNT_KEY
+# wrangler secret put INITIAL_ADMIN_PASSWORD
+
+# Example commands to set secrets:
+# echo '{"type":"service_account","project_id":"..."}' | wrangler secret put GOOGLE_SERVICE_ACCOUNT_KEY
+# echo 'your-secure-password' | wrangler secret put INITIAL_ADMIN_PASSWORD

@@ -8,30 +8,75 @@ import { ExportService } from './services/export';
 // Router setup
 const router = Router();
 
-// CORS headers
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+// Rate limiting configuration
+const RATE_LIMITS = {
+    LOGIN: { requests: 5, window: 60 }, // 5 requests per minute
+    API: { requests: 100, window: 60 }, // 100 requests per minute
+};
+
+// Get CORS headers based on environment
+const getCorsHeaders = (request, env) => {
+    const origin = request.headers.get('Origin');
+    const allowedOrigins = env.ALLOWED_ORIGINS
+        ? env.ALLOWED_ORIGINS.split(',')
+        : ['http://localhost:8787', 'http://localhost:3000'];
+
+    const corsHeaders = {
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400', // 24 hours
+    };
+
+    // Only set origin if it's in the allowed list
+    if (origin && allowedOrigins.includes(origin)) {
+        corsHeaders['Access-Control-Allow-Origin'] = origin;
+        corsHeaders['Vary'] = 'Origin';
+    }
+
+    return corsHeaders;
 };
 
 // Handle CORS preflight
-router.options('*', () => new Response(null, { headers: corsHeaders }));
+router.options('*', (request, env) => {
+    const corsHeaders = getCorsHeaders(request, env);
+    return new Response(null, { headers: corsHeaders });
+});
+
+// Rate limiting helper
+const checkRateLimit = async (key, limit, env) => {
+    const now = Math.floor(Date.now() / 1000);
+    const windowKey = `ratelimit:${key}:${Math.floor(now / limit.window)}`;
+
+    const current = await env.STOCKTAKE_KV.get(windowKey);
+    const count = current ? parseInt(current) : 0;
+
+    if (count >= limit.requests) {
+        return false; // Rate limit exceeded
+    }
+
+    await env.STOCKTAKE_KV.put(windowKey, (count + 1).toString(), {
+        expirationTtl: limit.window * 2
+    });
+
+    return true; // Within rate limit
+};
 
 // Authentication middleware
 const requireAuth = async (request, env) => {
+    const corsHeaders = getCorsHeaders(request, env);
     const authHeader = request.headers.get('Authorization');
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return new Response('Unauthorized', { status: 401, headers: corsHeaders });
     }
-    
+
     const token = authHeader.substring(7);
     const user = await AuthService.validateToken(token, env);
-    
+
     if (!user) {
         return new Response('Unauthorized', { status: 401, headers: corsHeaders });
     }
-    
+
     request.user = user;
     return null;
 };
@@ -39,11 +84,13 @@ const requireAuth = async (request, env) => {
 const requireAdmin = async (request, env) => {
     const authError = await requireAuth(request, env);
     if (authError) return authError;
-    
+
+    const corsHeaders = getCorsHeaders(request, env);
+
     if (request.user.role !== 'admin') {
         return new Response('Forbidden', { status: 403, headers: corsHeaders });
     }
-    
+
     return null;
 };
 
@@ -51,14 +98,33 @@ const requireAdmin = async (request, env) => {
 
 // Auth - Login
 router.post('/auth/login', async (request, env) => {
+    const corsHeaders = getCorsHeaders(request, env);
+
     try {
         const { username, password } = await request.json();
-        const result = await AuthService.login(username, password, env);
-        
-        if (!result) {
-            return new Response('Invalid credentials', { status: 401, headers: corsHeaders });
+
+        // Rate limiting by IP or username
+        const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
+        const rateLimitKey = `login:${clientIP}:${username}`;
+
+        const withinLimit = await checkRateLimit(rateLimitKey, RATE_LIMITS.LOGIN, env);
+
+        if (!withinLimit) {
+            return new Response(JSON.stringify({ error: 'Too many login attempts. Please try again later.' }), {
+                status: 429,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
         }
-        
+
+        const result = await AuthService.login(username, password, env);
+
+        if (!result) {
+            return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+                status: 401,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
         return new Response(JSON.stringify(result), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

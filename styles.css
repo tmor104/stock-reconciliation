@@ -216,6 +216,32 @@ body {
     z-index: 100;
 }
 
+.header-logo-section {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-logo {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.header-title {
+    font-size: 1.5rem;
+    margin: 0;
+    color: var(--slate-800);
+    font-weight: bold;
+    letter-spacing: 0.3px;
+}
+
+.header-title .logo-wizard {
+    font-weight: normal;
+    color: var(--blue-600);
+}
+
 .header h1 {
     font-size: 1.875rem;
     font-weight: bold;

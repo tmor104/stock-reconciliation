@@ -174,10 +174,16 @@ button, .btn-primary, .btn-secondary, .btn-warning {
 
 .admin-section {
     background: var(--card-bg);
-    padding: 30px;
-    border-radius: 12px;
-    margin-bottom: 30px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    padding: 32px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s ease;
+}
+
+.admin-section:hover {
+    box-shadow: var(--shadow-md);
 }
 
 .admin-section h2 {
@@ -194,10 +200,11 @@ button, .btn-primary, .btn-secondary, .btn-warning {
 }
 
 .info-box {
-    background: var(--bg-color);
-    padding: 20px;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
+    background: linear-gradient(135deg, var(--primary-light) 0%, #ffffff 100%);
+    padding: 24px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--primary-light);
+    box-shadow: var(--shadow-sm);
 }
 
 .info-box p {

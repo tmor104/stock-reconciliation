@@ -5,6 +5,7 @@ import { GoogleSheetsAPI } from './services/google-sheets-v2';
 import { AuthService } from './services/auth';
 import { VarianceCalculator } from './services/variance-calculator';
 import { ExportService } from './services/export';
+import { CountingService } from './services/counting-service';
 
 // Router setup
 const router = Router();
@@ -616,6 +617,198 @@ router.get('/export/dat/:stocktakeId', async (request, env) => {
                 'Content-Type': 'text/plain',
                 'Content-Disposition': `attachment; filename="stocktake-${currentStocktake.name}.dat"`
             }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// ============================================
+// COUNTING ENDPOINTS (Replaces Apps Script)
+// ============================================
+
+// Get Product Database
+router.get('/counting/products', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const products = await CountingService.getProductDatabase(env);
+        return new Response(JSON.stringify({ success: true, products }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Get Locations
+router.get('/counting/locations', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const locations = await CountingService.getLocations(env);
+        return new Response(JSON.stringify({ success: true, locations }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Get Kegs
+router.get('/counting/kegs', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const kegs = await CountingService.getKegs(env);
+        return new Response(JSON.stringify({ success: true, kegs }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Create Stocktake
+router.post('/counting/stocktake/create', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { name, user, folderId } = await request.json();
+        const result = await CountingService.createStocktake(name, user, folderId, env);
+        return new Response(JSON.stringify({ success: true, ...result }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// List Stocktakes
+router.get('/counting/stocktakes', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const url = new URL(request.url);
+        const folderId = url.searchParams.get('folderId') || null;
+        const stocktakes = await CountingService.listStocktakes(folderId, env);
+        return new Response(JSON.stringify({ success: true, stocktakes }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Sync Scans
+router.post('/counting/scans/sync', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId, scans } = await request.json();
+        const result = await CountingService.syncScans(stocktakeId, scans, env);
+        return new Response(JSON.stringify({ success: true, ...result }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Delete Scans
+router.post('/counting/scans/delete', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId, syncIds } = await request.json();
+        const result = await CountingService.deleteScans(stocktakeId, syncIds, env);
+        return new Response(JSON.stringify({ success: true, ...result }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Load User Scans
+router.get('/counting/scans/:stocktakeId/:username', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId, username } = request.params;
+        const result = await CountingService.loadUserScans(stocktakeId, username, env);
+        return new Response(JSON.stringify({ success: true, ...result }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Sync Kegs
+router.post('/counting/kegs/sync', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId, kegs, location, user } = await request.json();
+        const result = await CountingService.syncKegs(stocktakeId, kegs, location, user, env);
+        return new Response(JSON.stringify({ success: true, ...result }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Sync Manual Entries
+router.post('/counting/manual/sync', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId, manualEntries } = await request.json();
+        const result = await CountingService.syncManualEntries(stocktakeId, manualEntries, env);
+        return new Response(JSON.stringify({ success: true, ...result }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
         return new Response(JSON.stringify({ error: error.message }), {

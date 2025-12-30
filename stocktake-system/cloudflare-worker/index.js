@@ -691,13 +691,36 @@ router.post('/counting/stocktake/create', async (request, env) => {
     
     try {
         const { name, user, folderId } = await request.json();
+        
+        if (!folderId) {
+            return new Response(JSON.stringify({ 
+                success: false, 
+                error: 'Folder ID is required. Please configure a folder ID in Settings.' 
+            }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
         const result = await CountingService.createStocktake(name, user, folderId, env);
         return new Response(JSON.stringify({ success: true, ...result }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
+        let errorMessage = error.message || 'Failed to create stocktake';
+        let statusCode = 500;
+        
+        // Check if it's a permission error
+        if (error.message && (error.message.includes('PERMISSION_DENIED') || error.message.includes('Permission denied'))) {
+            errorMessage = 'Permission denied: The service account does not have write access to the folder. Please share the folder with the service account email and grant "Editor" permission.';
+            statusCode = 403;
+        }
+        
+        return new Response(JSON.stringify({ 
+            success: false,
+            error: errorMessage 
+        }), {
+            status: statusCode,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }

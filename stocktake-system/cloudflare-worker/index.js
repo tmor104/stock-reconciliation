@@ -179,7 +179,11 @@ router.get('/stocktake/current', async (request, env) => {
         const currentStocktake = await env.STOCKTAKE_KV.get('current_stocktake', { type: 'json' });
         
         if (!currentStocktake) {
-            return new Response(null, { status: 404, headers: corsHeaders });
+            // 404 is expected when there's no active stocktake - return proper JSON
+            return new Response(JSON.stringify({ error: 'No active stocktake' }), { 
+                status: 404, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
         }
         
         return new Response(JSON.stringify(currentStocktake), {
@@ -225,7 +229,11 @@ router.get('/sheets/count-sheets', async (request, env) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
+        console.error('Error listing count sheets:', error);
+        return new Response(JSON.stringify({ 
+            error: error.message || 'Failed to list count sheets',
+            details: error.stack 
+        }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

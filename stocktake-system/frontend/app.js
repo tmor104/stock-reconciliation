@@ -139,6 +139,7 @@ const api = {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
+        // 404 is expected when there's no active stocktake - return null
         if (response.status === 404) {
             return null;
         }
@@ -148,7 +149,12 @@ const api = {
             throw new Error(error.error || `HTTP ${response.status}`);
         }
         
-        return await response.json();
+        const data = await response.json();
+        // If response has error field, it's still a 404 case
+        if (data.error && data.error.includes('No active stocktake')) {
+            return null;
+        }
+        return data;
     },
 
     async getStocktakeHistory(token) {
@@ -316,7 +322,12 @@ function extractStocktakeName(countSheetName) {
 
 // Load Home Page
 async function loadHomePage() {
-    await loadCurrentStocktake();
+    try {
+        await loadCurrentStocktake();
+    } catch (error) {
+        // Ignore errors loading current stocktake - it's fine if there isn't one
+        console.log('No current stocktake:', error.message);
+    }
     await loadCountSheetsForHome();
 }
 

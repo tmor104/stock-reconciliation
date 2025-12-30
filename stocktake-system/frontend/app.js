@@ -135,26 +135,34 @@ const api = {
     },
 
     async getCurrentStocktake(token) {
-        const response = await fetch(`${CONFIG.WORKER_URL}/stocktake/current`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        // 404 is expected when there's no active stocktake - return null
-        if (response.status === 404) {
-            return null;
+        try {
+            const response = await fetch(`${CONFIG.WORKER_URL}/stocktake/current`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            // 404 is expected when there's no active stocktake - return null silently
+            if (response.status === 404) {
+                return null;
+            }
+            
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Failed to load stocktake' }));
+                throw new Error(error.error || `HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            // If response has error field, it's still a 404 case
+            if (data && data.error && data.error.includes('No active stocktake')) {
+                return null;
+            }
+            return data;
+        } catch (error) {
+            // Silently handle 404s - they're expected when no stocktake exists
+            if (error.message.includes('404') || error.message.includes('Not Found')) {
+                return null;
+            }
+            throw error;
         }
-        
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Failed to load stocktake' }));
-            throw new Error(error.error || `HTTP ${response.status}`);
-        }
-        
-        const data = await response.json();
-        // If response has error field, it's still a 404 case
-        if (data.error && data.error.includes('No active stocktake')) {
-            return null;
-        }
-        return data;
     },
 
     async getStocktakeHistory(token) {
@@ -170,12 +178,18 @@ const api = {
         });
         
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Failed to load count sheets' }));
-            throw new Error(error.error || `HTTP ${response.status}`);
+            const errorData = await response.json().catch(() => ({ error: 'Failed to load count sheets' }));
+            const errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`;
+            throw new Error(errorMessage);
         }
         
         const data = await response.json();
-        return Array.isArray(data) ? data : [];
+        // Always return an array - if it's not an array, return empty array
+        if (!Array.isArray(data)) {
+            console.warn('Expected array from count-sheets API, got:', data);
+            return [];
+        }
+        return data;
     },
 
     async uploadHnLFile(token, file, countSheetId, stocktakeName, onProgress) {
@@ -322,23 +336,33 @@ function extractStocktakeName(countSheetName) {
 
 // Load Home Page
 async function loadHomePage() {
+    // Load current stocktake (silently handle 404 - it's expected when no stocktake exists)
     try {
         await loadCurrentStocktake();
     } catch (error) {
-        // Ignore errors loading current stocktake - it's fine if there isn't one
-        console.log('No current stocktake:', error.message);
+        // Only log if it's not a 404
+        if (!error.message.includes('404') && !error.message.includes('No active stocktake')) {
+            console.error('Error loading current stocktake:', error);
+        }
+        // Set to null if there's an error
+        state.currentStocktake = null;
     }
+    
+    // Load count sheets
     await loadCountSheetsForHome();
 }
 
 // Load count sheets for home page
 async function loadCountSheetsForHome() {
+    const container = document.getElementById('count-sheets-list');
+    
     try {
         const sheets = await api.getAvailableCountSheets(state.currentUser.token);
-        const container = document.getElementById('count-sheets-list');
         
+        // Double-check it's an array (should be handled by API function, but be safe)
         if (!Array.isArray(sheets)) {
-            container.innerHTML = '<p class="error-text">Invalid response from server. Please try again.</p>';
+            console.error('Invalid response from count-sheets API:', sheets);
+            container.innerHTML = '<p class="error-text">Invalid response from server. Please check the console for details.</p>';
             return;
         }
         
@@ -373,8 +397,8 @@ async function loadCountSheetsForHome() {
         });
     } catch (error) {
         console.error('Failed to load count sheets:', error);
-        document.getElementById('count-sheets-list').innerHTML = 
-            '<p class="error-text">Failed to load count sheets. Please try again.</p>';
+        const errorMsg = error.message || 'Unknown error';
+        container.innerHTML = `<p class="error-text">Failed to load count sheets: ${errorMsg}<br><small>Check that Google Drive API is enabled and service account has permissions.</small></p>`;
     }
 }
 

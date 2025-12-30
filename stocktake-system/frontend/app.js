@@ -336,9 +336,9 @@ function extractStocktakeName(countSheetName) {
 
 // Load Home Page
 async function loadHomePage() {
-    // Load current stocktake (silently handle 404 - it's expected when no stocktake exists)
+    // Load current stocktake info (silently handle 404 - it's expected when no stocktake exists)
     try {
-        await loadCurrentStocktake();
+        await loadCurrentStocktakeInfo();
     } catch (error) {
         // Only log if it's not a 404
         if (!error.message.includes('404') && !error.message.includes('No active stocktake')) {
@@ -485,24 +485,32 @@ async function loadCurrentStocktakeInfo() {
         const stocktake = await api.getCurrentStocktake(state.currentUser.token);
         state.currentStocktake = stocktake;
         
-        if (stocktake) {
-            document.getElementById('current-stocktake-name').textContent = stocktake.name;
-            document.getElementById('current-stocktake-date').textContent = 
-                new Date(stocktake.createdAt).toLocaleString();
-            document.getElementById('current-stocktake-status').textContent = 
-                stocktake.status.toUpperCase();
-        } else {
-            document.getElementById('current-stocktake-name').textContent = 'None';
-            document.getElementById('current-stocktake-date').textContent = '-';
-            document.getElementById('current-stocktake-status').textContent = '-';
+        // Update UI elements (they exist on both home-screen and admin-screen)
+        const nameEl = document.getElementById('current-stocktake-name');
+        const dateEl = document.getElementById('current-stocktake-date');
+        const statusEl = document.getElementById('current-stocktake-status');
+        
+        if (stocktake && nameEl && dateEl && statusEl) {
+            nameEl.textContent = stocktake.name;
+            dateEl.textContent = new Date(stocktake.createdAt).toLocaleString();
+            statusEl.textContent = stocktake.status.toUpperCase();
+        } else if (nameEl && dateEl && statusEl) {
+            nameEl.textContent = 'None';
+            dateEl.textContent = '-';
+            statusEl.textContent = '-';
         }
     } catch (error) {
         // 404 is expected when there's no active stocktake - not an error
         if (error.message.includes('404') || error.message.includes('No active stocktake')) {
             state.currentStocktake = null;
-            document.getElementById('current-stocktake-name').textContent = 'None';
-            document.getElementById('current-stocktake-date').textContent = '-';
-            document.getElementById('current-stocktake-status').textContent = '-';
+            const nameEl = document.getElementById('current-stocktake-name');
+            const dateEl = document.getElementById('current-stocktake-date');
+            const statusEl = document.getElementById('current-stocktake-status');
+            if (nameEl && dateEl && statusEl) {
+                nameEl.textContent = 'None';
+                dateEl.textContent = '-';
+                statusEl.textContent = '-';
+            }
         } else {
             console.error('Failed to load current stocktake:', error);
         }

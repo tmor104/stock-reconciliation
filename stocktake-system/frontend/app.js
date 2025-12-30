@@ -473,7 +473,15 @@ async function loadCurrentStocktakeInfo() {
             document.getElementById('current-stocktake-status').textContent = '-';
         }
     } catch (error) {
-        console.error('Failed to load current stocktake:', error);
+        // 404 is expected when there's no active stocktake - not an error
+        if (error.message.includes('404') || error.message.includes('No active stocktake')) {
+            state.currentStocktake = null;
+            document.getElementById('current-stocktake-name').textContent = 'None';
+            document.getElementById('current-stocktake-date').textContent = '-';
+            document.getElementById('current-stocktake-status').textContent = '-';
+        } else {
+            console.error('Failed to load current stocktake:', error);
+        }
     }
 }
 

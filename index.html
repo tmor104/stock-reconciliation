@@ -33,6 +33,28 @@
         </div>
         
         <div class="home-content">
+            <!-- Settings Card -->
+            <div class="section-card settings-card">
+                <h2>⚙️ Settings</h2>
+                <div class="settings-content">
+                    <div class="form-group">
+                        <label for="folder-id-input">Google Drive Folder ID or URL</label>
+                        <p class="info-text">Enter your Google Drive folder ID or paste the full folder URL. This is required to create stocktakes.</p>
+                        <input 
+                            type="text" 
+                            id="folder-id-input" 
+                            placeholder="e.g., 1a2b3c4d5e6f7g8h9i0j or https://drive.google.com/drive/folders/1a2b3c4d5e6f7g8h9i0j"
+                            class="folder-input"
+                        >
+                        <div id="folder-id-status" class="folder-status"></div>
+                    </div>
+                    <div class="card-actions">
+                        <button id="save-folder-id-btn" class="btn-primary">Save Folder ID</button>
+                        <button id="clear-folder-id-btn" class="btn-secondary">Clear</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="current-stocktake-card" class="info-card" style="display: none;">
                 <h2>Current Stocktake</h2>
                 <div id="current-stocktake-info"></div>

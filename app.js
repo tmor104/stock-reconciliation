@@ -194,7 +194,20 @@ function setupEventListeners() {
     
     // Home screen
     const createStocktakeBtn = document.getElementById('create-stocktake-btn');
-    if (createStocktakeBtn) createStocktakeBtn.addEventListener('click', () => showModal('create-stocktake-modal'));
+    if (createStocktakeBtn) createStocktakeBtn.addEventListener('click', () => {
+        if (!state.folderId) {
+            alert('Please configure a Google Drive folder ID in Settings before creating a stocktake.');
+            return;
+        }
+        showModal('create-stocktake-modal');
+    });
+    
+    // Folder ID settings
+    const saveFolderIdBtn = document.getElementById('save-folder-id-btn');
+    if (saveFolderIdBtn) saveFolderIdBtn.addEventListener('click', saveFolderId);
+    
+    const clearFolderIdBtn = document.getElementById('clear-folder-id-btn');
+    if (clearFolderIdBtn) clearFolderIdBtn.addEventListener('click', clearFolderId);
     
     const refreshStocktakesBtn = document.getElementById('refresh-stocktakes-btn');
     if (refreshStocktakesBtn) refreshStocktakesBtn.addEventListener('click', loadStocktakes);
@@ -436,9 +449,6 @@ async function handleLogin(e) {
             const savedFolderId = await dbService.getState('folderId');
             if (savedFolderId) {
                 state.folderId = savedFolderId;
-            } else {
-                // Prompt for folder ID on first login
-                await promptForFolderId();
             }
             
             // Load products and locations
@@ -489,11 +499,116 @@ async function handleLogout() {
 // FOLDER ID CONFIGURATION
 // ============================================
 
-async function promptForFolderId() {
-    const folderId = prompt('Enter your Google Drive Folder ID for stocktakes (or leave empty to use root):');
-    if (folderId !== null) {
-        state.folderId = folderId.trim() || null;
-        await dbService.saveState('folderId', state.folderId);
+/**
+ * Extract folder ID from a Google Drive URL or return the ID if already provided
+ * Supports formats:
+ * - https://drive.google.com/drive/folders/FOLDER_ID
+ * - https://drive.google.com/drive/folders/FOLDER_ID?usp=sharing
+ * - FOLDER_ID (direct ID)
+ */
+function extractFolderId(input) {
+    if (!input || !input.trim()) return null;
+    
+    const trimmed = input.trim();
+    
+    // Check if it's a URL
+    if (trimmed.includes('drive.google.com')) {
+        // Extract ID from URL pattern: /folders/FOLDER_ID
+        const match = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+            return match[1];
+        }
+    }
+    
+    // If it's not a URL, assume it's already an ID
+    // Google Drive folder IDs are typically 33 characters, alphanumeric with dashes/underscores
+    if (/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+        return trimmed;
+    }
+    
+    return null;
+}
+
+async function saveFolderId() {
+    const input = document.getElementById('folder-id-input');
+    const status = document.getElementById('folder-id-status');
+    
+    if (!input || !status) return;
+    
+    const inputValue = input.value.trim();
+    
+    if (!inputValue) {
+        status.innerHTML = '<span class="error-text">⚠️ Folder ID is required to create stocktakes</span>';
+        status.className = 'folder-status error';
+        return;
+    }
+    
+    const folderId = extractFolderId(inputValue);
+    
+    if (!folderId) {
+        status.innerHTML = '<span class="error-text">❌ Invalid folder ID or URL format</span>';
+        status.className = 'folder-status error';
+        return;
+    }
+    
+    state.folderId = folderId;
+    await dbService.saveState('folderId', folderId);
+    
+    status.innerHTML = '<span class="success-text">✅ Folder ID saved successfully</span>';
+    status.className = 'folder-status success';
+    
+    // Update create button state
+    updateCreateButtonState();
+    
+    // Reload stocktakes with new folder ID
+    await loadStocktakes();
+}
+
+async function clearFolderId() {
+    const input = document.getElementById('folder-id-input');
+    const status = document.getElementById('folder-id-status');
+    
+    if (input) input.value = '';
+    if (status) {
+        status.innerHTML = '';
+        status.className = 'folder-status';
+    }
+    
+    state.folderId = null;
+    await dbService.saveState('folderId', null);
+    
+    updateCreateButtonState();
+}
+
+function updateFolderIdDisplay() {
+    const input = document.getElementById('folder-id-input');
+    const status = document.getElementById('folder-id-status');
+    
+    if (!input || !status) return;
+    
+    if (state.folderId) {
+        input.value = state.folderId;
+        status.innerHTML = '<span class="success-text">✅ Folder ID configured</span>';
+        status.className = 'folder-status success';
+    } else {
+        input.value = '';
+        status.innerHTML = '<span class="error-text">⚠️ Folder ID required to create stocktakes</span>';
+        status.className = 'folder-status error';
+    }
+    
+    updateCreateButtonState();
+}
+
+function updateCreateButtonState() {
+    const createBtn = document.getElementById('create-stocktake-btn');
+    if (createBtn) {
+        if (!state.folderId) {
+            createBtn.disabled = true;
+            createBtn.title = 'Please configure a folder ID in Settings first';
+        } else {
+            createBtn.disabled = false;
+            createBtn.title = '';
+        }
     }
 }
 
@@ -507,6 +622,9 @@ async function loadHomeScreen() {
     if (userInfo && state.user) {
         userInfo.textContent = `Hello, ${state.user.username}`;
     }
+    
+    // Update folder ID display
+    updateFolderIdDisplay();
     
     // Load stocktakes
     await loadStocktakes();
@@ -575,6 +693,13 @@ function updateCurrentStocktakeCard() {
 
 async function handleCreateStocktake(e) {
     e.preventDefault();
+    
+    // Validate folder ID is set
+    if (!state.folderId) {
+        alert('Please configure a Google Drive folder ID in Settings before creating a stocktake.');
+        hideModal('create-stocktake-modal');
+        return;
+    }
     
     const nameInput = document.getElementById('stocktake-name-input');
     if (!nameInput) return;

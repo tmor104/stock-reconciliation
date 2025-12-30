@@ -714,7 +714,30 @@ async function loadStocktakes() {
             }
         }
     } catch (error) {
-        stocktakesList.innerHTML = `<p class="loading-text" style="color: var(--red-600);">Error loading stocktakes: ${error.message}</p>`;
+        let errorMessage = error.message || 'Failed to load stocktakes';
+        
+        // Show helpful message if it's a permission error
+        if (errorMessage.includes('Permission denied') || errorMessage.includes('service account')) {
+            stocktakesList.innerHTML = `
+                <div class="error-card" style="padding: 20px; background: #fef2f2; border: 2px solid #fca5a5; border-radius: 12px; margin: 16px 0;">
+                    <h3 style="color: #dc2626; margin-bottom: 12px;">⚠️ Permission Error</h3>
+                    <p style="color: #991b1b; margin-bottom: 16px;">${errorMessage}</p>
+                    <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 12px;">
+                        <p style="font-weight: 600; margin-bottom: 8px;">To fix this:</p>
+                        <ol style="margin-left: 20px; color: #7f1d1d;">
+                            <li>Open your Google Drive folder</li>
+                            <li>Right-click the folder → <strong>Share</strong></li>
+                            <li>Add: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com</code></li>
+                            <li>Set permission to <strong>Editor</strong> (for creating stocktakes)</li>
+                            <li>Uncheck "Notify people"</li>
+                            <li>Click <strong>Share</strong></li>
+                        </ol>
+                    </div>
+                </div>
+            `;
+        } else {
+            stocktakesList.innerHTML = `<p class="loading-text" style="color: var(--red-600);">Error loading stocktakes: ${errorMessage}</p>`;
+        }
         console.error('Error loading stocktakes:', error);
     }
 }

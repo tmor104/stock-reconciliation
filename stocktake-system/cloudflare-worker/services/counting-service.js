@@ -316,8 +316,10 @@ export class CountingService {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.error?.message || errorJson.error || errorMessage;
                 // Add more context for permission errors
-                if (errorJson.error?.code === 403) {
-                    errorMessage = `Permission denied: The service account does not have access to the folder. Please share the folder with the service account email.`;
+                if (errorJson.error?.code === 403 || errorJson.error?.code === 404) {
+                    errorMessage = `Permission denied: The service account does not have access to folder ${folderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Viewer" permission (or "Editor" if you want to create stocktakes).`;
+                } else if (errorJson.error?.code === 500 || errorText.includes('PERMISSION_DENIED')) {
+                    errorMessage = `Permission denied: The service account cannot access folder ${folderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com`;
                 }
             } catch (e) {
                 errorMessage = errorText || errorMessage;

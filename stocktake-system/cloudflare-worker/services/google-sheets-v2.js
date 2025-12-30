@@ -133,7 +133,15 @@ export class GoogleSheetsAPI {
         );
         
         if (!response.ok) {
-            throw new Error('Failed to list count sheets');
+            const errorText = await response.text();
+            let errorMessage = 'Failed to list count sheets';
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.error?.message || errorJson.error || errorMessage;
+            } catch (e) {
+                errorMessage = errorText || errorMessage;
+            }
+            throw new Error(errorMessage);
         }
         
         const data = await response.json();

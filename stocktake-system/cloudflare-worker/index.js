@@ -23,14 +23,20 @@ router.options('*', () => new Response(null, { headers: corsHeaders }));
 const requireAuth = async (request, env) => {
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return new Response('Unauthorized', { status: 401, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+            status: 401, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
     }
     
     const token = authHeader.substring(7);
     const user = await AuthService.validateToken(token, env);
     
     if (!user) {
-        return new Response('Unauthorized', { status: 401, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+            status: 401, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
     }
     
     request.user = user;
@@ -42,7 +48,10 @@ const requireAdmin = async (request, env) => {
     if (authError) return authError;
     
     if (request.user.role !== 'admin') {
-        return new Response('Forbidden', { status: 403, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: 'Forbidden' }), { 
+            status: 403, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
     }
     
     return null;
@@ -57,7 +66,10 @@ router.post('/auth/login', async (request, env) => {
         const result = await AuthService.login(username, password, env);
         
         if (!result) {
-            return new Response('Invalid credentials', { status: 401, headers: corsHeaders });
+            return new Response(JSON.stringify({ error: 'Invalid credentials' }), { 
+                status: 401, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
         }
         
         return new Response(JSON.stringify(result), {

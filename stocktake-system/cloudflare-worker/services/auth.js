@@ -10,7 +10,7 @@ export class AuthService {
         }
         
         // Generate simple token (in production, use JWT)
-        const token = await this.generateToken(user);
+        const token = await this.generateToken(user, env);
         
         return {
             username: user.username,
@@ -19,18 +19,25 @@ export class AuthService {
         };
     }
     
-    static async generateToken(user) {
-        const payload = JSON.stringify({
+    static async generateToken(user, env) {
+        const payload = {
             username: user.username,
             role: user.role,
             exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
-        });
+        };
         
         const encoder = new TextEncoder();
-        const data = encoder.encode(payload);
+        const data = encoder.encode(JSON.stringify(payload));
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        const token = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        // Store token in KV for validation
+        await env.STOCKTAKE_KV.put(`token:${token}`, JSON.stringify(payload), {
+            expirationTtl: 24 * 60 * 60 // 24 hours in seconds
+        });
+        
+        return token;
     }
     
     static async validateToken(token, env) {

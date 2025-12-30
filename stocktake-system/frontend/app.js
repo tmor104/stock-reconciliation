@@ -143,6 +143,11 @@ const api = {
             return null;
         }
         
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to load stocktake' }));
+            throw new Error(error.error || `HTTP ${response.status}`);
+        }
+        
         return await response.json();
     },
 
@@ -157,7 +162,14 @@ const api = {
         const response = await fetch(`${CONFIG.WORKER_URL}/sheets/count-sheets`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        return await response.json();
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to load count sheets' }));
+            throw new Error(error.error || `HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
     },
 
     async uploadHnLFile(token, file, countSheetId, stocktakeName, onProgress) {
@@ -313,6 +325,11 @@ async function loadCountSheetsForHome() {
     try {
         const sheets = await api.getAvailableCountSheets(state.currentUser.token);
         const container = document.getElementById('count-sheets-list');
+        
+        if (!Array.isArray(sheets)) {
+            container.innerHTML = '<p class="error-text">Invalid response from server. Please try again.</p>';
+            return;
+        }
         
         if (sheets.length === 0) {
             container.innerHTML = '<p class="no-sheets">No count sheets available. Create a stocktake in the Stock app first.</p>';

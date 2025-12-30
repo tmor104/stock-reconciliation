@@ -310,7 +310,19 @@ export class CountingService {
         );
         
         if (!response.ok) {
-            throw new Error('Failed to list stocktakes');
+            const errorText = await response.text();
+            let errorMessage = 'Failed to list stocktakes';
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.error?.message || errorJson.error || errorMessage;
+                // Add more context for permission errors
+                if (errorJson.error?.code === 403) {
+                    errorMessage = `Permission denied: The service account does not have access to the folder. Please share the folder with the service account email.`;
+                }
+            } catch (e) {
+                errorMessage = errorText || errorMessage;
+            }
+            throw new Error(errorMessage);
         }
         
         const data = await response.json();

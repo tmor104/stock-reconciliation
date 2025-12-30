@@ -204,10 +204,25 @@ function setupEventListeners() {
     
     // Folder ID settings
     const saveFolderIdBtn = document.getElementById('save-folder-id-btn');
-    if (saveFolderIdBtn) saveFolderIdBtn.addEventListener('click', saveFolderId);
+    if (saveFolderIdBtn) {
+        console.log('Setting up save folder ID button listener');
+        saveFolderIdBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            saveFolderId(e);
+        });
+    } else {
+        console.error('save-folder-id-btn not found!');
+    }
     
     const clearFolderIdBtn = document.getElementById('clear-folder-id-btn');
-    if (clearFolderIdBtn) clearFolderIdBtn.addEventListener('click', clearFolderId);
+    if (clearFolderIdBtn) {
+        clearFolderIdBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            clearFolderId();
+        });
+    }
     
     const refreshStocktakesBtn = document.getElementById('refresh-stocktakes-btn');
     if (refreshStocktakesBtn) refreshStocktakesBtn.addEventListener('click', loadStocktakes);
@@ -529,13 +544,30 @@ function extractFolderId(input) {
     return null;
 }
 
-async function saveFolderId() {
+async function saveFolderId(e) {
+    // Prevent form submission if button is in a form
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    console.log('saveFolderId called');
+    
     const input = document.getElementById('folder-id-input');
     const status = document.getElementById('folder-id-status');
     
-    if (!input || !status) return;
+    if (!input) {
+        console.error('folder-id-input not found');
+        return;
+    }
+    
+    if (!status) {
+        console.error('folder-id-status not found');
+        return;
+    }
     
     const inputValue = input.value.trim();
+    console.log('Input value:', inputValue);
     
     if (!inputValue) {
         status.innerHTML = '<span class="error-text">⚠️ Folder ID is required to create stocktakes</span>';
@@ -544,6 +576,7 @@ async function saveFolderId() {
     }
     
     const folderId = extractFolderId(inputValue);
+    console.log('Extracted folder ID:', folderId);
     
     if (!folderId) {
         status.innerHTML = '<span class="error-text">❌ Invalid folder ID or URL format</span>';
@@ -551,17 +584,29 @@ async function saveFolderId() {
         return;
     }
     
-    state.folderId = folderId;
-    await dbService.saveState('folderId', folderId);
-    
-    status.innerHTML = '<span class="success-text">✅ Folder ID saved successfully</span>';
-    status.className = 'folder-status success';
-    
-    // Update create button state
-    updateCreateButtonState();
-    
-    // Reload stocktakes with new folder ID
-    await loadStocktakes();
+    try {
+        state.folderId = folderId;
+        await dbService.saveState('folderId', folderId);
+        console.log('Folder ID saved to IndexedDB');
+        
+        status.innerHTML = '<span class="success-text">✅ Folder ID saved successfully</span>';
+        status.className = 'folder-status success';
+        
+        // Update create button state
+        updateCreateButtonState();
+        
+        // Reload stocktakes with new folder ID (but don't fail if this errors)
+        try {
+            await loadStocktakes();
+        } catch (error) {
+            console.warn('Error reloading stocktakes (this is okay):', error);
+            // Still show success for saving the folder ID
+        }
+    } catch (error) {
+        console.error('Error saving folder ID:', error);
+        status.innerHTML = '<span class="error-text">❌ Error saving folder ID: ' + error.message + '</span>';
+        status.className = 'folder-status error';
+    }
 }
 
 async function clearFolderId() {

@@ -89,13 +89,7 @@ function formatDate(dateString) {
     return new Date(dateString).toLocaleString();
 }
 
-// SHA-256 hashing for passwords
-async function sha256(message) {
-    const msgBuffer = new TextEncoder().encode(message);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+// Note: sha256 is defined in api-service.js, no need to redeclare here
 
 // ============================================
 // INITIALIZATION

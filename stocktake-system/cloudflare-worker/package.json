@@ -1,5 +1,5 @@
 {
-  "name": "stocktake-worker",
+  "name": "stocktake-reconciliation",
   "version": "1.0.0",
   "description": "Cloudflare Worker for stocktake reconciliation system",
   "main": "index.js",

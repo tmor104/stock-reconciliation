@@ -90,4 +90,22 @@ export class AuthService {
         
         await env.STOCKTAKE_KV.put('users', JSON.stringify(filteredUsers));
     }
+    
+    static async updatePassword(username, newPassword, env) {
+        const usersJson = await env.STOCKTAKE_KV.get('users', { type: 'json' });
+        const users = usersJson || [];
+        
+        const userIndex = users.findIndex(u => u.username === username);
+        
+        if (userIndex === -1) {
+            throw new Error('User not found');
+        }
+        
+        // Update password (should already be hashed from frontend)
+        users[userIndex].password = newPassword;
+        
+        await env.STOCKTAKE_KV.put('users', JSON.stringify(users));
+        
+        return { success: true };
+    }
 }

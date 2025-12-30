@@ -45,41 +45,88 @@ export class GoogleSheetsAPI {
     
     static async getBarcodeMapping(env) {
         const accessToken = await this.getAccessToken(env);
-        const sheetId = env.BARCODE_SHEET_ID;
         
-        const response = await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A:B`,
-            {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
+        // Option 1: Use dedicated Barcode Mapping sheet if provided
+        if (env.BARCODE_SHEET_ID && env.BARCODE_SHEET_ID !== 'YOUR_GOOGLE_SHEETS_BARCODE_MAPPING_ID') {
+            const response = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${env.BARCODE_SHEET_ID}/values/A:B`,
+                {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                }
+            );
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch barcode mapping');
             }
-        );
-        
-        if (!response.ok) {
-            throw new Error('Failed to fetch barcode mapping');
+            
+            const data = await response.json();
+            const rows = data.values || [];
+            
+            // Skip header row, create mapping
+            const mapping = new Map();
+            for (let i = 1; i < rows.length; i++) {
+                const [barcode, product] = rows[i];
+                if (barcode && product) {
+                    // Map product description to barcode
+                    mapping.set(product.trim(), barcode.trim());
+                }
+            }
+            
+            return mapping;
         }
         
-        const data = await response.json();
-        const rows = data.values || [];
-        
-        // Skip header row, create mapping
-        const mapping = new Map();
-        for (let i = 1; i < rows.length; i++) {
-            const [barcode, product] = rows[i];
-            if (barcode && product) {
-                // Map product description to barcode
-                mapping.set(product.trim(), barcode.trim());
+        // Option 2: Auto-read from Master Sheet's Product Database
+        if (env.MASTER_SHEET_ID && env.MASTER_SHEET_ID !== 'YOUR_MASTER_SHEET_ID') {
+            const response = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${env.MASTER_SHEET_ID}/values/'Product Database'!A:B`,
+                {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                }
+            );
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch barcode mapping from Master Sheet. Make sure Master Sheet has a "Product Database" sheet with Barcode (A) and Product (B) columns.');
             }
+            
+            const data = await response.json();
+            const rows = data.values || [];
+            
+            // Skip header row, create mapping
+            const mapping = new Map();
+            for (let i = 1; i < rows.length; i++) {
+                const [barcode, product] = rows[i];
+                if (barcode && product) {
+                    // Map product description to barcode
+                    mapping.set(product.trim(), barcode.trim());
+                }
+            }
+            
+            return mapping;
         }
         
-        return mapping;
+        // No mapping available
+        throw new Error('Barcode mapping not configured. Set either BARCODE_SHEET_ID or MASTER_SHEET_ID in wrangler.toml');
     }
     
     static async listSheetsInFolder(env) {
         const accessToken = await this.getAccessToken(env);
+        
+        // Stock app creates individual spreadsheets (not in a folder)
+        // Search for all spreadsheets with "Stocktake -" in the name
+        // If COUNT_SHEETS_FOLDER_ID is set, search within that folder; otherwise search all Drive
         const folderId = env.COUNT_SHEETS_FOLDER_ID;
+        let query;
+        
+        if (folderId && folderId !== 'YOUR_GOOGLE_DRIVE_FOLDER_ID') {
+            // Search within specific folder
+            query = `'${folderId}'+in+parents+and+title+contains+'Stocktake -'+and+mimeType='application/vnd.google-apps.spreadsheet'`;
+        } else {
+            // Search all Drive for stocktake spreadsheets (Stock app creates them individually)
+            query = `title+contains+'Stocktake -'+and+mimeType='application/vnd.google-apps.spreadsheet'`;
+        }
         
         const response = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType='application/vnd.google-apps.spreadsheet'&fields=files(id,name)`,
+            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc`,
             {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             }
@@ -235,8 +282,10 @@ export class GoogleSheetsAPI {
     static async getCountData(countSheetId, env) {
         const accessToken = await this.getAccessToken(env);
         
+        // Stock app writes to "Raw Scans" sheet with 10 columns (A-J)
+        // Format: Barcode, Product, Quantity, Location, User, Timestamp, Stock Level, $ Value, Synced, Sync ID
         const response = await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${countSheetId}/values/A:K`,
+            `https://sheets.googleapis.com/v4/spreadsheets/${countSheetId}/values/'Raw Scans'!A:J`,
             {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             }
@@ -249,6 +298,8 @@ export class GoogleSheetsAPI {
         const data = await response.json();
         const rows = data.values || [];
         
+        // Skip header row
+        // Stock app format: A=Barcode, B=Product, C=Quantity, D=Location, E=User, F=Timestamp, G=Stock Level, H=$ Value, I=Synced, J=Sync ID
         return rows.slice(1).map(row => ({
             barcode: row[0] || '',
             product: row[1] || '',
@@ -259,8 +310,7 @@ export class GoogleSheetsAPI {
             stockLevel: row[6] || '',
             value: parseFloat(row[7]) || 0,
             synced: row[8] || '',
-            status: row[9] || '',
-            syncId: row[10] || ''
+            syncId: row[9] || ''  // Fixed: Stock app writes syncId in column J (index 9), not K
         }));
     }
     

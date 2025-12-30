@@ -1,6 +1,7 @@
 import { Router } from 'itty-router';
 import { parseHnLExcel } from './parsers/hnl-parser';
-import { GoogleSheetsAPI } from './services/google-sheets';
+// Use v2 which has proper JWT signing with jose library
+import { GoogleSheetsAPI } from './services/google-sheets-v2';
 import { AuthService } from './services/auth';
 import { VarianceCalculator } from './services/variance-calculator';
 import { ExportService } from './services/export';
@@ -116,6 +117,35 @@ router.delete('/admin/users/:username', async (request, env) => {
     try {
         const { username } = request.params;
         await AuthService.deleteUser(username, env);
+        
+        return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Admin - Update User Password
+router.put('/admin/users/:username/password', async (request, env) => {
+    const authError = await requireAdmin(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { username } = request.params;
+        const { password } = await request.json();
+        
+        if (!password) {
+            return new Response(JSON.stringify({ error: 'Password is required' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
+        await AuthService.updatePassword(username, password, env);
         
         return new Response(JSON.stringify({ success: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }

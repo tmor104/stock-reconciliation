@@ -1,22 +1,23 @@
-name = "stocktake-worker"
+name = "stocktake-reconciliation"
 main = "index.js"
 compatibility_date = "2024-01-01"
 node_compat = true
 
 [vars]
-# Replace these with your actual values
-BARCODE_SHEET_ID = "YOUR_GOOGLE_SHEETS_BARCODE_MAPPING_ID"
-COUNT_SHEETS_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"
+# Barcode Mapping: Use ONE of these options:
+# Option 1: Dedicated Barcode Mapping sheet (set BARCODE_SHEET_ID)
+# Option 2: Auto-use Master Sheet's Product Database (set MASTER_SHEET_ID)
+BARCODE_SHEET_ID = "YOUR_GOOGLE_SHEETS_BARCODE_MAPPING_ID"  # Leave as-is to use Option 2
+MASTER_SHEET_ID = "1e3rsYW4RoEpxpH8ZMckLP7VdtnpbbfQpd8N_NB9fRgM"  # Master Sheet - auto-uses Product Database
+COUNT_SHEETS_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # Optional - can leave empty
 
 [[kv_namespaces]]
 binding = "STOCKTAKE_KV"
-# Run: wrangler kv:namespace create "STOCKTAKE_KV"
-# Then paste the ID here:
-id = "YOUR_KV_NAMESPACE_ID"
+id = "271be3756fad4c9aa8e7e4ff31f55ff9"
 
 # Secrets (set via CLI):
 # wrangler secret put GOOGLE_SERVICE_ACCOUNT_KEY
 # wrangler secret put INITIAL_ADMIN_PASSWORD
 
 [env.production]
-name = "stocktake-worker"
+name = "stocktake-reconciliation"

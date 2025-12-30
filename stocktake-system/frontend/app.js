@@ -1,7 +1,7 @@
 // Configuration
 const CONFIG = {
-    WORKER_URL: 'YOUR_CLOUDFLARE_WORKER_URL', // Replace with your Cloudflare Worker URL
-    BARCODE_SHEET_ID: 'YOUR_BARCODE_SHEET_ID', // Replace with your barcode mapping sheet ID
+    WORKER_URL: 'https://stocktake-reconciliation.tomwmorgan47.workers.dev', // Cloudflare Worker URL
+    BARCODE_SHEET_ID: 'YOUR_BARCODE_SHEET_ID', // Not needed - uses Master Sheet automatically
 };
 
 // State Management
@@ -111,6 +111,24 @@ const api = {
         
         if (!response.ok) {
             throw new Error('Failed to delete user');
+        }
+        
+        return await response.json();
+    },
+
+    async updateUserPassword(token, username, newPassword) {
+        const hashedPassword = await sha256(newPassword);
+        const response = await fetch(`${CONFIG.WORKER_URL}/admin/users/${username}/password`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ password: hashedPassword })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to update password');
         }
         
         return await response.json();
@@ -325,9 +343,12 @@ async function loadUsers() {
                     <strong>${user.username}</strong>
                     <span class="user-badge ${user.role}">${user.role}</span>
                 </div>
-                ${user.username !== state.currentUser.username ? 
-                    `<button class="btn-danger" onclick="deleteUser('${user.username}')">Delete</button>` : 
-                    ''}
+                <div class="user-actions">
+                    <button class="btn-secondary" onclick="changePassword('${user.username}')">Change Password</button>
+                    ${user.username !== state.currentUser.username ? 
+                        `<button class="btn-danger" onclick="deleteUser('${user.username}')">Delete</button>` : 
+                        ''}
+                </div>
             </div>
         `).join('');
     } catch (error) {
@@ -387,6 +408,25 @@ async function deleteUser(username) {
         alert('User deleted successfully');
     } catch (error) {
         alert('Failed to delete user: ' + error.message);
+    }
+}
+
+async function changePassword(username) {
+    const newPassword = prompt(`Enter new password for "${username}":`);
+    if (!newPassword) {
+        return;
+    }
+    
+    if (newPassword.length < 4) {
+        alert('Password must be at least 4 characters long');
+        return;
+    }
+    
+    try {
+        await api.updateUserPassword(state.currentUser.token, username, newPassword);
+        alert('Password updated successfully');
+    } catch (error) {
+        alert('Failed to update password: ' + error.message);
     }
 }
 

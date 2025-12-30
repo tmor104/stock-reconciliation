@@ -79,7 +79,7 @@ wrangler login
 Create `wrangler.toml` in the cloudflare-worker directory:
 
 ```toml
-name = "stocktake-worker"
+name = "stocktake-reconciliation"
 main = "index.js"
 compatibility_date = "2024-01-01"
 
@@ -92,7 +92,7 @@ binding = "STOCKTAKE_KV"
 id = "YOUR_KV_NAMESPACE_ID"
 
 [env.production]
-name = "stocktake-worker"
+name = "stocktake-reconciliation"
 ```
 
 ### 2.3 Create KV Namespace
@@ -141,7 +141,7 @@ npm install itty-router xlsx
 wrangler deploy
 ```
 
-After deployment, note your Worker URL (e.g., `https://stocktake-worker.YOUR_ACCOUNT.workers.dev`)
+After deployment, note your Worker URL (e.g., `https://stocktake-reconciliation.YOUR_ACCOUNT.workers.dev`)
 
 ## Step 3: GitHub Pages Setup
 
@@ -157,7 +157,7 @@ Edit `frontend/app.js` and update:
 
 ```javascript
 const CONFIG = {
-    WORKER_URL: 'https://stocktake-worker.YOUR_ACCOUNT.workers.dev',
+    WORKER_URL: 'https://stocktake-reconciliation.YOUR_ACCOUNT.workers.dev',
     BARCODE_SHEET_ID: 'YOUR_BARCODE_SHEET_ID'
 };
 ```

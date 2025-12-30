@@ -199,6 +199,16 @@ Google Sheet with two columns:
 - Cloudflare KV (100k reads/day free)
 - Google Cloud (free tier)
 
+## Integration with Other Systems
+
+This system integrates with:
+- **Barcode Scanning App:** Reads count data from Google Sheets
+- **HnL System:** Imports Excel exports and exports .dat files
+
+For details on integrating with other systems, see:
+- `../INTEGRATION_GUIDE.md` - How to manage multi-repo integrations
+- `../INTEGRATION_CONTRACT_TEMPLATE.md` - Template for defining integration contracts
+
 ## Support
 
 See `docs/SETUP_GUIDE.md` for detailed documentation.

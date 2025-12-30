@@ -799,11 +799,18 @@ async function handleCreateStocktake(e) {
             hideLoading();
             showModal('upload-variance-modal');
         } else {
-            throw new Error(result.message || 'Failed to create stocktake');
+            throw new Error(result.error || result.message || 'Failed to create stocktake');
         }
     } catch (error) {
         hideLoading();
-        alert('Failed to create stocktake: ' + error.message);
+        let errorMessage = error.message || 'Failed to create stocktake';
+        
+        // Show helpful message if it's a permission error
+        if (errorMessage.includes('Permission denied') || errorMessage.includes('service account')) {
+            alert(`Permission Error:\n\n${errorMessage}\n\nTo fix this:\n1. Open your Google Drive folder\n2. Right-click → Share\n3. Add: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com\n4. Set permission to Editor\n5. Uncheck "Notify people"\n6. Click Share`);
+        } else {
+            alert('Failed to create stocktake: ' + errorMessage);
+        }
         console.error('Create stocktake error:', error);
     }
     

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Wizard - Unified Stock System</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+        <div class="login-container">
+            <h1>📦 Stock Wizard</h1>
+            <p class="login-subtitle">Unified Stock System</p>
+            <form id="login-form">
+                <input type="text" id="username" placeholder="Username" required autocomplete="username">
+                <input type="password" id="password" placeholder="Password" required autocomplete="current-password">
+                <button type="submit" id="login-btn">Sign In</button>
+                <div id="login-error" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Home Screen (Select/Create Stocktake) -->
+    <div id="home-screen" class="screen">
+        <div class="header">
+            <div>
+                <h1>📦 Stock Wizard</h1>
+                <p id="user-info" class="user-info"></p>
+            </div>
+            <button id="logout-btn" class="btn-secondary">Logout</button>
+        </div>
+        
+        <div class="home-content">
+            <div id="current-stocktake-card" class="info-card" style="display: none;">
+                <h2>Current Stocktake</h2>
+                <div id="current-stocktake-info"></div>
+                <div class="card-actions">
+                    <button id="continue-stocktake-btn" class="btn-primary">Continue Stocktake</button>
+                    <button id="view-reconciliation-btn" class="btn-primary">View Reconciliation</button>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <h2>Available Stocktakes</h2>
+                <p class="info-text">Select a stocktake to continue, or create a new one.</p>
+                <div id="stocktakes-list" class="stocktakes-grid">
+                    <p class="loading-text">Loading stocktakes...</p>
+                </div>
+                <div class="card-actions">
+                    <button id="refresh-stocktakes-btn" class="btn-secondary">Refresh List</button>
+                    <button id="create-stocktake-btn" class="btn-primary">Create New Stocktake</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Stocktake Modal -->
+    <div id="create-stocktake-modal" class="modal">
+        <div class="modal-content">
+            <h2>Create New Stocktake</h2>
+            <form id="create-stocktake-form">
+                <div class="form-group">
+                    <label for="stocktake-name-input">Stocktake Name</label>
+                    <input type="text" id="stocktake-name-input" placeholder="e.g., End of Month - December" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancel-create-btn" class="btn-secondary">Cancel</button>
+                    <button type="submit" id="create-stocktake-submit-btn" class="btn-primary">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Upload Variance Report Modal -->
+    <div id="upload-variance-modal" class="modal">
+        <div class="modal-content">
+            <h2>Upload Variance Report (Optional)</h2>
+            <p class="info-text">You can upload the HnL Excel export now, or skip and upload later.</p>
+            <form id="upload-variance-form">
+                <div class="form-group">
+                    <label for="variance-file-input">HnL Excel File</label>
+                    <input type="file" id="variance-file-input" accept=".xlsx,.xls" />
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="skip-upload-btn" class="btn-secondary">Skip for Now</button>
+                    <button type="submit" id="upload-variance-submit-btn" class="btn-primary">Upload</button>
+                </div>
+            </form>
+            <div id="upload-progress" class="progress-overlay" style="display: none;">
+                <div class="progress-content">
+                    <div class="spinner"></div>
+                    <p>Uploading variance report...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Counting Screen -->
+    <div id="counting-screen" class="screen">
+        <div class="header">
+            <div>
+                <h1>📦 Stock Wizard</h1>
+                <p id="counting-stocktake-info" class="user-info"></p>
+            </div>
+            <div class="header-actions">
+                <button id="counting-sync-btn" class="btn-secondary" disabled>
+                    <span class="sync-icon">🔄</span>
+                    <span id="sync-status-text">Sync</span>
+                    <span id="unsynced-count-badge" class="badge" style="display: none;">0</span>
+                </button>
+                <button id="counting-settings-btn" class="btn-secondary">⚙️ Settings</button>
+                <button id="counting-logout-btn" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+
+        <div class="counting-content">
+            <!-- Scan Type Selector -->
+            <div class="scan-type-selector">
+                <button class="scan-type-btn active" data-type="regular">📦 Regular Scans</button>
+                <button class="scan-type-btn" data-type="kegs">🍺 Keg Counting</button>
+            </div>
+
+            <!-- Location Selector -->
+            <div class="location-selector">
+                <label>Current Location</label>
+                <select id="location-select"></select>
+            </div>
+
+            <!-- Offline Indicator -->
+            <div id="offline-indicator" class="offline-indicator" style="display: none;">
+                <span>⚠️ Offline Mode - Data saved locally</span>
+            </div>
+
+            <!-- Barcode Scanner Input -->
+            <div id="barcode-input-section" class="input-section">
+                <label>Scan Barcode</label>
+                <input type="text" id="barcode-input" placeholder="Scan or enter barcode..." autocomplete="off">
+                <div class="input-actions">
+                    <button id="search-product-btn" class="btn-secondary">🔍 Search Product</button>
+                    <button id="manual-sync-btn" class="btn-secondary" disabled>🔄 Manual Sync</button>
+                </div>
+            </div>
+
+            <!-- Product Confirmation -->
+            <div id="product-confirmation" class="product-confirmation" style="display: none;">
+                <div class="product-info">
+                    <h3 id="product-name"></h3>
+                    <p id="product-details"></p>
+                </div>
+                <div class="quantity-input-section">
+                    <label>Enter Quantity</label>
+                    <input type="number" id="quantity-input" step="0.01" placeholder="Enter quantity..." min="0">
+                    <div class="quick-add-buttons">
+                        <button class="quick-add-btn" data-amount="1">+1</button>
+                        <button class="quick-add-btn" data-amount="5">+5</button>
+                        <button class="quick-add-btn" data-amount="6">+6</button>
+                        <button class="quick-add-btn" data-amount="7">+7</button>
+                        <button class="quick-add-btn" data-amount="12">+12</button>
+                        <button class="quick-add-btn" data-amount="24">+24</button>
+                    </div>
+                    <div class="quantity-actions">
+                        <button id="confirm-quantity-btn" class="btn-primary">Confirm</button>
+                        <button id="cancel-quantity-btn" class="btn-secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Mode -->
+            <div id="search-section" class="search-section" style="display: none;">
+                <button id="back-to-scan-btn" class="btn-secondary">← Back to Scan</button>
+                <label>Search Product</label>
+                <input type="text" id="search-input" placeholder="Start typing product name or barcode...">
+                <div id="search-results" class="search-results"></div>
+            </div>
+
+            <!-- Scanned Items List -->
+            <div id="scanned-items-section" class="scanned-items-section">
+                <h2 id="scanned-items-title">📦 Regular Scans (<span id="scanned-count">0</span>)</h2>
+                <div id="scanned-items-list" class="scanned-items-list"></div>
+            </div>
+
+            <!-- Manual Entries List -->
+            <div id="manual-entries-section" class="manual-entries-section" style="display: none;">
+                <div class="section-header">
+                    <h2>✍️ Manual Entries (<span id="manual-count">0</span>)</h2>
+                    <button id="sync-manual-btn" class="btn-primary" disabled>Sync Manual Entries</button>
+                </div>
+                <div id="manual-entries-list" class="manual-entries-list"></div>
+            </div>
+
+            <!-- Keg Counting Table -->
+            <div id="kegs-section" class="kegs-section" style="display: none;">
+                <div class="section-header">
+                    <h2>🍺 Keg Counting</h2>
+                    <button id="sync-kegs-btn" class="btn-primary" disabled>Sync Kegs</button>
+                </div>
+                <div id="kegs-table-container" class="kegs-table-container"></div>
+            </div>
+
+            <!-- Complete First Counts Button -->
+            <div class="complete-section">
+                <button id="complete-first-counts-btn" class="btn-primary btn-large">
+                    ✅ Complete First Counts
+                </button>
+                <p class="info-text">This will match your counts with the variance report and calculate differences.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reconciliation Screen -->
+    <div id="reconciliation-screen" class="screen">
+        <div class="header">
+            <div>
+                <h1>📊 Reconciliation</h1>
+                <p id="reconciliation-stocktake-info" class="user-info"></p>
+            </div>
+            <div class="header-actions">
+                <button id="refresh-variance-btn" class="btn-secondary">🔄 Refresh Variance Report</button>
+                <button id="back-to-counting-btn" class="btn-secondary">← Back to Counting</button>
+                <button id="reconciliation-logout-btn" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+
+        <div class="reconciliation-content">
+            <!-- Variance Report Status -->
+            <div id="variance-status-card" class="info-card">
+                <h2>Variance Report Status</h2>
+                <div id="variance-status-info"></div>
+                <div class="card-actions">
+                    <button id="upload-variance-from-recon-btn" class="btn-primary">Upload Variance Report</button>
+                </div>
+            </div>
+
+            <!-- Variance Table -->
+            <div id="variance-table-container" class="variance-table-container">
+                <div class="table-header">
+                    <h2>Variance Report</h2>
+                    <div class="table-filters">
+                        <input type="text" id="variance-search" placeholder="Search products...">
+                        <select id="variance-filter">
+                            <option value="all">All Items</option>
+                            <option value="variance">With Variance</option>
+                            <option value="positive">Positive Variance</option>
+                            <option value="negative">Negative Variance</option>
+                            <option value="uncounted">Uncounted</option>
+                            <option value="no-barcode">No Barcode</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="variance-table-wrapper" class="table-wrapper">
+                    <table id="variance-table" class="variance-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Barcode</th>
+                                <th>Theoretical</th>
+                                <th>Counted</th>
+                                <th>Variance Qty</th>
+                                <th>Variance $</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="variance-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Complete Stocktake Section -->
+            <div class="complete-stocktake-section">
+                <button id="complete-stocktake-btn" class="btn-primary btn-large">
+                    ✅ Complete Stocktake
+                </button>
+                <p class="info-text">This will generate the .dat file for HnL import and create a manual entries list.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Scan Modal -->
+    <div id="edit-scan-modal" class="modal">
+        <div class="modal-content">
+            <h2>Edit Scan</h2>
+            <div id="edit-scan-info"></div>
+            <div class="form-group">
+                <label for="edit-quantity-input">Quantity</label>
+                <input type="number" id="edit-quantity-input" step="0.01" min="0">
+            </div>
+            <div class="form-actions">
+                <button id="cancel-edit-btn" class="btn-secondary">Cancel</button>
+                <button id="save-edit-btn" class="btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <p id="loading-message">Loading...</p>
+    </div>
+
+    <script src="indexeddb-service.js"></script>
+    <script src="api-service.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+

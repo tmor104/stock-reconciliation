@@ -278,8 +278,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         state.currentUser = userData;
         
         if (userData.role === 'admin') {
-            await loadAdminDashboard();
-            showScreen('admin-screen');
+            await loadHomePage();
+            showScreen('home-screen');
         } else {
             await loadCurrentStocktake();
             showScreen('variance-screen');
@@ -289,8 +289,125 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     }
 });
 
+// Helper function to extract stocktake name from count sheet name
+function extractStocktakeName(countSheetName) {
+    // Remove "Stocktake - " prefix
+    let name = countSheetName.replace(/^Stocktake\s*-\s*/i, '');
+    
+    // Remove date suffix (format: " - YYYY-MM-DD HH:MM" or similar)
+    name = name.replace(/\s*-\s*\d{4}-\d{2}-\d{2}.*$/i, '');
+    name = name.replace(/\s*-\s*\d{1,2}\/\d{1,2}\/\d{4}.*$/i, '');
+    
+    // Trim whitespace
+    return name.trim() || countSheetName;
+}
+
+// Load Home Page
+async function loadHomePage() {
+    await loadCurrentStocktake();
+    await loadCountSheetsForHome();
+}
+
+// Load count sheets for home page
+async function loadCountSheetsForHome() {
+    try {
+        const sheets = await api.getAvailableCountSheets(state.currentUser.token);
+        const container = document.getElementById('count-sheets-list');
+        
+        if (sheets.length === 0) {
+            container.innerHTML = '<p class="no-sheets">No count sheets available. Create a stocktake in the Stock app first.</p>';
+            return;
+        }
+        
+        container.innerHTML = sheets.map(sheet => {
+            const extractedName = extractStocktakeName(sheet.name);
+            const date = new Date(sheet.modifiedTime).toLocaleDateString();
+            
+            return `
+                <div class="count-sheet-card" data-sheet-id="${sheet.id}" data-sheet-name="${sheet.name}">
+                    <h3>${extractedName}</h3>
+                    <p class="sheet-details">${sheet.name}</p>
+                    <p class="sheet-date">Last modified: ${date}</p>
+                    <button class="btn-primary create-stocktake-btn" data-sheet-id="${sheet.id}" data-sheet-name="${sheet.name}">
+                        Create Stocktake
+                    </button>
+                </div>
+            `;
+        }).join('');
+        
+        // Add event listeners to create stocktake buttons
+        container.querySelectorAll('.create-stocktake-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const sheetId = btn.dataset.sheetId;
+                const sheetName = btn.dataset.sheetName;
+                await createStocktakeFromHome(sheetId, sheetName);
+            });
+        });
+    } catch (error) {
+        console.error('Failed to load count sheets:', error);
+        document.getElementById('count-sheets-list').innerHTML = 
+            '<p class="error-text">Failed to load count sheets. Please try again.</p>';
+    }
+}
+
+// Create stocktake from home page
+async function createStocktakeFromHome(countSheetId, countSheetName) {
+    // Show file picker for HnL file
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xls,.xlsx';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const extractedName = extractStocktakeName(countSheetName);
+        
+        // Show progress
+        const progressContainer = document.createElement('div');
+        progressContainer.className = 'progress-overlay';
+        progressContainer.innerHTML = `
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 0%"></div>
+                </div>
+                <p class="progress-text">Creating stocktake...</p>
+            </div>
+        `;
+        document.body.appendChild(progressContainer);
+        
+        try {
+            await api.uploadHnLFile(
+                state.currentUser.token,
+                file,
+                countSheetId,
+                extractedName, // Auto-extracted name
+                (percent) => {
+                    const fill = progressContainer.querySelector('.progress-fill');
+                    const text = progressContainer.querySelector('.progress-text');
+                    if (fill) fill.style.width = percent + '%';
+                    if (text) text.textContent = `Processing: ${Math.round(percent)}%`;
+                }
+            );
+            
+            document.body.removeChild(progressContainer);
+            await loadHomePage();
+            alert('Stocktake created successfully!');
+        } catch (error) {
+            document.body.removeChild(progressContainer);
+            alert('Failed to create stocktake: ' + error.message);
+        }
+    };
+    input.click();
+}
+
 // Logout handlers
 document.getElementById('logout-btn').addEventListener('click', () => {
+    state.currentUser = null;
+    state.currentStocktake = null;
+    showScreen('login-screen');
+});
+
+document.getElementById('logout-home-btn').addEventListener('click', () => {
     state.currentUser = null;
     state.currentStocktake = null;
     showScreen('login-screen');
@@ -437,6 +554,7 @@ document.getElementById('start-stocktake-btn').addEventListener('click', async (
 });
 
 document.getElementById('refresh-sheets-btn').addEventListener('click', loadCountSheets);
+document.getElementById('refresh-count-sheets-btn').addEventListener('click', loadCountSheetsForHome);
 
 async function loadCountSheets() {
     try {
@@ -444,7 +562,17 @@ async function loadCountSheets() {
         const select = document.getElementById('count-sheet-select');
         
         select.innerHTML = '<option value="">Select a count sheet...</option>' +
-            sheets.map(sheet => `<option value="${sheet.id}">${sheet.name}</option>`).join('');
+            sheets.map(sheet => `<option value="${sheet.id}" data-name="${sheet.name}">${sheet.name}</option>`).join('');
+        
+        // Auto-fill stocktake name when count sheet is selected
+        select.addEventListener('change', (e) => {
+            const selectedOption = select.options[select.selectedIndex];
+            if (selectedOption.value) {
+                const sheetName = selectedOption.dataset.name;
+                const extractedName = extractStocktakeName(sheetName);
+                document.getElementById('stocktake-name').value = extractedName;
+            }
+        });
     } catch (error) {
         console.error('Failed to load count sheets:', error);
         alert('Failed to load count sheets');
@@ -456,11 +584,19 @@ document.getElementById('start-stocktake-form').addEventListener('submit', async
     
     const file = document.getElementById('hnl-file').files[0];
     const countSheetId = document.getElementById('count-sheet-select').value;
-    const stocktakeName = document.getElementById('stocktake-name').value;
+    let stocktakeName = document.getElementById('stocktake-name').value;
     
-    if (!file || !countSheetId || !stocktakeName) {
-        alert('Please fill in all fields');
+    if (!file || !countSheetId) {
+        alert('Please select a count sheet and upload an HnL file');
         return;
+    }
+    
+    // If stocktake name is empty, extract from count sheet name
+    if (!stocktakeName || stocktakeName.trim() === '') {
+        const selectedOption = document.getElementById('count-sheet-select').options[document.getElementById('count-sheet-select').selectedIndex];
+        if (selectedOption.dataset.name) {
+            stocktakeName = extractStocktakeName(selectedOption.dataset.name);
+        }
     }
     
     const progressContainer = document.getElementById('upload-progress');
@@ -485,7 +621,12 @@ document.getElementById('start-stocktake-form').addEventListener('submit', async
         progressContainer.style.display = 'none';
         progressFill.style.width = '0%';
         
-        await loadAdminDashboard();
+        // Reload current screen
+        if (document.getElementById('home-screen').classList.contains('active')) {
+            await loadHomePage();
+        } else {
+            await loadAdminDashboard();
+        }
         alert('Stocktake created successfully!');
     } catch (error) {
         progressContainer.style.display = 'none';
@@ -509,7 +650,12 @@ document.getElementById('view-variance-btn').addEventListener('click', async () 
 });
 
 document.getElementById('back-to-admin-btn').addEventListener('click', () => {
-    showScreen('admin-screen');
+    if (state.currentUser && state.currentUser.role === 'admin') {
+        loadHomePage();
+        showScreen('home-screen');
+    } else {
+        showScreen('admin-screen');
+    }
 });
 
 async function loadCurrentStocktake() {

@@ -220,6 +220,21 @@ router.get('/sheets/count-sheets', async (request, env) => {
     }
 });
 
+// Helper function to extract stocktake name from count sheet name
+// Format: "Stocktake - {name} - {date}" -> extracts {name}
+function extractStocktakeName(countSheetName) {
+    // Remove "Stocktake - " prefix
+    let name = countSheetName.replace(/^Stocktake\s*-\s*/i, '');
+    
+    // Remove date suffix (format: " - YYYY-MM-DD HH:MM" or similar)
+    // Match pattern: " - " followed by date-like string
+    name = name.replace(/\s*-\s*\d{4}-\d{2}-\d{2}.*$/i, '');
+    name = name.replace(/\s*-\s*\d{1,2}\/\d{1,2}\/\d{4}.*$/i, '');
+    
+    // Trim whitespace
+    return name.trim() || countSheetName;
+}
+
 // Stocktake - Create New
 router.post('/stocktake/create', async (request, env) => {
     const authError = await requireAdmin(request, env);
@@ -229,7 +244,31 @@ router.post('/stocktake/create', async (request, env) => {
         const formData = await request.formData();
         const hnlFile = formData.get('hnlFile');
         const countSheetId = formData.get('countSheetId');
-        const stocktakeName = formData.get('stocktakeName');
+        let stocktakeName = formData.get('stocktakeName');
+        
+        // If stocktake name not provided, extract from count sheet name
+        if (!stocktakeName || stocktakeName.trim() === '') {
+            const sheets = await GoogleSheetsAPI.listSheetsInFolder(env);
+            const countSheet = sheets.find(s => s.id === countSheetId);
+            
+            if (countSheet) {
+                stocktakeName = extractStocktakeName(countSheet.name);
+            } else {
+                // Fallback: try to get name from Drive API
+                const accessToken = await GoogleSheetsAPI.getAccessToken(env);
+                const driveResponse = await fetch(
+                    `https://www.googleapis.com/drive/v3/files/${countSheetId}?fields=name`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+                
+                if (driveResponse.ok) {
+                    const fileData = await driveResponse.json();
+                    stocktakeName = extractStocktakeName(fileData.name);
+                } else {
+                    stocktakeName = 'Stocktake ' + new Date().toLocaleDateString();
+                }
+            }
+        }
         
         // Parse HnL file
         const hnlData = await parseHnLExcel(await hnlFile.arrayBuffer());

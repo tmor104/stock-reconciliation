@@ -19,19 +19,20 @@ export class VarianceCalculator {
         const productCountMap = new Map();
         const reverseBarcodeMap = new Map();
         
-        // Create reverse mapping (barcode -> productCode)
-        for (const [productCode, barcode] of barcodeMapping) {
-            reverseBarcodeMap.set(barcode, productCode);
+        // Create reverse mapping (barcode -> product description)
+        // Note: barcodeMapping is Map<ProductDescription, Barcode> from Product Database sheet
+        for (const [productDescription, barcode] of barcodeMapping) {
+            reverseBarcodeMap.set(barcode, productDescription);
         }
-        
-        // Map barcode counts to product codes
+
+        // Map barcode counts to product descriptions
         for (const [barcode, qty] of countMap) {
-            const productCode = reverseBarcodeMap.get(barcode);
-            if (productCode) {
-                if (productCountMap.has(productCode)) {
-                    productCountMap.set(productCode, productCountMap.get(productCode) + qty);
+            const productDescription = reverseBarcodeMap.get(barcode);
+            if (productDescription) {
+                if (productCountMap.has(productDescription)) {
+                    productCountMap.set(productDescription, productCountMap.get(productDescription) + qty);
                 } else {
-                    productCountMap.set(productCode, qty);
+                    productCountMap.set(productDescription, qty);
                 }
             }
         }
@@ -48,27 +49,29 @@ export class VarianceCalculator {
         
         // Calculate variance for each theoretical item
         const items = theoretical.map(item => {
-            const productCode = item.productCode || item.description; // Fall back to description for matching
-            
+            // Match by product description (from HnL Stock Description column)
+            // This matches the Product Database sheet's Column B
+            const productDescription = item.description;
+
             // Get counted quantity (from barcode scans or manual entry)
-            let countedQty = productCountMap.get(productCode) || 0;
+            let countedQty = productCountMap.get(productDescription) || 0;
             let manuallyEntered = false;
-            
-            // Check for manual adjustment
-            if (adjustmentMap.has(productCode)) {
-                const adjustment = adjustmentMap.get(productCode);
+
+            // Check for manual adjustment (uses productCode from theoretical sheet)
+            if (adjustmentMap.has(item.productCode)) {
+                const adjustment = adjustmentMap.get(item.productCode);
                 countedQty = parseFloat(adjustment.newCount) || 0;
                 manuallyEntered = true;
             }
-            
+
             // Calculate variances
             const theoreticalQty = item.theoreticalQty;
             const qtyVariance = countedQty - theoreticalQty;
             const dollarVariance = qtyVariance * item.unitCost;
-            const variancePercent = theoreticalQty !== 0 
-                ? (qtyVariance / Math.abs(theoreticalQty)) * 100 
+            const variancePercent = theoreticalQty !== 0
+                ? (qtyVariance / Math.abs(theoreticalQty)) * 100
                 : 0;
-            
+
             return {
                 ...item,
                 countedQty,
@@ -76,7 +79,7 @@ export class VarianceCalculator {
                 qtyVariance,
                 dollarVariance,
                 variancePercent,
-                hasBarcode: barcodeMapping.has(productCode)
+                hasBarcode: barcodeMapping.has(productDescription)
             };
         });
         

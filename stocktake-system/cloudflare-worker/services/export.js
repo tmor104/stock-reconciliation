@@ -68,8 +68,8 @@ export class ExportService {
     static generateManualEntryList(theoretical, barcodeMapping) {
         // Get items that don't have barcodes
         const manualItems = theoretical.filter(item => {
-            const productCode = item.productCode || item.description;
-            return !barcodeMapping.has(productCode);
+            // Match by product description (same as Product Database Column B)
+            return !barcodeMapping.has(item.description);
         });
         
         if (manualItems.length === 0) {
@@ -110,20 +110,20 @@ export class ExportService {
     }
     
     static generateDatFile(varianceData, barcodeMapping) {
-        // Create reverse mapping (productCode -> barcode)
+        // Create reverse mapping (product description -> barcode)
         const productToBarcodeMap = new Map();
-        for (const [productCode, barcode] of barcodeMapping) {
-            productToBarcodeMap.set(productCode, barcode);
+        for (const [productDescription, barcode] of barcodeMapping) {
+            productToBarcodeMap.set(productDescription, barcode);
         }
-        
+
         let datContent = '';
-        
+
         // Only include items with:
         // 1. A barcode
         // 2. Non-zero counted quantity
         varianceData.items.forEach(item => {
-            const productCode = item.productCode || item.description;
-            const barcode = productToBarcodeMap.get(productCode);
+            // Match by product description (same as Product Database Column B)
+            const barcode = productToBarcodeMap.get(item.description);
             
             // Skip items without barcodes or with zero count
             if (!barcode || item.countedQty === 0) {

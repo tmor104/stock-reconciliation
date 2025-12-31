@@ -84,6 +84,31 @@ router.post('/auth/login', async (request, env) => {
     }
 });
 
+// Health Check - Validate Master Sheet Configuration
+router.get('/health/master-sheet', async (request, env) => {
+    const authError = await requireAdmin(request, env);
+    if (authError) return authError;
+
+    try {
+        const validation = await GoogleSheetsAPI.validateMasterSheet(env);
+        return new Response(JSON.stringify({
+            success: true,
+            message: 'Master Sheet is properly configured',
+            ...validation
+        }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({
+            success: false,
+            error: error.message
+        }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
 // Admin - Get Users
 router.get('/admin/users', async (request, env) => {
     const authError = await requireAdmin(request, env);

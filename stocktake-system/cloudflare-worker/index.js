@@ -707,12 +707,18 @@ router.post('/counting/stocktake/create', async (request, env) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
+        // Log the full error for debugging
+        console.error('Create stocktake error:', error);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
         let errorMessage = error.message || 'Failed to create stocktake';
         let statusCode = 500;
         
         // Check if it's a permission error
         if (error.message && (error.message.includes('PERMISSION_DENIED') || error.message.includes('Permission denied'))) {
-            errorMessage = 'Permission denied: The service account does not have write access to the folder. Please share the folder with the service account email and grant "Editor" permission.';
+            // Use the specific error message from the service, which includes details
+            errorMessage = error.message; // This will have the specific details from counting-service.js
             statusCode = 403;
         }
         

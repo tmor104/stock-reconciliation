@@ -310,7 +310,8 @@ export class CountingService {
         if (cleanFolderId) {
             // First, verify the folder exists and is accessible by getting its metadata
             // Folder ID: 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE
-            const folderUrl = `https://www.googleapis.com/drive/v3/files/${cleanFolderId}?fields=id,name,mimeType,capabilities`;
+            // Add supportsAllDrives=true for service account access
+            const folderUrl = `https://www.googleapis.com/drive/v3/files/${cleanFolderId}?fields=id,name,mimeType,capabilities&supportsAllDrives=true`;
             console.log(`Testing folder access: ${cleanFolderId} (1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE)`);
             
             const folderTestResponse = await fetch(folderUrl, {
@@ -350,14 +351,15 @@ export class CountingService {
             }
             
             // Folder is accessible, now use full query
-            // Using: 'FOLDER_ID' in parents format
-            query = `'${cleanFolderId}' in parents and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+            // Use standard Google Drive API query format: parents in 'FOLDER_ID'
+            query = `parents in '${cleanFolderId}' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
             console.log(`Query for folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE: ${query}`);
         } else {
             query = `title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         }
         
-        driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`;
+        // Add supportsAllDrives=true for service account access
+        driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&supportsAllDrives=true&includeItemsFromAllDrives=true`;
         
         console.log('Drive API Query:', query);
         console.log('Drive API URL:', driveUrl);

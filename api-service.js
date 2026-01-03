@@ -138,6 +138,21 @@ class UnifiedAPIService {
         });
         
         if (!response.ok) {
+            // If 401, token is invalid - clear it
+            if (response.status === 401) {
+                this.token = null;
+                // Clear from IndexedDB
+                if (typeof dbService !== 'undefined') {
+                    dbService.saveState('token', null).catch(console.error);
+                    dbService.saveState('user', null).catch(console.error);
+                }
+                // Trigger logout (skip confirmation for expired tokens)
+                if (typeof handleLogout === 'function') {
+                    handleLogout(true);
+                }
+                throw new Error('Session expired. Please log in again.');
+            }
+            
             let errorMessage = 'Failed to list stocktakes';
             try {
                 const errorData = await response.json();

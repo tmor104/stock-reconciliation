@@ -112,36 +112,51 @@ async function init() {
             state.token = savedToken;
             apiService.setToken(savedToken);
             
-            if (savedStocktake) {
-                state.currentStocktake = savedStocktake;
-            }
-            
-            if (savedFolderId) {
-                state.folderId = savedFolderId;
-            }
-            
-            if (savedLocation) {
-                state.currentLocation = savedLocation;
-            }
-            
-            // Load products and locations from cache
-            state.productDatabase = await dbService.getProducts();
-            state.locations = await dbService.getLocations();
-            
-            // Check if we have a current stocktake
-            if (state.currentStocktake) {
-                // Load scans for current stocktake
-                const scans = await dbService.getAllScans(state.currentStocktake.id);
-                state.scannedItems = scans;
+            // Validate token by making a test API call
+            try {
+                const testResult = await apiService.getProductDatabase();
+                // If we get here, token is valid
                 
-                // Count unsynced
-                const unsynced = await dbService.getUnsyncedScans(state.currentStocktake.id);
-                state.unsyncedCount = unsynced.length;
+                if (savedStocktake) {
+                    state.currentStocktake = savedStocktake;
+                }
+                
+                if (savedFolderId) {
+                    state.folderId = savedFolderId;
+                }
+                
+                if (savedLocation) {
+                    state.currentLocation = savedLocation;
+                }
+                
+                // Load products and locations from cache
+                state.productDatabase = await dbService.getProducts();
+                state.locations = await dbService.getLocations();
+                
+                // Check if we have a current stocktake
+                if (state.currentStocktake) {
+                    // Load scans for current stocktake
+                    const scans = await dbService.getAllScans(state.currentStocktake.id);
+                    state.scannedItems = scans;
+                    
+                    // Count unsynced
+                    const unsynced = await dbService.getUnsyncedScans(state.currentStocktake.id);
+                    state.unsyncedCount = unsynced.length;
+                }
+                
+                // Show home screen
+                showScreen('home-screen');
+                await loadHomeScreen();
+            } catch (error) {
+                // Token is invalid or expired - clear it and show login
+                console.warn('Token validation failed, clearing saved state:', error);
+                await dbService.saveState('user', null);
+                await dbService.saveState('token', null);
+                state.user = null;
+                state.token = null;
+                apiService.setToken(null);
+                showScreen('login-screen');
             }
-            
-            // Show home screen
-            showScreen('home-screen');
-            await loadHomeScreen();
         } else {
             // Show login screen
             showScreen('login-screen');
@@ -482,8 +497,8 @@ async function handleLogin(e) {
     }
 }
 
-async function handleLogout() {
-    if (state.unsyncedCount > 0) {
+async function handleLogout(skipConfirm = false) {
+    if (!skipConfirm && state.unsyncedCount > 0) {
         if (!confirm(`You have ${state.unsyncedCount} unsynced scans. Are you sure you want to logout?`)) {
             return;
         }
@@ -496,6 +511,8 @@ async function handleLogout() {
     state.manualEntries = [];
     state.kegsList = [];
     state.unsyncedCount = 0;
+    
+    apiService.setToken(null);
     
     await dbService.saveState('user', null);
     await dbService.saveState('token', null);

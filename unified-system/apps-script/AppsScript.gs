@@ -13,28 +13,8 @@ const STOCKTAKE_FOLDER_ID = '1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE'; // Google Drive
 // Main entry point for HTTP POST requests
 function doPost(e) {
   try {
-    // Log the request for debugging
-    Logger.log('doPost called');
-    Logger.log('e.postData: ' + JSON.stringify(e.postData));
-    Logger.log('e.parameter: ' + JSON.stringify(e.parameter));
-    
-    // Handle both JSON and text/plain Content-Type
-    let requestData;
-    if (e.postData && e.postData.contents) {
-      requestData = e.postData.contents;
-      Logger.log('Using e.postData.contents');
-    } else if (e.parameter && e.parameter.data) {
-      requestData = e.parameter.data;
-      Logger.log('Using e.parameter.data');
-    } else {
-      Logger.log('No request data found');
-      return createResponse(false, 'No request data received. postData: ' + (e.postData ? 'exists' : 'null') + ', parameter: ' + (e.parameter ? 'exists' : 'null'));
-    }
-    
-    Logger.log('Request data: ' + requestData);
-    const request = JSON.parse(requestData);
+    const request = JSON.parse(e.postData.contents);
     const action = request.action;
-    Logger.log('Action: ' + action);
 
     // Route to appropriate handler
     switch(action) {

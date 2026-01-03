@@ -319,11 +319,11 @@ export class CountingService {
                 },
                 body: JSON.stringify({
                     values: [
-                        [['Property', 'Value']],
-                        [['stocktake_name', name]],
-                        [['created_by', user]],
-                        [['created_date', dateStr]],
-                        [['status', 'Active']]
+                        ['Property', 'Value'],
+                        ['stocktake_name', name],
+                        ['created_by', user],
+                        ['created_date', dateStr],
+                        ['status', 'Active']
                     ]
                 })
             }
@@ -633,34 +633,51 @@ export class CountingService {
             tally[barcode].stockLevel
         ]);
         
-        // Clear existing tally (keep header)
-        if (tallyRows.length > 0) {
-            // First, clear existing data
-            const lastRow = tallyRows.length + 1;
-            await fetch(
-                `https://sheets.googleapis.com/v4/spreadsheets/${stocktakeId}/values/Tally!A2:F${lastRow}?valueInputOption=RAW`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ values: [] })
+        // Update tally with single atomic operation
+        try {
+            if (tallyRows.length > 0) {
+                // Single PUT operation - overwrites the range atomically
+                const lastRow = tallyRows.length + 1;
+                const updateResponse = await fetch(
+                    `https://sheets.googleapis.com/v4/spreadsheets/${stocktakeId}/values/Tally!A2:F${lastRow}?valueInputOption=RAW`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ values: tallyRows })
+                    }
+                );
+
+                if (!updateResponse.ok) {
+                    const errorText = await updateResponse.text();
+                    console.error('Failed to update tally:', errorText);
+                    throw new Error(`Failed to update tally: ${errorText}`);
                 }
-            );
-            
-            // Then write new data
-            await fetch(
-                `https://sheets.googleapis.com/v4/spreadsheets/${stocktakeId}/values/Tally!A2:F?valueInputOption=RAW`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ values: tallyRows })
+            } else {
+                // Clear tally if no rows
+                const clearResponse = await fetch(
+                    `https://sheets.googleapis.com/v4/spreadsheets/${stocktakeId}/values/Tally!A2:F100?valueInputOption=RAW`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ values: [] })
+                    }
+                );
+
+                if (!clearResponse.ok) {
+                    console.error('Failed to clear tally');
+                    // Non-critical - continue
                 }
-            );
+            }
+        } catch (error) {
+            console.error('Error updating tally:', error);
+            // Re-throw to let caller handle
+            throw new Error(`Tally update failed: ${error.message}`);
         }
     }
     
@@ -715,11 +732,56 @@ export class CountingService {
                     body: JSON.stringify({ values: deletedRows })
                 }
             );
-            
-            // Delete from Raw Scans (delete in reverse order to maintain indices)
-            // Note: Google Sheets API doesn't support batch delete, so we'd need to use batchUpdate
-            // For now, we'll mark them as deleted and filter them out
-            // This is a limitation - we'd need to use batchUpdate for actual deletion
+
+            // Get sheet ID for Raw Scans
+            const sheetMetadata = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${stocktakeId}`,
+                {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                }
+            );
+
+            if (!sheetMetadata.ok) {
+                throw new Error('Failed to get sheet metadata for deletion');
+            }
+
+            const spreadsheetData = await sheetMetadata.json();
+            const rawScansSheet = spreadsheetData.sheets.find(
+                s => s.properties.title === 'Raw Scans'
+            );
+
+            if (!rawScansSheet) {
+                throw new Error('Raw Scans sheet not found');
+            }
+
+            const sheetId = rawScansSheet.properties.sheetId;
+
+            // Delete rows in reverse order to maintain indices
+            const deleteRequests = rowsToDelete
+                .sort((a, b) => b - a) // Sort descending
+                .map(rowIndex => ({
+                    deleteDimension: {
+                        range: {
+                            sheetId: sheetId,
+                            dimension: 'ROWS',
+                            startIndex: rowIndex - 1, // Convert to 0-based
+                            endIndex: rowIndex
+                        }
+                    }
+                }));
+
+            // Execute batch delete
+            await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${stocktakeId}:batchUpdate`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requests: deleteRequests })
+                }
+            );
         }
         
         // Update Tally

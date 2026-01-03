@@ -323,28 +323,37 @@ If column structure changes:
 
 ### Known Issues
 
-#### 🔴 Critical: Column Mapping Mismatch
+#### ✅ FIXED: Column Mapping Mismatch (Resolved)
 
-**Problem:**
+**Previous Problem:**
 - Stock app writes Sync ID in column **J** (index 9)
-- Stocktake system reads Sync ID from column **K** (index 10)
-- This means stocktake will get empty/incorrect syncId values
+- Stocktake system was reading Sync ID from column **K** (index 10)
 
-**Impact:** 
-- Sync ID may not be read correctly
-- May affect tracking/debugging but shouldn't break core functionality (barcode/product matching still works)
+**Status:** ✅ **FIXED** in google-sheets-v2.js and google-sheets.js
+- Both files now correctly read `syncId: row[9]` (Column J)
+- Sync ID is now read correctly from the correct column
 
-**Fix Required:**
-Update `stocktake-system/cloudflare-worker/services/google-sheets.js` line 235:
-```javascript
-// Current (WRONG):
-syncId: row[10] || ''
+**Fixed in:**
+- `stocktake-system/cloudflare-worker/services/google-sheets-v2.js` line 321
+- `stocktake-system/cloudflare-worker/services/google-sheets.js` line 283
 
-// Should be:
-syncId: row[9] || ''  // Column J, not K
-```
+### Product Database Column B Requirement
 
-**Also:** Stocktake reads A-K but should only read A-J since Stock app only writes 10 columns.
+**IMPORTANT:** The Product Database sheet (in Master Sheet) must have:
+- **Column A:** Barcode (e.g., "9300857058404")
+- **Column B:** Stock Description (e.g., "Great Northern Original 4.2% 330mL Bottle")
+
+**Column B MUST contain the exact Stock Description** as it appears in the HnL file's "Stock Description" column (Column C in HnL export).
+
+**Why this matters:**
+- The Stock app reads Column B to display product names when scanning
+- The variance calculator matches counted items to theoretical items by description
+- If Column B contains InvCode instead of Description, matching will fail
+
+**Verified in code:**
+- `google-sheets-v2.js:200` - Uses `item.description` for barcode lookup
+- `variance-calculator.js:54` - Matches by `item.description`
+- `export.js:72,126` - Uses `item.description` for barcode mapping
 
 ### Future Enhancements
 
@@ -353,7 +362,6 @@ syncId: row[9] || ''  // Column J, not K
 - [ ] Stocktake → Stock app notifications
 - [ ] Conflict resolution for concurrent edits
 - [ ] Batch processing for large datasets
-- [ ] Fix column mapping mismatch (syncId)
 
 ---
 
@@ -393,8 +401,8 @@ const scanRow = [
 ];
 // Total: 10 columns (A-J)
 
-// Stocktake reads (google-sheets.js line 224-236):
-// Note: Reads A-K but only uses A-J
+// Stocktake reads (google-sheets-v2.js line 311-322):
+// ✅ CORRECTED - Now reads A-J correctly
 {
   barcode: row[0] || '',                    // A
   product: row[1] || '',                    // B
@@ -405,15 +413,12 @@ const scanRow = [
   stockLevel: row[6] || '',                 // G
   value: parseFloat(row[7]) || 0,           // H
   synced: row[8] || '',                     // I
-  status: row[9] || '',                     // J (empty - not written by Stock app)
-  syncId: row[10] || ''                     // K (actually column J in Stock app)
+  syncId: row[9] || ''                      // J ✅ FIXED - Correctly reads from column J
 }
 ```
 
-**⚠️ IMPORTANT MISMATCH:**
+**✅ FIXED:**
 - Stock app writes Sync ID in column **J** (index 9)
-- Stocktake reads Sync ID from column **K** (index 10)
-- This means stocktake is reading the wrong column for Sync ID!
-
-**Fix Required:** Stocktake system should read `row[9]` for syncId, not `row[10]`.
+- Stocktake now correctly reads Sync ID from column **J** (index 9)
+- Sync ID mapping is now correct!
 

@@ -42,7 +42,48 @@ export class GoogleSheetsAPI {
         const data = await response.json();
         return data.access_token;
     }
-    
+
+    static async validateMasterSheet(env) {
+        // Validate that Master Sheet has required tabs
+        if (!env.MASTER_SHEET_ID || env.MASTER_SHEET_ID === 'YOUR_MASTER_SHEET_ID') {
+            throw new Error('MASTER_SHEET_ID not configured in environment variables');
+        }
+
+        const accessToken = await this.getAccessToken(env);
+
+        const response = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${env.MASTER_SHEET_ID}`,
+            {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            }
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to access Master Sheet: ${errorText}`);
+        }
+
+        const data = await response.json();
+        const sheetNames = data.sheets.map(s => s.properties.title);
+
+        // Required sheets for the system to function
+        const requiredSheets = ['Product Database', 'Locations'];
+        const missingSheets = requiredSheets.filter(name => !sheetNames.includes(name));
+
+        if (missingSheets.length > 0) {
+            throw new Error(
+                `Master Sheet is missing required tabs: ${missingSheets.join(', ')}. ` +
+                `Found tabs: ${sheetNames.join(', ')}`
+            );
+        }
+
+        return {
+            valid: true,
+            sheetNames,
+            spreadsheetName: data.properties.title
+        };
+    }
+
     static async getBarcodeMapping(env) {
         const accessToken = await this.getAccessToken(env);
         

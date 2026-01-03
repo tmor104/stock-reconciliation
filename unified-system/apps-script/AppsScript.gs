@@ -40,9 +40,7 @@ function doPost(e) {
         return createResponse(false, 'Unknown action: ' + action);
     }
   } catch (error) {
-    Logger.log('Error in doPost: ' + error.toString());
-    Logger.log('Error stack: ' + error.stack);
-    return createResponse(false, 'Server error: ' + error.toString() + ' (Stack: ' + error.stack + ')');
+    return createResponse(false, 'Error: ' + error.toString());
   }
 }
 
@@ -185,66 +183,73 @@ function handleCreateStocktake(request) {
 }
 
 function handleListStocktakes(request) {
-  let files;
-  
-  // If folder ID is provided, search within that folder
-  if (STOCKTAKE_FOLDER_ID && STOCKTAKE_FOLDER_ID.trim() !== '') {
-    try {
-      const folder = DriveApp.getFolderById(STOCKTAKE_FOLDER_ID);
-      files = folder.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
-    } catch (e) {
-      Logger.log('Error accessing folder, falling back to Drive search: ' + e.message);
-      // Fallback to Drive-wide search
+  try {
+    let files;
+    
+    // If folder ID is provided, search within that folder
+    if (STOCKTAKE_FOLDER_ID && STOCKTAKE_FOLDER_ID.trim() !== '') {
+      try {
+        const folder = DriveApp.getFolderById(STOCKTAKE_FOLDER_ID);
+        files = folder.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
+      } catch (e) {
+        // Fallback to Drive-wide search
+        files = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
+      }
+    } else {
+      // Search all of Drive
       files = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
     }
-  } else {
-    // Search all of Drive
-    files = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
-  }
 
-  const stocktakes = [];
-  while (files.hasNext()) {
-    const file = files.next();
-    const ss = SpreadsheetApp.openById(file.getId());
+    const stocktakes = [];
+    while (files.hasNext()) {
+      try {
+        const file = files.next();
+        const ss = SpreadsheetApp.openById(file.getId());
 
-    // Try to get metadata from Metadata sheet
-    let name = file.getName();
-    let createdBy = 'Unknown';
-    let createdDate = 'Unknown';
-    let status = 'Active';
+        // Try to get metadata from Metadata sheet
+        let name = file.getName();
+        let createdBy = 'Unknown';
+        let createdDate = 'Unknown';
+        let status = 'Active';
 
-    try {
-      const metadataSheet = ss.getSheetByName('Metadata');
-      if (metadataSheet) {
-        const metadataData = metadataSheet.getRange('A2:B5').getValues();
-        metadataData.forEach(row => {
-          if (row[0] === 'stocktake_name') name = row[1] || file.getName();
-          if (row[0] === 'created_by') createdBy = row[1] || 'Unknown';
-          if (row[0] === 'created_date') createdDate = row[1] || 'Unknown';
-          if (row[0] === 'status') status = row[1] || 'Active';
+        try {
+          const metadataSheet = ss.getSheetByName('Metadata');
+          if (metadataSheet) {
+            const metadataData = metadataSheet.getRange('A2:B5').getValues();
+            metadataData.forEach(row => {
+              if (row[0] === 'stocktake_name') name = row[1] || file.getName();
+              if (row[0] === 'created_by') createdBy = row[1] || 'Unknown';
+              if (row[0] === 'created_date') createdDate = row[1] || 'Unknown';
+              if (row[0] === 'status') status = row[1] || 'Active';
+            });
+          }
+        } catch (e) {
+          // If metadata sheet doesn't exist, use defaults
+        }
+
+        stocktakes.push({
+          id: file.getId(),
+          name: file.getName(),
+          displayName: name,
+          createdBy,
+          createdDate,
+          status,
+          url: file.getUrl(),
+          lastModified: file.getLastUpdated()
         });
+      } catch (e) {
+        // Skip files that can't be accessed
+        continue;
       }
-    } catch (e) {
-      // If metadata sheet doesn't exist, use defaults
-      Logger.log('No metadata sheet found for ' + file.getName());
     }
 
-    stocktakes.push({
-      id: file.getId(),
-      name: file.getName(),
-      displayName: name,
-      createdBy,
-      createdDate,
-      status,
-      url: file.getUrl(),
-      lastModified: file.getLastUpdated()
-    });
+    // Sort by last modified (newest first)
+    stocktakes.sort((a, b) => b.lastModified - a.lastModified);
+
+    return createResponse(true, 'Stocktakes loaded', { stocktakes });
+  } catch (error) {
+    return createResponse(false, 'Error listing stocktakes: ' + error.toString());
   }
-
-  // Sort by last modified (newest first)
-  stocktakes.sort((a, b) => b.lastModified - a.lastModified);
-
-  return createResponse(true, 'Stocktakes loaded', { stocktakes });
 }
 
 // ============================================

@@ -152,12 +152,21 @@ class UnifiedAPIService {
         });
         
         if (!response.ok) {
-            throw new Error('Failed to list stocktakes');
+            // Try to get error details from response
+            let errorDetails = 'Failed to list stocktakes';
+            try {
+                const errorData = await response.json();
+                errorDetails = errorData.error || errorData.message || JSON.stringify(errorData);
+            } catch (e) {
+                const text = await response.text();
+                errorDetails = text || 'Failed to list stocktakes';
+            }
+            throw new Error(errorDetails);
         }
         
         const result = await response.json();
         if (!result.success) {
-            throw new Error(result.message || 'Failed to list stocktakes');
+            throw new Error(result.message || result.error || 'Failed to list stocktakes');
         }
         
         return {

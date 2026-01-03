@@ -108,9 +108,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
+        // Use text/plain to avoid CORS preflight (Apps Script doesn't handle OPTIONS)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'createStocktake',
                 name,
@@ -140,9 +141,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
+        // Use text/plain to avoid CORS preflight (Apps Script doesn't handle OPTIONS)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'listStocktakes'
             })
@@ -172,9 +174,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
+        // Use text/plain to avoid CORS preflight (Apps Script doesn't handle OPTIONS)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'syncScans',
                 stocktakeId,
@@ -199,9 +202,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
+        // Use text/plain to avoid CORS preflight (Apps Script doesn't handle OPTIONS)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'deleteScans',
                 stocktakeId,
@@ -226,9 +230,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
+        // Use text/plain to avoid CORS preflight (Apps Script doesn't handle OPTIONS)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'loadUserScans',
                 stocktakeId,
@@ -253,9 +258,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
+        // Use text/plain to avoid CORS preflight (Apps Script doesn't handle OPTIONS)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'syncKegs',
                 stocktakeId,
@@ -282,9 +288,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
+        // Use text/plain to avoid CORS preflight (Apps Script doesn't handle OPTIONS)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'syncManualEntries',
                 stocktakeId,

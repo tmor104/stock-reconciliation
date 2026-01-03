@@ -304,6 +304,7 @@ export class CountingService {
                 })
             }
         );
+        await checkResponse(deletedScansResponse, 'set up Deleted Scans sheet headers');
     }
     
     static async setMetadata(spreadsheetId, name, user, dateStr, accessToken) {

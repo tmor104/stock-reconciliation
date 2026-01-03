@@ -149,6 +149,7 @@ export class CountingService {
         if (folderId && folderId.trim() !== '') {
             const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
             // Use request body for PATCH, not URL parameters
+            // Don't remove 'root' - just add the folder as a parent (file can be in multiple places)
             const moveUrl = `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?supportsAllDrives=true`;
             
             console.log(`Moving spreadsheet ${spreadsheetId} to folder ${cleanFolderId}`);
@@ -160,8 +161,8 @@ export class CountingService {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    addParents: [cleanFolderId],
-                    removeParents: ['root']
+                    addParents: [cleanFolderId]
+                    // Don't removeParents - just add the folder as a parent
                 })
             });
             

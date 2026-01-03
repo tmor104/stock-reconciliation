@@ -249,45 +249,59 @@ class UnifiedAPIService {
     }
 
     async syncKegs(stocktakeId, kegs, location, user) {
-        if (!this.token) {
-            throw new Error('Not authenticated');
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        const response = await fetch(`${CONFIG.WORKER_URL}/counting/kegs/sync`, {
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ stocktakeId, kegs, location, user })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'syncKegs',
+                stocktakeId,
+                kegs,
+                location,
+                user
+            })
         });
         
         if (!response.ok) {
             throw new Error('Failed to sync kegs');
         }
         
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to sync kegs');
+        }
+        
+        return result;
     }
 
     async syncManualEntries(stocktakeId, manualEntries) {
-        if (!this.token) {
-            throw new Error('Not authenticated');
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        const response = await fetch(`${CONFIG.WORKER_URL}/counting/manual/sync`, {
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ stocktakeId, manualEntries })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'syncManualEntries',
+                stocktakeId,
+                manualEntries
+            })
         });
         
         if (!response.ok) {
             throw new Error('Failed to sync manual entries');
         }
         
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to sync manual entries');
+        }
+        
+        return result;
     }
 
     // ============================================

@@ -32,6 +32,10 @@ function doPost(e) {
         return handleDeleteScans(request);
       case 'loadUserScans':
         return handleLoadUserScans(request);
+      case 'syncKegs':
+        return handleSyncKegs(request);
+      case 'syncManualEntries':
+        return handleSyncManualEntries(request);
       default:
         return createResponse(false, 'Unknown action: ' + action);
     }
@@ -465,6 +469,121 @@ function handleDeleteScans(request) {
   return createResponse(true, 'Scans deleted successfully', {
     deletedCount: deletedRows.length,
     deletedIds: syncIds
+  });
+}
+
+// ============================================
+// SYNC KEGS
+// ============================================
+
+function handleSyncKegs(request) {
+  const { stocktakeId, kegs, location, user } = request;
+
+  if (!kegs || kegs.length === 0) {
+    return createResponse(true, 'No kegs to sync', { syncedCount: 0 });
+  }
+
+  const ss = SpreadsheetApp.openById(stocktakeId);
+  const kegsSheet = ss.getSheetByName('Kegs');
+
+  if (!kegsSheet) {
+    return createResponse(false, 'Kegs sheet not found in stocktake');
+  }
+
+  const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+  const syncId = Utilities.getUuid();
+
+  const kegsToAdd = kegs.map(keg => [
+    keg.product || keg.name || '',
+    keg.count || 0,
+    location || '',
+    user || '',
+    timestamp,
+    'Yes',
+    syncId
+  ]);
+
+  const lastRow = kegsSheet.getLastRow();
+  kegsSheet.getRange(lastRow + 1, 1, kegsToAdd.length, 7).setValues(kegsToAdd);
+
+  return createResponse(true, 'Kegs synced successfully', {
+    syncedCount: kegs.length,
+    syncId: syncId
+  });
+}
+
+// ============================================
+// SYNC MANUAL ENTRIES
+// ============================================
+
+function handleSyncManualEntries(request) {
+  const { stocktakeId, manualEntries } = request;
+
+  if (!manualEntries || manualEntries.length === 0) {
+    return createResponse(true, 'No manual entries to sync', { syncedCount: 0 });
+  }
+
+  const ss = SpreadsheetApp.openById(stocktakeId);
+  const manualSheet = ss.getSheetByName('Manual');
+
+  if (!manualSheet) {
+    return createResponse(false, 'Manual sheet not found in stocktake');
+  }
+
+  const lastRow = manualSheet.getLastRow();
+  const existingSyncIds = {};
+
+  // Get existing sync IDs to check for updates
+  if (lastRow > 1) {
+    const existingData = manualSheet.getRange('H2:H' + lastRow).getValues(); // Column H is syncId
+    existingData.forEach((row, index) => {
+      if (row[0]) {
+        existingSyncIds[row[0]] = index + 2;
+      }
+    });
+  }
+
+  const entriesToAdd = [];
+  const syncedIds = [];
+
+  manualEntries.forEach(entry => {
+    const timestamp = entry.timestamp || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+    const syncId = entry.syncId || Utilities.getUuid();
+    
+    const entryRow = [
+      entry.product || '',
+      entry.quantity || 0,
+      entry.location || '',
+      entry.user || '',
+      timestamp,
+      entry.stockLevel || '',
+      entry.value || '',
+      syncId
+    ];
+
+    if (existingSyncIds[syncId]) {
+      // Update existing entry
+      const rowIndex = existingSyncIds[syncId];
+      manualSheet.getRange(rowIndex, 1, 1, 8).setValues([entryRow]);
+    } else {
+      // Add to list of new entries to append
+      entriesToAdd.push(entryRow);
+    }
+
+    syncedIds.push(syncId);
+  });
+
+  // Append new entries if any
+  if (entriesToAdd.length > 0) {
+    const newLastRow = manualSheet.getLastRow();
+    manualSheet.getRange(newLastRow + 1, 1, entriesToAdd.length, 8).setValues(entriesToAdd);
+  }
+
+  return createResponse(true, 'Manual entries synced successfully', {
+    syncedCount: manualEntries.length,
+    syncedIds: syncedIds,
+    newEntries: entriesToAdd.length,
+    updatedEntries: manualEntries.length - entriesToAdd.length
   });
 }
 

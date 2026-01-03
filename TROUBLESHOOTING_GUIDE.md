@@ -35,6 +35,15 @@ stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com
 - Folder must be shared with service account
 - "Notify people" should be unchecked
 
+**⚠️ IMPORTANT: No IAM Roles Needed!**
+- You do **NOT** need to assign IAM roles to the service account in Google Cloud Console
+- IAM roles are for managing the service account itself, not for Drive/Sheets access
+- For Google Drive/Sheets access, you **only** need to:
+  1. Enable the APIs (Google Sheets API, Google Drive API)
+  2. Create the service account
+  3. Share folders/files directly with the service account email address
+- That's it! No IAM role assignment required.
+
 ---
 
 ## Common Errors and Solutions

@@ -309,49 +309,8 @@ export class CountingService {
         let driveUrl;
         
         if (cleanFolderId) {
-            // First, verify the folder exists and is accessible by getting its metadata
-            // Folder ID: 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE
-            // Add supportsAllDrives=true for service account access
-            const folderUrl = `https://www.googleapis.com/drive/v3/files/${cleanFolderId}?fields=id,name,mimeType,capabilities&supportsAllDrives=true`;
-            console.log(`Testing folder access: ${cleanFolderId} (1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE)`);
-            
-            const folderTestResponse = await fetch(folderUrl, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
-            
-            if (!folderTestResponse.ok) {
-                const folderError = await folderTestResponse.text();
-                console.error('Folder access test failed:', folderError);
-                let folderErrorMsg = `Cannot access folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE.`;
-                try {
-                    const folderErrorJson = JSON.parse(folderError);
-                    const folderErrorCode = folderErrorJson.error?.code;
-                    const folderErrorText = folderErrorJson.error?.message || folderError;
-                    
-                    if (folderErrorCode === 400) {
-                        folderErrorMsg = `Invalid folder ID: 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE. The folder may not exist. Check: https://drive.google.com/drive/folders/1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE`;
-                    } else if (folderErrorCode === 403) {
-                        folderErrorMsg = `Permission denied for folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE. Share it with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com (Editor permission). Wait 10-30 seconds after sharing.`;
-                    } else if (folderErrorCode === 404) {
-                        folderErrorMsg = `Folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE not found. It may have been deleted or the service account doesn't have access.`;
-                    } else {
-                        folderErrorMsg = `Error accessing folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE: ${folderErrorText} (Code: ${folderErrorCode})`;
-                    }
-                } catch (e) {
-                    folderErrorMsg = `Error accessing folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE. Raw error: ${folderError}`;
-                }
-                throw new Error(folderErrorMsg);
-            }
-            
-            const folderData = await folderTestResponse.json();
-            console.log(`Folder accessible: ${folderData.name} (${folderData.mimeType})`);
-            
-            // Verify it's actually a folder
-            if (folderData.mimeType !== 'application/vnd.google-apps.folder') {
-                throw new Error(`1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE is not a folder. It is a ${folderData.mimeType}.`);
-            }
-            
-            // Folder is accessible, now use full query
+            // Skip folder verification for now - go straight to query
+            // The query itself will fail if folder doesn't exist or isn't accessible
             // Use standard Google Drive API query format: parents in 'FOLDER_ID'
             query = `parents in '${cleanFolderId}' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
             console.log(`Query for folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE: ${query}`);

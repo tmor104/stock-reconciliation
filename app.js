@@ -818,51 +818,62 @@ async function handleCreateStocktake(e) {
 }
 
 async function selectStocktake(stocktake) {
-    state.currentStocktake = {
-        id: stocktake.id,
-        name: stocktake.name || stocktake.displayName,
-        url: stocktake.url
-    };
+    console.log('Selecting stocktake:', stocktake);
     
-    await dbService.saveState('currentStocktake', state.currentStocktake);
-    await dbService.saveStocktake(state.currentStocktake);
-    
-    // Load scans for this stocktake
     try {
-        const result = await apiService.loadUserScans(stocktake.id, state.user.username);
-        if (result.success && result.scans) {
-            // Save scans to IndexedDB
-            for (const scan of result.scans) {
-                const scanWithMeta = {
-                    ...scan,
-                    stocktakeId: stocktake.id,
-                    stocktakeName: stocktake.name,
-                    synced: true
-                };
-                await dbService.saveScan(scanWithMeta);
+        state.currentStocktake = {
+            id: stocktake.id,
+            name: stocktake.name || stocktake.displayName,
+            url: stocktake.url
+        };
+        
+        await dbService.saveState('currentStocktake', state.currentStocktake);
+        await dbService.saveStocktake(state.currentStocktake);
+        
+        // Load scans for this stocktake (non-blocking - continue even if this fails)
+        try {
+            const result = await apiService.loadUserScans(stocktake.id, state.user.username);
+            if (result.success && result.scans) {
+                // Save scans to IndexedDB
+                for (const scan of result.scans) {
+                    const scanWithMeta = {
+                        ...scan,
+                        stocktakeId: stocktake.id,
+                        stocktakeName: stocktake.name,
+                        synced: true
+                    };
+                    await dbService.saveScan(scanWithMeta);
+                }
             }
+        } catch (error) {
+            console.warn('Error loading user scans (continuing anyway):', error);
+            // Continue even if loading scans fails
+        }
+        
+        // Load local scans
+        const scans = await dbService.getAllScans(stocktake.id);
+        state.scannedItems = scans || [];
+        
+        const unsynced = await dbService.getUnsyncedScans(stocktake.id);
+        state.unsyncedCount = unsynced ? unsynced.length : 0;
+        
+        // Check if variance report exists
+        const varianceData = await dbService.getVarianceData(stocktake.id);
+        if (varianceData && varianceData.length > 0) {
+            state.varianceData = varianceData;
+            // Go to reconciliation screen
+            console.log('Variance data found, going to reconciliation screen');
+            showScreen('reconciliation-screen');
+            loadReconciliationScreen();
+        } else {
+            // No variance data - go to counting screen or prompt for variance upload
+            console.log('No variance data, going to counting screen');
+            showScreen('counting-screen');
+            loadCountingScreen();
         }
     } catch (error) {
-        console.error('Error loading user scans:', error);
-    }
-    
-    // Load local scans
-    const scans = await dbService.getAllScans(stocktake.id);
-    state.scannedItems = scans;
-    
-    const unsynced = await dbService.getUnsyncedScans(stocktake.id);
-    state.unsyncedCount = unsynced.length;
-    
-    // Check if variance report exists
-    const varianceData = await dbService.getVarianceData(stocktake.id);
-    if (varianceData) {
-        state.varianceData = varianceData;
-        // Go to reconciliation screen
-        showScreen('reconciliation-screen');
-        loadReconciliationScreen();
-    } else {
-        // Prompt for variance upload or go to counting
-        showModal('upload-variance-modal');
+        console.error('Error selecting stocktake:', error);
+        alert('Error selecting stocktake: ' + error.message);
     }
 }
 

@@ -303,16 +303,36 @@ export class CountingService {
         }
         
         // Build query - use proper Google Drive API query syntax
-        // Note: Use "parents in" (not "+in+parents") and proper spacing
+        // Try simpler query first if complex one fails
         let query;
+        let driveUrl;
+        
         if (cleanFolderId) {
-            // Query format: parents in 'FOLDER_ID' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'
-            query = `parents in '${cleanFolderId}' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+            // First, try to verify folder exists with a simple query
+            // Query format: 'FOLDER_ID' in parents
+            const simpleQuery = `'${cleanFolderId}' in parents`;
+            const simpleUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(simpleQuery)}&fields=files(id,name,mimeType)&pageSize=1`;
+            
+            console.log('Testing folder access with simple query:', simpleQuery);
+            const testResponse = await fetch(simpleUrl, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            
+            if (!testResponse.ok) {
+                const testError = await testResponse.text();
+                console.error('Simple query failed:', testError);
+                // If simple query fails, the folder ID is likely invalid or not accessible
+                throw new Error(`Cannot access folder ${cleanFolderId}. The folder may not exist, may not be shared with the service account, or the folder ID is incorrect. Error: ${testError}`);
+            }
+            
+            // Folder is accessible, now use full query
+            // Query format: 'FOLDER_ID' in parents and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'
+            query = `'${cleanFolderId}' in parents and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         } else {
             query = `title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         }
         
-        const driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`;
+        driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`;
         
         console.log('Drive API Query:', query);
         console.log('Drive API URL:', driveUrl);

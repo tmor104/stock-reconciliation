@@ -678,18 +678,21 @@ function handleSyncManualEntries(request, correlationId) {
     syncedIds.push(syncId);
   });
 
-  // Append new entries if any
-  if (entriesToAdd.length > 0) {
-    const newLastRow = manualSheet.getLastRow();
-    manualSheet.getRange(newLastRow + 1, 1, entriesToAdd.length, 8).setValues(entriesToAdd);
-  }
+    // Append new entries if any
+    if (entriesToAdd.length > 0) {
+      const newLastRow = manualSheet.getLastRow();
+      manualSheet.getRange(newLastRow + 1, 1, entriesToAdd.length, 8).setValues(entriesToAdd);
+    }
 
-  return createResponse(true, 'Manual entries synced successfully', {
-    syncedCount: manualEntries.length,
-    syncedIds: syncedIds,
-    newEntries: entriesToAdd.length,
-    updatedEntries: manualEntries.length - entriesToAdd.length
-  });
+    return createResponse(true, 'Manual entries synced successfully', {
+      syncedCount: manualEntries.length,
+      syncedIds: syncedIds,
+      newEntries: entriesToAdd.length,
+      updatedEntries: manualEntries.length - entriesToAdd.length
+    });
+  } catch (error) {
+    return createErrorResponse('Error syncing manual entries: ' + error.toString(), 'handleSyncManualEntries', { stack: error.stack }, correlationId);
+  }
 }
 
 // ============================================

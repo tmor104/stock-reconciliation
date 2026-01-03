@@ -297,17 +297,24 @@ export class CountingService {
         
         let query;
         if (folderId && folderId.trim() !== '') {
-            query = `'${folderId}'+in+parents+and+title+contains+'Stocktake -'+and+mimeType='application/vnd.google-apps.spreadsheet'`;
+            // Clean folder ID - remove any invalid characters
+            const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+            if (!cleanFolderId || cleanFolderId.length < 10) {
+                throw new Error(`Invalid folder ID format: ${folderId}. Folder ID should be alphanumeric with dashes/underscores.`);
+            }
+            query = `'${cleanFolderId}'+in+parents+and+title+contains+'Stocktake -'+and+mimeType='application/vnd.google-apps.spreadsheet'`;
         } else {
             query = `title+contains+'Stocktake -'+and+mimeType='application/vnd.google-apps.spreadsheet'`;
         }
         
-        const response = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc`,
-            {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            }
-        );
+        const driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc`;
+        
+        console.log('Drive API Query:', query);
+        console.log('Drive API URL:', driveUrl);
+        
+        const response = await fetch(driveUrl, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
         
         if (!response.ok) {
             const errorText = await response.text();

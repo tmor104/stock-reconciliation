@@ -206,8 +206,16 @@ export class CountingService {
     }
     
     static async setupStocktakeSheets(spreadsheetId, accessToken) {
+        // Helper function to check response
+        const checkResponse = async (response, operation) => {
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to ${operation}: ${errorText}`);
+            }
+        };
+        
         // Tally sheet headers
-        await fetch(
+        const tallyResponse = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Tally!A1:F1?valueInputOption=RAW`,
             {
                 method: 'PUT',
@@ -220,9 +228,10 @@ export class CountingService {
                 })
             }
         );
+        await checkResponse(tallyResponse, 'set up Tally sheet headers');
         
         // Raw Scans sheet headers
-        await fetch(
+        const rawScansResponse = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Raw Scans'!A1:J1?valueInputOption=RAW`,
             {
                 method: 'PUT',
@@ -238,9 +247,10 @@ export class CountingService {
                 })
             }
         );
+        await checkResponse(rawScansResponse, 'set up Raw Scans sheet headers');
         
         // Manual sheet headers
-        await fetch(
+        const manualResponse = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Manual!A1:H1?valueInputOption=RAW`,
             {
                 method: 'PUT',
@@ -256,9 +266,10 @@ export class CountingService {
                 })
             }
         );
+        await checkResponse(manualResponse, 'set up Manual sheet headers');
         
         // Kegs sheet headers
-        await fetch(
+        const kegsResponse = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Kegs!A1:G1?valueInputOption=RAW`,
             {
                 method: 'PUT',
@@ -274,9 +285,10 @@ export class CountingService {
                 })
             }
         );
+        await checkResponse(kegsResponse, 'set up Kegs sheet headers');
         
         // Deleted Scans sheet headers
-        await fetch(
+        const deletedScansResponse = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Deleted Scans'!A1:K1?valueInputOption=RAW`,
             {
                 method: 'PUT',

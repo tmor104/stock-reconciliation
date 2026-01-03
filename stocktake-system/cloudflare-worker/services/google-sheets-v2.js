@@ -118,11 +118,13 @@ export class GoogleSheetsAPI {
         let query;
         
         if (folderId && folderId !== 'YOUR_GOOGLE_DRIVE_FOLDER_ID') {
-            // Search within specific folder
-            query = `'${folderId}'+in+parents+and+title+contains+'Stocktake -'+and+mimeType='application/vnd.google-apps.spreadsheet'`;
+            // Clean folder ID
+            const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+            // Search within specific folder - use proper Google Drive API query syntax
+            query = `parents in '${cleanFolderId}' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         } else {
             // Search all Drive for stocktake spreadsheets (Stock app creates them individually)
-            query = `title+contains+'Stocktake -'+and+mimeType='application/vnd.google-apps.spreadsheet'`;
+            query = `title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         }
         
         const response = await fetch(

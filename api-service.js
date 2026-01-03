@@ -138,7 +138,14 @@ class UnifiedAPIService {
         });
         
         if (!response.ok) {
-            throw new Error('Failed to list stocktakes');
+            let errorMessage = 'Failed to list stocktakes';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorData.message || errorMessage;
+            } catch (e) {
+                errorMessage = `Failed to list stocktakes (${response.status})`;
+            }
+            throw new Error(errorMessage);
         }
         
         return await response.json();

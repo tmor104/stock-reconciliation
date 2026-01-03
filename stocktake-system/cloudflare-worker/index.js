@@ -739,7 +739,13 @@ router.get('/counting/stocktakes', async (request, env) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
+        console.error('Error listing stocktakes:', error);
+        // Preserve the error message from the service
+        const errorMessage = error.message || 'Failed to list stocktakes';
+        return new Response(JSON.stringify({ 
+            success: false,
+            error: errorMessage 
+        }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

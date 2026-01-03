@@ -314,15 +314,23 @@ export class CountingService {
             let errorMessage = 'Failed to list stocktakes';
             try {
                 const errorJson = JSON.parse(errorText);
-                errorMessage = errorJson.error?.message || errorJson.error || errorMessage;
+                const errorCode = errorJson.error?.code;
+                const errorMsg = errorJson.error?.message || errorJson.error || errorMessage;
+                
                 // Add more context for permission errors
-                if (errorJson.error?.code === 403 || errorJson.error?.code === 404) {
+                if (errorCode === 403 || errorCode === 404) {
                     errorMessage = `Permission denied: The service account does not have access to folder ${folderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Viewer" permission (or "Editor" if you want to create stocktakes).`;
-                } else if (errorJson.error?.code === 500 || errorText.includes('PERMISSION_DENIED')) {
-                    errorMessage = `Permission denied: The service account cannot access folder ${folderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com`;
+                } else if (errorCode === 500 || errorText.includes('PERMISSION_DENIED') || errorMsg.includes('permission') || errorMsg.includes('Permission')) {
+                    errorMessage = `Permission denied: The service account cannot access folder ${folderId}. Error: ${errorMsg}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission.`;
+                } else {
+                    errorMessage = `${errorMsg} (Code: ${errorCode || 'unknown'})`;
                 }
             } catch (e) {
+                // If we can't parse the error, include the raw text
                 errorMessage = errorText || errorMessage;
+                if (errorText.includes('permission') || errorText.includes('Permission')) {
+                    errorMessage = `Permission denied: The service account cannot access folder ${folderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission.`;
+                }
             }
             throw new Error(errorMessage);
         }

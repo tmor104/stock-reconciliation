@@ -12,119 +12,200 @@ const STOCKTAKE_FOLDER_ID = '1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE'; // Google Drive
 
 // Main entry point for HTTP POST requests
 function doPost(e) {
+  const correlationId = Utilities.getUuid();
   try {
-    const request = JSON.parse(e.postData.contents);
+    // Validate request data exists
+    if (!e || !e.postData || !e.postData.contents) {
+      return createErrorResponse('No request data received', 'doPost', { hasPostData: !!e?.postData }, correlationId);
+    }
+
+    // Parse JSON safely
+    let request;
+    try {
+      request = JSON.parse(e.postData.contents);
+    } catch (parseError) {
+      return createErrorResponse('Invalid JSON in request body', 'doPost', { 
+        parseError: parseError.toString(),
+        bodyPreview: e.postData.contents.substring(0, 100)
+      }, correlationId);
+    }
+
+    // Validate action exists
+    if (!request.action) {
+      return createErrorResponse('Missing action parameter', 'doPost', { requestKeys: Object.keys(request) }, correlationId);
+    }
+
     const action = request.action;
+    console.log(`[${correlationId}] Processing action: ${action}`);
 
     // Route to appropriate handler
+    let result;
     switch(action) {
       case 'getProductDatabase':
-        return handleGetProductDatabase(request);
+        result = handleGetProductDatabase(request, correlationId);
+        break;
       case 'getLocations':
-        return handleGetLocations(request);
+        result = handleGetLocations(request, correlationId);
+        break;
       case 'createStocktake':
-        return handleCreateStocktake(request);
+        result = handleCreateStocktake(request, correlationId);
+        break;
       case 'listStocktakes':
-        return handleListStocktakes(request);
+        result = handleListStocktakes(request, correlationId);
+        break;
       case 'syncScans':
-        return handleSyncScans(request);
+        result = handleSyncScans(request, correlationId);
+        break;
       case 'deleteScans':
-        return handleDeleteScans(request);
+        result = handleDeleteScans(request, correlationId);
+        break;
       case 'loadUserScans':
-        return handleLoadUserScans(request);
+        result = handleLoadUserScans(request, correlationId);
+        break;
       case 'syncKegs':
-        return handleSyncKegs(request);
+        result = handleSyncKegs(request, correlationId);
+        break;
       case 'syncManualEntries':
-        return handleSyncManualEntries(request);
+        result = handleSyncManualEntries(request, correlationId);
+        break;
       default:
-        return createResponse(false, 'Unknown action: ' + action);
+        return createErrorResponse('Unknown action: ' + action, 'doPost', { availableActions: ['getProductDatabase', 'getLocations', 'createStocktake', 'listStocktakes', 'syncScans', 'deleteScans', 'loadUserScans', 'syncKegs', 'syncManualEntries'] }, correlationId);
     }
+    
+    return result;
   } catch (error) {
-    return createResponse(false, 'Error: ' + error.toString());
+    console.error(`[${correlationId}] Unhandled error in doPost:`, error);
+    return createErrorResponse(error.toString(), 'doPost', { 
+      stack: error.stack,
+      name: error.name
+    }, correlationId);
   }
 }
 
-// Handle GET requests (for testing) - NOW WITH CORS
+// Handle GET requests (for testing)
 function doGet(e) {
-  const response = {
-    success: true,
-    message: 'Unified Stock System API is running. Use POST requests.',
-    timestamp: new Date().toISOString()
-  };
-
-  return createResponse(true, 'API is running', response);
+  const correlationId = Utilities.getUuid();
+  try {
+    const response = {
+      ok: true,
+      message: 'Unified Stock System API is running. Use POST requests.',
+      timestamp: new Date().toISOString(),
+      correlationId: correlationId
+    };
+    return ContentService.createTextOutput(JSON.stringify(response))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    console.error(`[${correlationId}] Error in doGet:`, error);
+    return createErrorResponse(error.toString(), 'doGet', { stack: error.stack }, correlationId);
+  }
 }
 
 // ============================================
 // PRODUCT DATABASE
 // ============================================
 
-function handleGetProductDatabase(request) {
-  const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
-  const productSheet = ss.getSheetByName('Product Database');
+function handleGetProductDatabase(request, correlationId) {
+  try {
+    const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+    const productSheet = ss.getSheetByName('Product Database');
 
-  const lastRow = productSheet.getLastRow();
-  if (lastRow < 2) {
-    return createResponse(true, 'No products found', { products: [] });
+    const lastRow = productSheet.getLastRow();
+    if (lastRow < 2) {
+      return createResponse(true, 'No products found', { products: [] });
+    }
+
+    // Get all product data (skip header row)
+    const data = productSheet.getRange('A2:D' + lastRow).getValues();
+
+    const products = data.map(row => ({
+      barcode: row[0].toString(),
+      product: row[1],
+      currentStock: row[2] || 0,
+      value: row[3] || 0
+    }));
+
+    return createResponse(true, 'Products loaded', { products });
+  } catch (error) {
+    return createErrorResponse('Error loading product database: ' + error.toString(), 'handleGetProductDatabase', { stack: error.stack }, correlationId);
   }
-
-  // Get all product data (skip header row)
-  const data = productSheet.getRange('A2:D' + lastRow).getValues();
-
-  const products = data.map(row => ({
-    barcode: row[0].toString(),
-    product: row[1],
-    currentStock: row[2] || 0,
-    value: row[3] || 0
-  }));
-
-  return createResponse(true, 'Products loaded', { products });
 }
 
 // ============================================
 // LOCATIONS
 // ============================================
 
-function handleGetLocations(request) {
-  const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
-  const locationsSheet = ss.getSheetByName('Locations');
+function handleGetLocations(request, correlationId) {
+  try {
+    const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+    const locationsSheet = ss.getSheetByName('Locations');
 
-  const lastRow = locationsSheet.getLastRow();
-  if (lastRow < 2) {
-    return createResponse(true, 'No locations found', { locations: [] });
+    const lastRow = locationsSheet.getLastRow();
+    if (lastRow < 2) {
+      return createResponse(true, 'No locations found', { locations: [] });
+    }
+
+    const data = locationsSheet.getRange('A2:A' + lastRow).getValues();
+    const locations = data.map(row => row[0]).filter(loc => loc !== '');
+
+    return createResponse(true, 'Locations loaded', { locations });
+  } catch (error) {
+    return createErrorResponse('Error loading locations: ' + error.toString(), 'handleGetLocations', { stack: error.stack }, correlationId);
   }
-
-  const data = locationsSheet.getRange('A2:A' + lastRow).getValues();
-  const locations = data.map(row => row[0]).filter(loc => loc !== '');
-
-  return createResponse(true, 'Locations loaded', { locations });
 }
 
 // ============================================
 // STOCKTAKE MANAGEMENT
 // ============================================
 
-function handleCreateStocktake(request) {
-  const { name, user } = request;
-  const timestamp = new Date();
-  const dateStr = Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
-
-  // Create new spreadsheet for this stocktake
-  const stocktakeName = `Stocktake - ${name} - ${dateStr}`;
-  const newSheet = SpreadsheetApp.create(stocktakeName);
-  const stocktakeId = newSheet.getId();
-
-  // Move spreadsheet to folder if folder ID is provided
-  if (STOCKTAKE_FOLDER_ID && STOCKTAKE_FOLDER_ID.trim() !== '') {
-    try {
-      const file = DriveApp.getFileById(stocktakeId);
-      const folder = DriveApp.getFolderById(STOCKTAKE_FOLDER_ID);
-      file.moveTo(folder);
-    } catch (e) {
-      Logger.log('Warning: Could not move spreadsheet to folder: ' + e.message);
-      // Continue anyway - spreadsheet is still created
+function handleCreateStocktake(request, correlationId) {
+  try {
+    // Validate required parameters
+    if (!request.name) {
+      return createErrorResponse('Missing required parameter: name', 'handleCreateStocktake', { requestKeys: Object.keys(request) }, correlationId);
     }
-  }
+    if (!request.user) {
+      return createErrorResponse('Missing required parameter: user', 'handleCreateStocktake', { requestKeys: Object.keys(request) }, correlationId);
+    }
+
+    const { name, user } = request;
+    const timestamp = new Date();
+    const dateStr = Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+
+    // Create new spreadsheet for this stocktake
+    const stocktakeName = `Stocktake - ${name} - ${dateStr}`;
+    let newSheet;
+    try {
+      newSheet = SpreadsheetApp.create(stocktakeName);
+    } catch (createError) {
+      return createErrorResponse('Failed to create spreadsheet: ' + createError.toString(), 'handleCreateStocktake', { createError: createError.toString() }, correlationId);
+    }
+    const stocktakeId = newSheet.getId();
+
+    // Move spreadsheet to folder if folder ID is provided
+    let folderId = STOCKTAKE_FOLDER_ID;
+    if (request.folderId) {
+      folderId = request.folderId;
+    }
+
+    if (folderId && folderId.trim() !== '') {
+      try {
+        // Validate folder exists and is accessible
+        const folder = DriveApp.getFolderById(folderId);
+        const folderName = folder.getName(); // Test access
+        console.log(`[${correlationId}] Moving spreadsheet to folder: ${folderName} (${folderId})`);
+        
+        const file = DriveApp.getFileById(stocktakeId);
+        file.moveTo(folder);
+      } catch (folderError) {
+        console.error(`[${correlationId}] Could not move spreadsheet to folder:`, folderError);
+        return createErrorResponse(
+          'Folder not found or not accessible: ' + folderError.toString(),
+          'handleCreateStocktake',
+          { folderId: folderId, folderError: folderError.toString() },
+          correlationId
+        );
+      }
+    }
 
   // Set up Tally sheet
   const tallySheet = newSheet.getActiveSheet();
@@ -256,7 +337,8 @@ function handleListStocktakes(request) {
 // SCAN SYNCING
 // ============================================
 
-function handleSyncScans(request) {
+function handleSyncScans(request, correlationId) {
+  try {
   const { stocktakeId, scans } = request;
 
   if (!scans || scans.length === 0) {
@@ -319,12 +401,15 @@ function handleSyncScans(request) {
   // Update Tally sheet
   updateTally(tallySheet, rawScansSheet);
 
-  return createResponse(true, 'Scans synced successfully', {
-    syncedCount: scans.length,
-    syncedIds: syncedIds,
-    newScans: scansToAdd.length,
-    updatedScans: scans.length - scansToAdd.length
-  });
+    return createResponse(true, 'Scans synced successfully', {
+      syncedCount: scans.length,
+      syncedIds: syncedIds,
+      newScans: scansToAdd.length,
+      updatedScans: scans.length - scansToAdd.length
+    });
+  } catch (error) {
+    return createErrorResponse('Error syncing scans: ' + error.toString(), 'handleSyncScans', { stack: error.stack }, correlationId);
+  }
 }
 
 function updateTally(tallySheet, rawScansSheet) {
@@ -382,7 +467,8 @@ function updateTally(tallySheet, rawScansSheet) {
 // LOAD USER SCAN HISTORY
 // ============================================
 
-function handleLoadUserScans(request) {
+function handleLoadUserScans(request, correlationId) {
+  try {
   const { stocktakeId, username } = request;
 
   const ss = SpreadsheetApp.openById(stocktakeId);
@@ -412,17 +498,21 @@ function handleLoadUserScans(request) {
       syncId: row[9]
     }));
 
-  return createResponse(true, 'User scans loaded', {
-    scans: userScans,
-    count: userScans.length
-  });
+    return createResponse(true, 'User scans loaded', {
+      scans: userScans,
+      count: userScans.length
+    });
+  } catch (error) {
+    return createErrorResponse('Error loading user scans: ' + error.toString(), 'handleLoadUserScans', { stack: error.stack }, correlationId);
+  }
 }
 
 // ============================================
 // DELETE SCANS (WITH AUDIT TRAIL)
 // ============================================
 
-function handleDeleteScans(request) {
+function handleDeleteScans(request, correlationId) {
+  try {
   const { stocktakeId, syncIds } = request;
 
   if (!syncIds || syncIds.length === 0) {
@@ -473,17 +563,21 @@ function handleDeleteScans(request) {
     updateTally(tallySheet, rawScansSheet);
   }
 
-  return createResponse(true, 'Scans deleted successfully', {
-    deletedCount: deletedRows.length,
-    deletedIds: syncIds
-  });
+    return createResponse(true, 'Scans deleted successfully', {
+      deletedCount: deletedRows.length,
+      deletedIds: syncIds
+    });
+  } catch (error) {
+    return createErrorResponse('Error deleting scans: ' + error.toString(), 'handleDeleteScans', { stack: error.stack }, correlationId);
+  }
 }
 
 // ============================================
 // SYNC KEGS
 // ============================================
 
-function handleSyncKegs(request) {
+function handleSyncKegs(request, correlationId) {
+  try {
   const { stocktakeId, kegs, location, user } = request;
 
   if (!kegs || kegs.length === 0) {
@@ -513,17 +607,21 @@ function handleSyncKegs(request) {
   const lastRow = kegsSheet.getLastRow();
   kegsSheet.getRange(lastRow + 1, 1, kegsToAdd.length, 7).setValues(kegsToAdd);
 
-  return createResponse(true, 'Kegs synced successfully', {
-    syncedCount: kegs.length,
-    syncId: syncId
-  });
+    return createResponse(true, 'Kegs synced successfully', {
+      syncedCount: kegs.length,
+      syncId: syncId
+    });
+  } catch (error) {
+    return createErrorResponse('Error syncing kegs: ' + error.toString(), 'handleSyncKegs', { stack: error.stack }, correlationId);
+  }
 }
 
 // ============================================
 // SYNC MANUAL ENTRIES
 // ============================================
 
-function handleSyncManualEntries(request) {
+function handleSyncManualEntries(request, correlationId) {
+  try {
   const { stocktakeId, manualEntries } = request;
 
   if (!manualEntries || manualEntries.length === 0) {
@@ -603,31 +701,33 @@ function handleSyncManualEntries(request) {
  * Creates a properly formatted JSON response
  * CORS headers are automatically handled by Apps Script when deployed as Web App with "Anyone" access
  */
+// Create success response - always JSON
 function createResponse(success, message, data = {}) {
   const response = {
-    success,
-    message,
+    ok: success,
+    success: success, // Keep for backward compatibility
+    message: message,
     ...data
   };
+  return ContentService.createTextOutput(JSON.stringify(response))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
-  const output = ContentService.createTextOutput(JSON.stringify(response));
-  output.setMimeType(ContentService.MimeType.JSON);
-
-  // *** CRITICAL CORS HEADERS ***
-  // These headers tell the browser it's OK for ANY domain to access this script
-  // Note: setHeader() may not work in all contexts, but matches working stock app pattern
-  
-  try {
-    output.setHeader('Access-Control-Allow-Origin', '*');
-    output.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    output.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    output.setHeader('Access-Control-Max-Age', '3600');
-  } catch (e) {
-    // If setHeader doesn't work, deployment as "Anyone" should handle CORS automatically
-    Logger.log('setHeader not supported, relying on deployment settings: ' + e.message);
-  }
-
-  return output;
+// Create error response - always JSON
+function createErrorResponse(message, where, inputSummary = {}, correlationId = null) {
+  const response = {
+    ok: false,
+    success: false, // Keep for backward compatibility
+    error: {
+      message: message,
+      where: where,
+      correlationId: correlationId || Utilities.getUuid()
+    },
+    inputSummary: inputSummary
+  };
+  console.error(`[${response.error.correlationId}] Error in ${where}:`, message, inputSummary);
+  return ContentService.createTextOutput(JSON.stringify(response))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // ============================================

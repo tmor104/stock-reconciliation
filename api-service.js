@@ -165,7 +165,11 @@ class UnifiedAPIService {
             let errorDetails = 'Failed to list stocktakes';
             try {
                 const errorData = await response.json();
-                errorDetails = errorData.error || errorData.message || JSON.stringify(errorData);
+                errorDetails = errorData.error || errorData.message || errorData.htmlError || JSON.stringify(errorData);
+                // Include response preview if available
+                if (errorData.responsePreview) {
+                    errorDetails += '\n\nResponse preview: ' + errorData.responsePreview;
+                }
             } catch (e) {
                 const text = await response.text();
                 errorDetails = text || 'Failed to list stocktakes';

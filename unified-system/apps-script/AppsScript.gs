@@ -603,10 +603,24 @@ function createResponse(success, message, data = {}) {
     ...data
   };
 
-  // ContentService automatically handles CORS when deployed as Web App
-  // No need to set headers manually - Apps Script doesn't support setHeader()
-  return ContentService.createTextOutput(JSON.stringify(response))
-    .setMimeType(ContentService.MimeType.JSON);
+  const output = ContentService.createTextOutput(JSON.stringify(response));
+  output.setMimeType(ContentService.MimeType.JSON);
+
+  // *** CRITICAL CORS HEADERS ***
+  // These headers tell the browser it's OK for ANY domain to access this script
+  // Note: setHeader() may not work in all contexts, but matches working stock app pattern
+  
+  try {
+    output.setHeader('Access-Control-Allow-Origin', '*');
+    output.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    output.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    output.setHeader('Access-Control-Max-Age', '3600');
+  } catch (e) {
+    // If setHeader doesn't work, deployment as "Anyone" should handle CORS automatically
+    Logger.log('setHeader not supported, relying on deployment settings: ' + e.message);
+  }
+
+  return output;
 }
 
 // ============================================

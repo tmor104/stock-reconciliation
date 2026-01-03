@@ -124,3 +124,4 @@ This way:
 - [ ] `COUNT_SHEETS_FOLDER_ID` set in `wrangler.toml` (if using folder)
 - [ ] Worker redeployed after updating `wrangler.toml`
 
+

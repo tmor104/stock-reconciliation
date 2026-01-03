@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Authentication</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 16px;
+            margin-top: 5px;
+            box-sizing: border-box;
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .result.success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+            display: block;
+        }
+        .result.error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+            display: block;
+        }
+        .result pre {
+            margin: 10px 0 0 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        h1 {
+            margin-top: 0;
+        }
+        .info {
+            background: #eff6ff;
+            border: 1px solid #3b82f6;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Test Service Account Authentication</h1>
+        
+        <div class="info">
+            <strong>What this does:</strong> Tests if your Google Service Account key is properly configured in Cloudflare Workers.
+            <br><br>
+            <strong>Worker URL:</strong> <code id="workerUrl"></code>
+        </div>
+
+        <label>
+            Username:
+            <input type="text" id="username" placeholder="admin" value="admin">
+        </label>
+
+        <label>
+            Password:
+            <input type="password" id="password" placeholder="Your admin password">
+        </label>
+
+        <button id="testBtn" onclick="testAuth()">Test Authentication</button>
+
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        // Get worker URL from config or default
+        const workerUrl = 'https://stocktake-reconciliation.tomwmorgan47.workers.dev';
+        document.getElementById('workerUrl').textContent = workerUrl;
+
+        async function testAuth() {
+            const btn = document.getElementById('testBtn');
+            const result = document.getElementById('result');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Reset result
+            result.className = 'result';
+            result.style.display = 'none';
+            btn.disabled = true;
+            btn.textContent = 'Testing...';
+
+            try {
+                // Step 1: Login to get token
+                const loginResponse = await fetch(`${workerUrl}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (!loginResponse.ok) {
+                    const errorData = await loginResponse.json();
+                    throw new Error(`Login failed: ${errorData.error || 'Invalid credentials'}`);
+                }
+
+                const loginData = await loginResponse.json();
+                const token = loginData.token;
+
+                if (!token) {
+                    throw new Error('No token received from login');
+                }
+
+                // Step 2: Test service account authentication
+                const testResponse = await fetch(`${workerUrl}/debug/test-auth`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const testData = await testResponse.json();
+
+                if (testData.success) {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <strong>✅ Success!</strong>
+                        <p>${testData.message}</p>
+                        <pre>${JSON.stringify(testData, null, 2)}</pre>
+                    `;
+                } else {
+                    result.className = 'result error';
+                    result.innerHTML = `
+                        <strong>❌ Error</strong>
+                        <p><strong>${testData.error}</strong></p>
+                        ${testData.step ? `<p><strong>Next step:</strong> ${testData.step}</p>` : ''}
+                        ${testData.details ? `<pre>${testData.details}</pre>` : ''}
+                        <pre>${JSON.stringify(testData, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `
+                    <strong>❌ Error</strong>
+                    <p>${error.message}</p>
+                    <pre>${error.stack || ''}</pre>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Test Authentication';
+                result.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
+

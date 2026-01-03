@@ -90,3 +90,4 @@ All data is stored locally in IndexedDB:
 
 This ensures no data loss on refresh or network issues.
 
+

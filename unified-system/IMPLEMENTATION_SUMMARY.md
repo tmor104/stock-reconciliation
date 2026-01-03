@@ -129,3 +129,4 @@ unified-system/
 5. **Modern UI** - Stock app's beautiful design
 6. **Complete Workflow** - End-to-end stocktake process
 
+

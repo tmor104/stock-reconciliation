@@ -99,3 +99,4 @@ The folder approach is better because:
 - ✅ All future spreadsheets automatically accessible
 - ✅ Better organization
 
+

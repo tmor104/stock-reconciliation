@@ -91,3 +91,4 @@ The stocktake system needs a **different sheet** called **"Barcode Mapping"**:
 
 The stocktake system does NOT automatically create the Master Sheet because it's not for the stocktake system - it's for the Stock app!
 
+

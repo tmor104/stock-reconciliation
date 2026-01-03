@@ -60,10 +60,99 @@ const requireAdmin = async (request, env) => {
 
 // Routes
 
+// Auth - Initialize Admin (one-time setup)
+router.post('/auth/init', async (request, env) => {
+    try {
+        // Check if users already exist
+        const usersJson = await env.STOCKTAKE_KV.get('users', { type: 'json' });
+        const users = usersJson || [];
+        
+        if (users.length > 0) {
+            return new Response(JSON.stringify({ 
+                error: 'Users already exist. Use /auth/login instead.' 
+            }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
+        // Get initial admin password from secret
+        const initialPassword = env.INITIAL_ADMIN_PASSWORD;
+        
+        if (!initialPassword) {
+            return new Response(JSON.stringify({ 
+                error: 'INITIAL_ADMIN_PASSWORD secret is not set. Set it via: wrangler secret put INITIAL_ADMIN_PASSWORD' 
+            }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
+        // Hash the password (frontend sends hashed passwords)
+        const encoder = new TextEncoder();
+        const passwordData = encoder.encode(initialPassword);
+        const passwordHash = await crypto.subtle.digest('SHA-256', passwordData);
+        const passwordHashArray = Array.from(new Uint8Array(passwordHash));
+        const passwordHashHex = passwordHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        // Create admin user with hashed password (as frontend sends hashed passwords)
+        const adminUser = {
+            username: 'admin',
+            password: passwordHashHex, // Store hashed password
+            role: 'admin'
+        };
+        
+        await env.STOCKTAKE_KV.put('users', JSON.stringify([adminUser]));
+        
+        return new Response(JSON.stringify({ 
+            success: true,
+            message: 'Admin user created successfully. You can now login with username "admin" and the password you set in INITIAL_ADMIN_PASSWORD secret.'
+        }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
 // Auth - Login
 router.post('/auth/login', async (request, env) => {
     try {
         const { username, password } = await request.json();
+        
+        // Auto-initialize if no users exist and password matches INITIAL_ADMIN_PASSWORD
+        const usersJson = await env.STOCKTAKE_KV.get('users', { type: 'json' });
+        const users = usersJson || [];
+        
+        if (users.length === 0 && username === 'admin' && env.INITIAL_ADMIN_PASSWORD) {
+            // Hash the INITIAL_ADMIN_PASSWORD to match what frontend sends
+            const encoder = new TextEncoder();
+            const initialPasswordData = encoder.encode(env.INITIAL_ADMIN_PASSWORD);
+            const initialPasswordHash = await crypto.subtle.digest('SHA-256', initialPasswordData);
+            const initialPasswordHashArray = Array.from(new Uint8Array(initialPasswordHash));
+            const initialPasswordHashHex = initialPasswordHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            
+            // Compare with the hashed password from frontend
+            if (password === initialPasswordHashHex) {
+                // Create admin user with hashed password (as frontend sends hashed passwords)
+                const adminUser = {
+                    username: 'admin',
+                    password: initialPasswordHashHex, // Store hashed password
+                    role: 'admin'
+                };
+                await env.STOCKTAKE_KV.put('users', JSON.stringify([adminUser]));
+                
+                // Now login
+                const result = await AuthService.login(username, password, env);
+                return new Response(JSON.stringify(result), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+        }
+        
         const result = await AuthService.login(username, password, env);
         
         if (!result) {
@@ -847,6 +936,92 @@ router.post('/counting/manual/sync', async (request, env) => {
         });
     } catch (error) {
         return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Debug - Test Authentication
+router.get('/debug/test-auth', async (request, env) => {
+    try {
+        // Check if secret exists
+        if (!env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+            return new Response(JSON.stringify({ 
+                success: false,
+                error: 'GOOGLE_SERVICE_ACCOUNT_KEY secret is not set',
+                step: 'Set the secret in Cloudflare Dashboard or via wrangler secret put'
+            }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // Try to parse the JSON
+        let serviceAccountKey;
+        try {
+            serviceAccountKey = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY);
+        } catch (e) {
+            return new Response(JSON.stringify({ 
+                success: false,
+                error: 'GOOGLE_SERVICE_ACCOUNT_KEY is not valid JSON',
+                details: e.message,
+                step: 'Re-upload the service account JSON key'
+            }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // Try to get an access token
+        try {
+            const accessToken = await GoogleSheetsAPI.getAccessToken(env);
+            
+            // Test with a simple Drive API call
+            const testResponse = await fetch(
+                'https://www.googleapis.com/drive/v3/about?fields=user',
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+
+            if (!testResponse.ok) {
+                const errorText = await testResponse.text();
+                return new Response(JSON.stringify({ 
+                    success: false,
+                    error: 'Failed to authenticate with Google Drive API',
+                    status: testResponse.status,
+                    details: errorText,
+                    step: 'Check that APIs are enabled and service account key is valid'
+                }), {
+                    status: 500,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            return new Response(JSON.stringify({ 
+                success: true,
+                message: 'Authentication successful! Service account is working correctly.',
+                serviceAccountEmail: serviceAccountKey.client_email,
+                projectId: serviceAccountKey.project_id
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        } catch (error) {
+            return new Response(JSON.stringify({ 
+                success: false,
+                error: 'Failed to get access token',
+                details: error.message,
+                step: 'Check service account key and API enablement'
+            }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+    } catch (error) {
+        return new Response(JSON.stringify({ 
+            success: false,
+            error: error.message,
+            step: 'Check Cloudflare Worker logs for details'
+        }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

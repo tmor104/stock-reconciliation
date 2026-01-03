@@ -147,21 +147,22 @@ export class CountingService {
         
         // Move to folder if folderId provided
         if (folderId && folderId.trim() !== '') {
-            try {
-                const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-                await fetch(
-                    `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${cleanFolderId}&removeParents=root&supportsAllDrives=true`,
-                    {
-                        method: 'PATCH',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
-                        }
+            const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+            const moveResponse = await fetch(
+                `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${cleanFolderId}&removeParents=root&supportsAllDrives=true`,
+                {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
                     }
-                );
-            } catch (e) {
-                // Continue even if folder move fails
-                console.error('Failed to move to folder:', e);
+                }
+            );
+
+            if (!moveResponse.ok) {
+                const errorText = await moveResponse.text();
+                console.error('Failed to move spreadsheet to folder:', errorText);
+                throw new Error(`Failed to move spreadsheet to folder: ${errorText}`);
             }
         }
         
@@ -180,7 +181,7 @@ export class CountingService {
     
     static async setupStocktakeSheets(spreadsheetId, accessToken) {
         // Tally sheet headers
-        await fetch(
+        const tallyResponse = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Tally!A1:F1?valueInputOption=RAW`,
             {
                 method: 'PUT',
@@ -193,6 +194,11 @@ export class CountingService {
                 })
             }
         );
+
+        if (!tallyResponse.ok) {
+            const errorText = await tallyResponse.text();
+            throw new Error(`Failed to set up Tally sheet headers: ${errorText}`);
+        }
         
         // Raw Scans sheet headers
         await fetch(

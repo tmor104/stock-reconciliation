@@ -147,22 +147,44 @@ export class CountingService {
         
         // Move to folder if folderId provided
         if (folderId && folderId.trim() !== '') {
-            try {
-                const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-                await fetch(
-                    `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${cleanFolderId}&removeParents=root&supportsAllDrives=true`,
-                    {
-                        method: 'PATCH',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
-                        }
+            const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+            const moveUrl = `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${cleanFolderId}&removeParents=root&supportsAllDrives=true`;
+            
+            console.log(`Moving spreadsheet ${spreadsheetId} to folder ${cleanFolderId}`);
+            
+            const moveResponse = await fetch(moveUrl, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!moveResponse.ok) {
+                const moveError = await moveResponse.text();
+                console.error('Failed to move to folder:', moveError);
+                let moveErrorMsg = `Failed to move spreadsheet to folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE.`;
+                
+                try {
+                    const moveErrorJson = JSON.parse(moveError);
+                    const moveErrorCode = moveErrorJson.error?.code;
+                    const moveErrorText = moveErrorJson.error?.message || moveError;
+                    
+                    if (moveErrorCode === 403) {
+                        moveErrorMsg = `Permission denied: The service account does not have write access to folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission. Then wait 10-30 seconds for permissions to propagate.`;
+                    } else if (moveErrorCode === 404) {
+                        moveErrorMsg = `Folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE not found. Please verify the folder ID is correct.`;
+                    } else {
+                        moveErrorMsg = `Error moving to folder: ${moveErrorText} (Code: ${moveErrorCode})`;
                     }
-                );
-            } catch (e) {
-                // Continue even if folder move fails
-                console.error('Failed to move to folder:', e);
+                } catch (e) {
+                    moveErrorMsg = `Error moving to folder. Raw error: ${moveError}`;
+                }
+                
+                throw new Error(moveErrorMsg);
             }
+            
+            console.log(`Successfully moved spreadsheet to folder ${cleanFolderId}`);
         }
         
         // Set up sheets with headers

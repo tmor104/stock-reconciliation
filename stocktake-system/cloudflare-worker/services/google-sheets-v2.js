@@ -121,10 +121,12 @@ export class GoogleSheetsAPI {
             // Clean folder ID
             const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
             // Search within specific folder - use standard Google Drive API query syntax
-            query = `parents in '${cleanFolderId}' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+            // NOTE: Use 'name' not 'title' - title is deprecated in Drive API v3
+            query = `parents in '${cleanFolderId}' and name contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         } else {
             // Search all Drive for stocktake spreadsheets (Stock app creates them individually)
-            query = `title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+            // NOTE: Use 'name' not 'title' - title is deprecated in Drive API v3
+            query = `name contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         }
         
         // Add supportsAllDrives=true for service account access

@@ -312,10 +312,11 @@ export class CountingService {
             // Skip folder verification for now - go straight to query
             // The query itself will fail if folder doesn't exist or isn't accessible
             // Use standard Google Drive API query format: parents in 'FOLDER_ID'
-            query = `parents in '${cleanFolderId}' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+            // NOTE: Use 'name' not 'title' - title is deprecated in Drive API v3
+            query = `parents in '${cleanFolderId}' and name contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
             console.log(`Query for folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE: ${query}`);
         } else {
-            query = `title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+            query = `name contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         }
         
         // Add supportsAllDrives=true for service account access

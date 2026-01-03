@@ -3,7 +3,8 @@
 
 const CONFIG = {
     WORKER_URL: 'https://stocktake-reconciliation.tomwmorgan47.workers.dev',
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyRxTKP3KGCiGKhkraeaSz9rxEknGR6mF0LnGQBzMuXp_WfjLf7DtLULC0924ZJcmwQ/exec',
+    // Use Cloudflare Worker proxy to avoid CORS issues
+    APPS_SCRIPT_URL: 'https://stocktake-reconciliation.tomwmorgan47.workers.dev/apps-script/proxy',
 };
 
 // Utility function for SHA-256 hashing
@@ -108,9 +109,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        // No Content-Type header = simple request = no preflight (Apps Script doesn't handle OPTIONS)
+        // Use Cloudflare Worker proxy (handles CORS properly)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'createStocktake',
                 name,
@@ -140,9 +142,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        // No Content-Type header = simple request = no preflight (Apps Script doesn't handle OPTIONS)
+        // Use Cloudflare Worker proxy (handles CORS properly)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'listStocktakes'
             })
@@ -172,9 +175,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        // No Content-Type header = simple request = no preflight (Apps Script doesn't handle OPTIONS)
+        // Use Cloudflare Worker proxy (handles CORS properly)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'syncScans',
                 stocktakeId,
@@ -199,9 +203,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        // No Content-Type header = simple request = no preflight (Apps Script doesn't handle OPTIONS)
+        // Use Cloudflare Worker proxy (handles CORS properly)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'deleteScans',
                 stocktakeId,
@@ -226,9 +231,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        // No Content-Type header = simple request = no preflight (Apps Script doesn't handle OPTIONS)
+        // Use Cloudflare Worker proxy (handles CORS properly)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'loadUserScans',
                 stocktakeId,
@@ -253,9 +259,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        // No Content-Type header = simple request = no preflight (Apps Script doesn't handle OPTIONS)
+        // Use Cloudflare Worker proxy (handles CORS properly)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'syncKegs',
                 stocktakeId,
@@ -282,9 +289,10 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        // No Content-Type header = simple request = no preflight (Apps Script doesn't handle OPTIONS)
+        // Use Cloudflare Worker proxy (handles CORS properly)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'syncManualEntries',
                 stocktakeId,

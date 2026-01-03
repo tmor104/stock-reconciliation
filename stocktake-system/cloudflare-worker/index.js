@@ -20,6 +20,45 @@ const corsHeaders = {
 // Handle CORS preflight
 router.options('*', () => new Response(null, { headers: corsHeaders }));
 
+// Apps Script Proxy - forwards requests to Apps Script to avoid CORS
+router.post('/apps-script/proxy', async (request, env) => {
+    try {
+        const APPS_SCRIPT_URL = env.APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyRxTKP3KGCiGKhkraeaSz9rxEknGR6mF0LnGQBzMuXp_WfjLf7DtLULC0924ZJcmwQ/exec';
+        
+        // Get the request body
+        const body = await request.text();
+        
+        // Forward to Apps Script (server-to-server, no CORS issues)
+        const appsScriptResponse = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: body
+        });
+        
+        // Get the response from Apps Script
+        const responseText = await appsScriptResponse.text();
+        
+        // Return with CORS headers (browser → Worker is fine, Worker → Apps Script is server-to-server)
+        return new Response(responseText, {
+            status: appsScriptResponse.status,
+            headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/json'
+            }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ 
+            success: false,
+            error: 'Proxy error: ' + error.message 
+        }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
 // Authentication middleware
 const requireAuth = async (request, env) => {
     const authHeader = request.headers.get('Authorization');

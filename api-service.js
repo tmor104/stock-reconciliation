@@ -121,12 +121,21 @@ class UnifiedAPIService {
         });
         
         if (!response.ok) {
-            throw new Error('Failed to create stocktake');
+            // Try to get error details from response
+            let errorDetails = 'Failed to create stocktake';
+            try {
+                const errorData = await response.json();
+                errorDetails = errorData.error || errorData.message || JSON.stringify(errorData);
+            } catch (e) {
+                const text = await response.text();
+                errorDetails = text || 'Failed to create stocktake';
+            }
+            throw new Error(errorDetails);
         }
         
         const result = await response.json();
         if (!result.success) {
-            throw new Error(result.message || 'Failed to create stocktake');
+            throw new Error(result.message || result.error || 'Failed to create stocktake');
         }
         
         return {

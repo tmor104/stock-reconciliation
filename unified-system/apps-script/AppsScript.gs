@@ -4,7 +4,7 @@
 
 // CONFIGURATION - Update this with your Master Sheet ID and Stocktake Folder ID
 const MASTER_SHEET_ID = '1e3rsYW4RoEpxpH8ZMckLP7VdtnpbbfQpd8N_NB9fRgM'; // Master Sheet ID
-const STOCKTAKE_FOLDER_ID = ''; // Google Drive Folder ID where stocktakes will be created (leave empty to use root)
+const STOCKTAKE_FOLDER_ID = '1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE'; // Google Drive Folder ID where stocktakes will be created
 
 // ============================================
 // HTTP REQUEST HANDLERS WITH CORS
@@ -474,8 +474,8 @@ function handleDeleteScans(request) {
 // ============================================
 
 /**
- * Creates a properly formatted JSON response with CORS headers
- * This ensures your GitHub Pages site can access the API
+ * Creates a properly formatted JSON response
+ * CORS headers are automatically handled by Apps Script when deployed as Web App with "Anyone" access
  */
 function createResponse(success, message, data = {}) {
   const response = {
@@ -484,25 +484,10 @@ function createResponse(success, message, data = {}) {
     ...data
   };
 
-  const output = ContentService.createTextOutput(JSON.stringify(response));
-  output.setMimeType(ContentService.MimeType.JSON);
-
-  // *** CRITICAL CORS HEADERS ***
-  // These headers tell the browser it's OK for ANY domain to access this script
-
-  // Allow ANY domain to access this API
-  output.setHeader('Access-Control-Allow-Origin', '*');
-
-  // Allow these HTTP methods
-  output.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-
-  // Allow these headers in requests
-  output.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  // Cache preflight requests for 1 hour
-  output.setHeader('Access-Control-Max-Age', '3600');
-
-  return output;
+  // ContentService automatically handles CORS when deployed as Web App
+  // No need to set headers manually - Apps Script doesn't support setHeader()
+  return ContentService.createTextOutput(JSON.stringify(response))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // ============================================

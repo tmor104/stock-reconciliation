@@ -112,84 +112,188 @@ export class CountingService {
         const dateStr = timestamp.toISOString().slice(0, 16).replace('T', ' ');
         const stocktakeName = `Stocktake - ${name} - ${dateStr}`;
         
-        // Create spreadsheet
-        const createResponse = await fetch(
-            'https://sheets.googleapis.com/v4/spreadsheets',
-            {
+        // CRITICAL: Service accounts cannot create files in root Drive
+        // They MUST create files in a shared folder
+        if (!folderId || folderId.trim() === '') {
+            throw new Error('Folder ID is required. Service accounts cannot create files in root Drive. Please:\n\n1. Create a folder in Google Drive\n2. Share it with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com\n3. Grant "Editor" permission\n4. Enter the folder ID in Settings');
+        }
+        
+        const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+        
+        // CRITICAL INSIGHT: Service accounts CANNOT create files in root Drive
+        // They MUST create files in a shared folder using Drive API with parents parameter
+        // OR use Sheets API and immediately move to folder (but CREATE might still fail)
+        
+        console.log(`Attempting to create spreadsheet - will try Drive API method first`);
+        
+        // METHOD 1: Try Drive API to create spreadsheet directly in folder
+        // This might work better than Sheets API + move
+        try {
+            const driveCreateResponse = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    properties: {
-                        title: stocktakeName
-                    },
-                    sheets: [
-                        { properties: { title: 'Tally', index: 0 } },
-                        { properties: { title: 'Raw Scans', index: 1 } },
-                        { properties: { title: 'Manual', index: 2 } },
-                        { properties: { title: 'Kegs', index: 3 } },
-                        { properties: { title: 'Deleted Scans', index: 4 } },
-                        { properties: { title: 'Metadata', index: 5 } }
-                    ]
+                    name: stocktakeName,
+                    mimeType: 'application/vnd.google-apps.spreadsheet',
+                    parents: [cleanFolderId]
                 })
+            });
+            
+            if (driveCreateResponse.ok) {
+                const driveData = await driveCreateResponse.json();
+                const spreadsheetId = driveData.id;
+                console.log(`Successfully created spreadsheet ${spreadsheetId} directly in folder using Drive API`);
+                
+                // Drive API creates spreadsheet with only default sheet
+                // We need to add the other sheets using Sheets API batchUpdate
+                const addSheetsResponse = await fetch(
+                    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            requests: [
+                                { addSheet: { properties: { title: 'Tally', index: 0 } } },
+                                { addSheet: { properties: { title: 'Raw Scans', index: 1 } } },
+                                { addSheet: { properties: { title: 'Manual', index: 2 } } },
+                                { addSheet: { properties: { title: 'Kegs', index: 3 } } },
+                                { addSheet: { properties: { title: 'Deleted Scans', index: 4 } } },
+                                { addSheet: { properties: { title: 'Metadata', index: 5 } } }
+                            ]
+                        })
+                    }
+                );
+                
+                if (!addSheetsResponse.ok) {
+                    const sheetsError = await addSheetsResponse.text();
+                    console.error('Failed to add sheets:', sheetsError);
+                    // Continue anyway - we can still use the spreadsheet
+                }
+                
+                // Now set up sheet headers
+                await this.setupStocktakeSheets(spreadsheetId, accessToken);
+                await this.setMetadata(spreadsheetId, name, user, dateStr, accessToken);
+                
+                return {
+                    stocktakeId: spreadsheetId,
+                    name: stocktakeName,
+                    url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`
+                };
+            } else {
+                const driveError = await driveCreateResponse.text();
+                console.log('Drive API create failed, trying Sheets API method:', driveError);
+                // Fall through to Sheets API method
             }
-        );
+        } catch (driveError) {
+            console.log('Drive API create threw error, trying Sheets API method:', driveError);
+            // Fall through to Sheets API method
+        }
+        
+        // METHOD 2: Fallback to Sheets API (creates in service account's Drive, then move)
+        console.log(`Trying Sheets API method (create then move)`);
+        const createResponse = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                properties: {
+                    title: stocktakeName
+                },
+                sheets: [
+                    { properties: { title: 'Tally', index: 0 } },
+                    { properties: { title: 'Raw Scans', index: 1 } },
+                    { properties: { title: 'Manual', index: 2 } },
+                    { properties: { title: 'Kegs', index: 3 } },
+                    { properties: { title: 'Deleted Scans', index: 4 } },
+                    { properties: { title: 'Metadata', index: 5 } }
+                ]
+            })
+        });
         
         if (!createResponse.ok) {
-            const error = await createResponse.text();
-            throw new Error(`Failed to create spreadsheet: ${error}`);
+            const errorText = await createResponse.text();
+            let errorMessage = 'Failed to create spreadsheet';
+            
+            try {
+                const errorJson = JSON.parse(errorText);
+                const errorCode = errorJson.error?.code;
+                const errorMsg = errorJson.error?.message || errorText;
+                
+                console.error('Sheets API Create Error:', {
+                    code: errorCode,
+                    message: errorMsg,
+                    fullError: errorText
+                });
+                
+                if (errorCode === 403) {
+                    // Service account can't create files - need to verify folder sharing
+                    errorMessage = `403 Permission Denied: The service account cannot create spreadsheets.\n\nVERIFY:\n1. Folder ${cleanFolderId} is shared with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com\n2. Permission is "Editor" (not Viewer)\n3. Wait 1-2 minutes after sharing\n4. Check folder URL: https://drive.google.com/drive/folders/${cleanFolderId}\n\nIf still failing, the service account may need domain-wide delegation or IAM roles.`;
+                } else {
+                    errorMessage = `Failed to create spreadsheet: ${errorMsg} (Code: ${errorCode || 'unknown'})`;
+                }
+            } catch (e) {
+                errorMessage = `Failed to create spreadsheet. Raw error: ${errorText}`;
+            }
+            
+            throw new Error(errorMessage);
         }
         
         const spreadsheetData = await createResponse.json();
         const spreadsheetId = spreadsheetData.spreadsheetId;
         
-        // Move to folder if folderId provided
-        if (folderId && folderId.trim() !== '') {
-            const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-            // According to Google Drive API v3 docs: addParents and removeParents are QUERY PARAMETERS (comma-separated strings)
-            // NOT request body fields. The request body is for File resource fields only.
-            const moveUrl = `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${cleanFolderId}&supportsAllDrives=true`;
+        console.log(`Created spreadsheet ${spreadsheetId}, now moving to folder ${cleanFolderId}`);
+        
+        // Immediately move to shared folder (service account must have Editor access)
+        const moveUrl = `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${cleanFolderId}&supportsAllDrives=true`;
+        
+        const moveResponse = await fetch(moveUrl, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!moveResponse.ok) {
+            const moveError = await moveResponse.text();
+            console.error('Failed to move to folder:', moveError);
             
-            console.log(`Moving spreadsheet ${spreadsheetId} to folder ${cleanFolderId}`);
-            console.log(`Move URL: ${moveUrl}`);
+            // Delete the spreadsheet we created since we can't move it
+            await fetch(`https://www.googleapis.com/drive/v3/files/${spreadsheetId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            }).catch(() => {});
             
-            const moveResponse = await fetch(moveUrl, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                }
-                // No body needed - addParents is a query parameter
-            });
+            let moveErrorMsg = `Failed to move spreadsheet to folder ${cleanFolderId}.`;
             
-            if (!moveResponse.ok) {
-                const moveError = await moveResponse.text();
-                console.error('Failed to move to folder:', moveError);
-                let moveErrorMsg = `Failed to move spreadsheet to folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE.`;
+            try {
+                const moveErrorJson = JSON.parse(moveError);
+                const moveErrorCode = moveErrorJson.error?.code;
+                const moveErrorText = moveErrorJson.error?.message || moveError;
                 
-                try {
-                    const moveErrorJson = JSON.parse(moveError);
-                    const moveErrorCode = moveErrorJson.error?.code;
-                    const moveErrorText = moveErrorJson.error?.message || moveError;
-                    
-                    if (moveErrorCode === 403) {
-                        moveErrorMsg = `Permission denied: The service account does not have write access to folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission. Then wait 10-30 seconds for permissions to propagate.`;
-                    } else if (moveErrorCode === 404) {
-                        moveErrorMsg = `Folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE not found. Please verify the folder ID is correct.`;
-                    } else {
-                        moveErrorMsg = `Error moving to folder: ${moveErrorText} (Code: ${moveErrorCode})`;
-                    }
-                } catch (e) {
-                    moveErrorMsg = `Error moving to folder. Raw error: ${moveError}`;
+                if (moveErrorCode === 403) {
+                    moveErrorMsg = `403 Permission Denied: Cannot move to folder ${cleanFolderId}.\n\nVERIFY FOLDER SHARING:\n1. Open: https://drive.google.com/drive/folders/${cleanFolderId}\n2. Click "Share"\n3. Verify: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com is listed\n4. Permission MUST be "Editor"\n5. If not there, add it with Editor permission\n6. Wait 1-2 minutes, then try again`;
+                } else if (moveErrorCode === 404) {
+                    moveErrorMsg = `Folder ${cleanFolderId} not found. Check the folder ID is correct.`;
+                } else {
+                    moveErrorMsg = `Error moving to folder: ${moveErrorText} (Code: ${moveErrorCode})`;
                 }
-                
-                throw new Error(moveErrorMsg);
+            } catch (e) {
+                moveErrorMsg = `Error moving to folder. Raw error: ${moveError}`;
             }
             
-            console.log(`Successfully moved spreadsheet to folder ${cleanFolderId}`);
+            throw new Error(moveErrorMsg);
         }
+        
+        console.log(`Successfully created and moved spreadsheet to folder ${cleanFolderId}`);
         
         // Set up sheets with headers
         await this.setupStocktakeSheets(spreadsheetId, accessToken);

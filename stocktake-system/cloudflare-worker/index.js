@@ -942,6 +942,175 @@ router.post('/counting/manual/sync', async (request, env) => {
     }
 });
 
+// Debug - Test Folder Access
+router.get('/debug/test-folder-access', async (request, env) => {
+    try {
+        const url = new URL(request.url);
+        const folderId = url.searchParams.get('folderId');
+        
+        if (!folderId) {
+            return new Response(JSON.stringify({ 
+                error: 'Please provide folderId query parameter, e.g., ?folderId=1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE' 
+            }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
+        const accessToken = await GoogleSheetsAPI.getAccessToken(env);
+        
+        // Test 1: Can we get folder info?
+        const folderInfoResponse = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,permissions&supportsAllDrives=true`,
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        
+        const results = {
+            folderId,
+            canAccessFolder: folderInfoResponse.ok,
+            folderInfo: null,
+            canCreateInFolder: false,
+            createTestResult: null
+        };
+        
+        if (folderInfoResponse.ok) {
+            results.folderInfo = await folderInfoResponse.json();
+            
+            // Test 2: Can we create a file in this folder?
+            const testCreateResponse = await fetch(
+                'https://www.googleapis.com/drive/v3/files?supportsAllDrives=true',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: 'TEST_DELETE_ME_' + Date.now(),
+                        mimeType: 'application/vnd.google-apps.spreadsheet',
+                        parents: [folderId]
+                    })
+                }
+            );
+            
+            results.canCreateInFolder = testCreateResponse.ok;
+            
+            if (testCreateResponse.ok) {
+                const createdFile = await testCreateResponse.json();
+                results.createTestResult = { success: true, fileId: createdFile.id };
+                
+                // Delete test file
+                await fetch(
+                    `https://www.googleapis.com/drive/v3/files/${createdFile.id}`,
+                    {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }
+                ).catch(() => {});
+            } else {
+                const errorText = await testCreateResponse.text();
+                try {
+                    results.createTestResult = JSON.parse(errorText);
+                } catch (e) {
+                    results.createTestResult = { error: errorText };
+                }
+            }
+        } else {
+            const errorText = await folderInfoResponse.text();
+            try {
+                results.folderInfo = JSON.parse(errorText);
+            } catch (e) {
+                results.folderInfo = { error: errorText };
+            }
+        }
+        
+        return new Response(JSON.stringify(results, null, 2), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ 
+            error: error.message,
+            stack: error.stack
+        }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Debug - Test Service Account (No auth required for testing)
+router.get('/debug/test-service-account', async (request, env) => {
+    try {
+        // Test if we can get an access token
+        const accessToken = await GoogleSheetsAPI.getAccessToken(env);
+        
+        // Test if we can create a spreadsheet (just test, don't actually create)
+        const testResponse = await fetch(
+            'https://sheets.googleapis.com/v4/spreadsheets',
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    properties: { title: 'TEST - DELETE ME' }
+                })
+            }
+        );
+        
+        const responseText = await testResponse.text();
+        
+        if (testResponse.ok) {
+            const data = JSON.parse(responseText);
+            // Delete the test spreadsheet immediately
+            await fetch(
+                `https://www.googleapis.com/drive/v3/files/${data.spreadsheetId}`,
+                {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                }
+            );
+            
+            return new Response(JSON.stringify({ 
+                success: true,
+                message: 'Service account CAN create spreadsheets! The key is working.',
+                spreadsheetId: data.spreadsheetId,
+                deleted: true
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        } else {
+            let errorData;
+            try {
+                errorData = JSON.parse(responseText);
+            } catch (e) {
+                errorData = { error: { message: responseText } };
+            }
+            
+            return new Response(JSON.stringify({ 
+                success: false,
+                error: errorData.error?.message || 'Unknown error',
+                code: errorData.error?.code,
+                status: testResponse.status,
+                fullError: errorData
+            }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+    } catch (error) {
+        return new Response(JSON.stringify({ 
+            success: false,
+            error: error.message,
+            stack: error.stack
+        }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
 // Debug - Test Authentication
 router.get('/debug/test-auth', async (request, env) => {
     try {

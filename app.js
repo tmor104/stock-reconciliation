@@ -527,6 +527,12 @@ async function handleLogout(skipConfirm = false) {
     if (passwordInput) passwordInput.value = '';
 }
 
+// Make handleLogout and dbService available globally for API service
+if (typeof window !== 'undefined') {
+    window.handleLogout = handleLogout;
+    window.dbService = dbService;
+}
+
 // ============================================
 // FOLDER ID CONFIGURATION
 // ============================================

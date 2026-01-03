@@ -141,14 +141,14 @@ class UnifiedAPIService {
             // If 401, token is invalid - clear it
             if (response.status === 401) {
                 this.token = null;
-                // Clear from IndexedDB
-                if (typeof dbService !== 'undefined') {
-                    dbService.saveState('token', null).catch(console.error);
-                    dbService.saveState('user', null).catch(console.error);
+                // Clear from IndexedDB (if available globally)
+                if (typeof window !== 'undefined' && window.dbService) {
+                    window.dbService.saveState('token', null).catch(console.error);
+                    window.dbService.saveState('user', null).catch(console.error);
                 }
                 // Trigger logout (skip confirmation for expired tokens)
-                if (typeof handleLogout === 'function') {
-                    handleLogout(true);
+                if (typeof window !== 'undefined' && typeof window.handleLogout === 'function') {
+                    window.handleLogout(true);
                 }
                 throw new Error('Session expired. Please log in again.');
             }

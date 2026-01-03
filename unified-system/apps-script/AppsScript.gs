@@ -13,7 +13,17 @@ const STOCKTAKE_FOLDER_ID = '1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE'; // Google Drive
 // Main entry point for HTTP POST requests
 function doPost(e) {
   try {
-    const request = JSON.parse(e.postData.contents);
+    // Handle both JSON and text/plain Content-Type
+    let requestData;
+    if (e.postData && e.postData.contents) {
+      requestData = e.postData.contents;
+    } else if (e.parameter && e.parameter.data) {
+      requestData = e.parameter.data;
+    } else {
+      return createResponse(false, 'No request data received');
+    }
+    
+    const request = JSON.parse(requestData);
     const action = request.action;
 
     // Route to appropriate handler

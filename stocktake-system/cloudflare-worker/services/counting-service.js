@@ -309,8 +309,8 @@ export class CountingService {
         
         if (cleanFolderId) {
             // First, try to verify folder exists with a simple query
-            // Query format: 'FOLDER_ID' in parents
-            const simpleQuery = `'${cleanFolderId}' in parents`;
+            // Query format: parents in 'FOLDER_ID' (correct Google Drive API syntax)
+            const simpleQuery = `parents in '${cleanFolderId}'`;
             const simpleUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(simpleQuery)}&fields=files(id,name,mimeType)&pageSize=1`;
             
             console.log('Testing folder access with simple query:', simpleQuery);
@@ -321,13 +321,28 @@ export class CountingService {
             if (!testResponse.ok) {
                 const testError = await testResponse.text();
                 console.error('Simple query failed:', testError);
-                // If simple query fails, the folder ID is likely invalid or not accessible
-                throw new Error(`Cannot access folder ${cleanFolderId}. The folder may not exist, may not be shared with the service account, or the folder ID is incorrect. Error: ${testError}`);
+                let testErrorMsg = `Cannot access folder ${cleanFolderId}.`;
+                try {
+                    const testErrorJson = JSON.parse(testError);
+                    const testErrorCode = testErrorJson.error?.code;
+                    const testErrorText = testErrorJson.error?.message || testError;
+                    
+                    if (testErrorCode === 400) {
+                        testErrorMsg = `Invalid folder ID: ${cleanFolderId}. The folder may not exist or the ID is incorrect. Please verify the folder ID from the Google Drive URL.`;
+                    } else if (testErrorCode === 403 || testErrorCode === 404) {
+                        testErrorMsg = `Permission denied: The service account cannot access folder ${cleanFolderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission.`;
+                    } else {
+                        testErrorMsg = `${testErrorMsg} Error: ${testErrorText}`;
+                    }
+                } catch (e) {
+                    testErrorMsg = `${testErrorMsg} Raw error: ${testError}`;
+                }
+                throw new Error(testErrorMsg);
             }
             
             // Folder is accessible, now use full query
-            // Query format: 'FOLDER_ID' in parents and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'
-            query = `'${cleanFolderId}' in parents and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+            // Query format: parents in 'FOLDER_ID' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'
+            query = `parents in '${cleanFolderId}' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         } else {
             query = `title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         }

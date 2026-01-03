@@ -120,15 +120,16 @@ export class GoogleSheetsAPI {
         if (folderId && folderId !== 'YOUR_GOOGLE_DRIVE_FOLDER_ID') {
             // Clean folder ID
             const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-            // Search within specific folder - use proper Google Drive API query syntax
+            // Search within specific folder - use standard Google Drive API query syntax
             query = `parents in '${cleanFolderId}' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         } else {
             // Search all Drive for stocktake spreadsheets (Stock app creates them individually)
             query = `title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         }
         
+        // Add supportsAllDrives=true for service account access
         const response = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc`,
+            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&supportsAllDrives=true&includeItemsFromAllDrives=true`,
             {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             }

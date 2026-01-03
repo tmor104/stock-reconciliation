@@ -148,8 +148,9 @@ export class CountingService {
         // Move to folder if folderId provided
         if (folderId && folderId.trim() !== '') {
             try {
+                const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
                 await fetch(
-                    `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${folderId}&removeParents=root`,
+                    `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${cleanFolderId}&removeParents=root&supportsAllDrives=true`,
                     {
                         method: 'PATCH',
                         headers: {

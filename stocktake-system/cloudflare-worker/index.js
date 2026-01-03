@@ -278,7 +278,7 @@ router.post('/stocktake/create', async (request, env) => {
                 // Fallback: try to get name from Drive API
                 const accessToken = await GoogleSheetsAPI.getAccessToken(env);
                 const driveResponse = await fetch(
-                    `https://www.googleapis.com/drive/v3/files/${countSheetId}?fields=name`,
+                    `https://www.googleapis.com/drive/v3/files/${countSheetId}?fields=name&supportsAllDrives=true`,
                     { headers: { 'Authorization': `Bearer ${accessToken}` } }
                 );
                 

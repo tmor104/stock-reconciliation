@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Authentication</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            color: #166534;
+        }
+        .error {
+            background: #fee2e2;
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        label {
+            font-weight: 600;
+            color: #334155;
+            display: block;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Test Authentication</h1>
+        <p>This will test if your service account is configured correctly.</p>
+
+        <label>1. Enter Username:</label>
+        <input type="text" id="username" value="admin" placeholder="Username">
+
+        <label>2. Enter Password:</label>
+        <input type="password" id="password" placeholder="Password">
+
+        <button onclick="testAuth()">🚀 Test Authentication</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_URL = 'https://stocktake-reconciliation.tomwmorgan47.workers.dev';
+
+        // SHA-256 hash function
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function testAuth() {
+            const resultDiv = document.getElementById('result');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = 'Please enter username and password';
+                return;
+            }
+
+            try {
+                resultDiv.className = 'result';
+                resultDiv.textContent = 'Testing...\n\nStep 1: Hashing password...';
+
+                // Hash the password
+                const hashedPassword = await sha256(password);
+
+                resultDiv.textContent += '\n✓ Password hashed\n\nStep 2: Logging in...';
+
+                // Login
+                const loginResponse = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password: hashedPassword })
+                });
+
+                if (!loginResponse.ok) {
+                    const error = await loginResponse.json();
+                    throw new Error(`Login failed: ${error.error || 'Invalid credentials'}`);
+                }
+
+                const loginData = await loginResponse.json();
+                const token = loginData.token;
+
+                resultDiv.textContent += '\n✓ Login successful\n\nStep 3: Testing service account authentication...';
+
+                // Test auth
+                const authTestResponse = await fetch(`${API_URL}/debug/test-auth`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const authTestData = await authTestResponse.json();
+
+                if (authTestData.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ SUCCESS! Everything is working!\n\n` +
+                        `Service Account: ${authTestData.serviceAccountEmail}\n` +
+                        `Test Spreadsheet Created: ${authTestData.testSpreadsheetCreated}\n` +
+                        `Test Spreadsheet Deleted: ${authTestData.testSpreadsheetDeleted}\n\n` +
+                        `You can now create stocktakes! 🎉`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Authentication test failed:\n\n` +
+                        `Error: ${authTestData.error}\n` +
+                        `Details: ${authTestData.details || 'N/A'}\n` +
+                        `Step: ${authTestData.step || 'N/A'}\n` +
+                        `Status: ${authTestData.status || 'N/A'}\n\n` +
+                        `Help: ${authTestData.help || 'Check the error above'}\n\n` +
+                        `Full Response:\n${JSON.stringify(authTestData, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error:\n\n${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

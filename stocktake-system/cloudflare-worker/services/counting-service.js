@@ -148,22 +148,20 @@ export class CountingService {
         // Move to folder if folderId provided
         if (folderId && folderId.trim() !== '') {
             const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-            // Use request body for PATCH, not URL parameters
-            // Don't remove 'root' - just add the folder as a parent (file can be in multiple places)
-            const moveUrl = `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?supportsAllDrives=true`;
+            // According to Google Drive API v3 docs: addParents and removeParents are QUERY PARAMETERS (comma-separated strings)
+            // NOT request body fields. The request body is for File resource fields only.
+            const moveUrl = `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${cleanFolderId}&supportsAllDrives=true`;
             
             console.log(`Moving spreadsheet ${spreadsheetId} to folder ${cleanFolderId}`);
+            console.log(`Move URL: ${moveUrl}`);
             
             const moveResponse = await fetch(moveUrl, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    addParents: [cleanFolderId]
-                    // Don't removeParents - just add the folder as a parent
-                })
+                }
+                // No body needed - addParents is a query parameter
             });
             
             if (!moveResponse.ok) {

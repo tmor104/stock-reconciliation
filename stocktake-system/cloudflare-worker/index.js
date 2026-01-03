@@ -853,6 +853,128 @@ router.post('/counting/manual/sync', async (request, env) => {
     }
 });
 
+// Debug endpoint to test Google Sheets API authentication
+router.get('/debug/test-auth', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+
+    try {
+        // Test 1: Check if secret is set
+        if (!env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'GOOGLE_SERVICE_ACCOUNT_KEY secret is not set',
+                help: 'Run: wrangler secret put GOOGLE_SERVICE_ACCOUNT_KEY'
+            }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // Test 2: Check if secret can be parsed
+        let serviceAccount;
+        try {
+            serviceAccount = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY);
+        } catch (e) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'GOOGLE_SERVICE_ACCOUNT_KEY is not valid JSON',
+                details: e.message
+            }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // Test 3: Get access token
+        let accessToken;
+        try {
+            accessToken = await GoogleSheetsAPI.getAccessToken(env);
+        } catch (e) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Failed to get access token',
+                details: e.message,
+                serviceAccountEmail: serviceAccount.client_email
+            }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // Test 4: Try to create a test spreadsheet
+        const testResponse = await fetch(
+            'https://sheets.googleapis.com/v4/spreadsheets',
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    properties: { title: 'API Auth Test - DELETE ME' }
+                })
+            }
+        );
+
+        const responseText = await testResponse.text();
+        let responseData;
+        try {
+            responseData = JSON.parse(responseText);
+        } catch (e) {
+            responseData = responseText;
+        }
+
+        if (!testResponse.ok) {
+            return new Response(JSON.stringify({
+                success: false,
+                step: 'create_spreadsheet',
+                status: testResponse.status,
+                statusText: testResponse.statusText,
+                error: responseData,
+                serviceAccountEmail: serviceAccount.client_email,
+                help: testResponse.status === 403
+                    ? 'Google Sheets API might not be enabled, or OAuth Consent Screen not configured'
+                    : 'Check the error details above'
+            }), {
+                status: 200, // Return 200 so client can see the debug info
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // Test 5: Delete the test spreadsheet
+        const spreadsheetId = responseData.spreadsheetId;
+        if (spreadsheetId) {
+            await fetch(
+                `https://www.googleapis.com/drive/v3/files/${spreadsheetId}`,
+                {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                }
+            );
+        }
+
+        return new Response(JSON.stringify({
+            success: true,
+            message: 'All authentication tests passed!',
+            serviceAccountEmail: serviceAccount.client_email,
+            testSpreadsheetCreated: true,
+            testSpreadsheetDeleted: true
+        }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({
+            success: false,
+            error: error.message,
+            stack: error.stack
+        }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
 // 404 handler
 router.all('*', () => new Response('Not Found', { status: 404, headers: corsHeaders }));
 

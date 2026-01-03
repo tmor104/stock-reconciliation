@@ -103,6 +103,13 @@ body {
     margin-bottom: 24px;
 }
 
+.emoji-logo {
+    font-size: 96px;
+    line-height: 1;
+    margin-bottom: 16px;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
 .main-logo {
     max-width: 120px;
     height: auto;
@@ -220,6 +227,13 @@ body {
     display: flex;
     align-items: center;
     gap: 16px;
+}
+
+.header-emoji-logo {
+    font-size: 48px;
+    line-height: 1;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 .header-logo {

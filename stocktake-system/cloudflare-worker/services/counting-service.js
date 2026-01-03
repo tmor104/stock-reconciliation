@@ -307,7 +307,7 @@ export class CountingService {
     }
     
     static async setMetadata(spreadsheetId, name, user, dateStr, accessToken) {
-        await fetch(
+        const metadataResponse = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Metadata!A1:B5?valueInputOption=RAW`,
             {
                 method: 'PUT',
@@ -326,6 +326,11 @@ export class CountingService {
                 })
             }
         );
+        
+        if (!metadataResponse.ok) {
+            const errorText = await metadataResponse.text();
+            throw new Error(`Failed to set metadata: ${errorText}`);
+        }
     }
     
     // ============================================

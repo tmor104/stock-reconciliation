@@ -189,15 +189,15 @@ function handleListStocktakes(request) {
   if (STOCKTAKE_FOLDER_ID && STOCKTAKE_FOLDER_ID.trim() !== '') {
     try {
       const folder = DriveApp.getFolderById(STOCKTAKE_FOLDER_ID);
-      files = folder.searchFiles('title contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
+      files = folder.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
     } catch (e) {
       Logger.log('Error accessing folder, falling back to Drive search: ' + e.message);
       // Fallback to Drive-wide search
-      files = DriveApp.searchFiles('title contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
+      files = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
     }
   } else {
     // Search all of Drive
-    files = DriveApp.searchFiles('title contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
+    files = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
   }
 
   const stocktakes = [];

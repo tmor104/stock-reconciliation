@@ -1,8 +1,9 @@
 // Unified API Service
-// All operations go through Cloudflare Workers (no Apps Script needed!)
+// Hybrid approach: Apps Script for file operations, Cloudflare Workers for auth and complex logic
 
 const CONFIG = {
     WORKER_URL: 'https://stocktake-reconciliation.tomwmorgan47.workers.dev',
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyRxTKP3KGCiGKhkraeaSz9rxEknGR6mF0LnGQBzMuXp_WfjLf7DtLULC0924ZJcmwQ/exec',
 };
 
 // Utility function for SHA-256 hashing
@@ -99,175 +100,208 @@ class UnifiedAPIService {
     }
 
     // ============================================
-    // STOCKTAKE MANAGEMENT (Cloudflare Workers)
+    // STOCKTAKE MANAGEMENT (Apps Script - File Operations)
     // ============================================
 
     async createStocktake(name, user, folderId = null) {
-        if (!this.token) {
-            throw new Error('Not authenticated');
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        const response = await fetch(`${CONFIG.WORKER_URL}/counting/stocktake/create`, {
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ name, user, folderId })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'createStocktake',
+                name,
+                user
+            })
         });
         
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Failed to create stocktake' }));
-            throw new Error(error.error || 'Failed to create stocktake');
+            throw new Error('Failed to create stocktake');
         }
         
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to create stocktake');
+        }
+        
+        return {
+            success: true,
+            stocktakeId: result.stocktakeId,
+            name: result.name,
+            url: result.url
+        };
     }
 
     async listStocktakes(folderId = null) {
-        if (!this.token) {
-            throw new Error('Not authenticated');
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        const url = folderId 
-            ? `${CONFIG.WORKER_URL}/counting/stocktakes?folderId=${encodeURIComponent(folderId)}`
-            : `${CONFIG.WORKER_URL}/counting/stocktakes`;
-        
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${this.token}` }
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'listStocktakes'
+            })
         });
         
         if (!response.ok) {
-            // If 401, token is invalid - clear it
-            if (response.status === 401) {
-                this.token = null;
-                // Clear from IndexedDB (if available globally)
-                if (typeof window !== 'undefined' && window.dbService) {
-                    window.dbService.saveState('token', null).catch(console.error);
-                    window.dbService.saveState('user', null).catch(console.error);
-                }
-                // Trigger logout (skip confirmation for expired tokens)
-                if (typeof window !== 'undefined' && typeof window.handleLogout === 'function') {
-                    window.handleLogout(true);
-                }
-                throw new Error('Session expired. Please log in again.');
-            }
-            
-            let errorMessage = 'Failed to list stocktakes';
-            try {
-                const errorData = await response.json();
-                errorMessage = errorData.error || errorData.message || errorMessage;
-            } catch (e) {
-                errorMessage = `Failed to list stocktakes (${response.status})`;
-            }
-            throw new Error(errorMessage);
+            throw new Error('Failed to list stocktakes');
         }
         
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to list stocktakes');
+        }
+        
+        return {
+            success: true,
+            stocktakes: result.stocktakes || []
+        };
     }
 
     // ============================================
-    // SCAN SYNCING (Cloudflare Workers)
+    // SCAN SYNCING (Apps Script - File Operations)
     // ============================================
 
     async syncScans(stocktakeId, scans) {
-        if (!this.token) {
-            throw new Error('Not authenticated');
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        const response = await fetch(`${CONFIG.WORKER_URL}/counting/scans/sync`, {
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ stocktakeId, scans })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'syncScans',
+                stocktakeId,
+                scans
+            })
         });
         
         if (!response.ok) {
             throw new Error('Failed to sync scans');
         }
         
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to sync scans');
+        }
+        
+        return result;
     }
 
     async deleteScans(stocktakeId, syncIds) {
-        if (!this.token) {
-            throw new Error('Not authenticated');
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        const response = await fetch(`${CONFIG.WORKER_URL}/counting/scans/delete`, {
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ stocktakeId, syncIds })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'deleteScans',
+                stocktakeId,
+                syncIds
+            })
         });
         
         if (!response.ok) {
             throw new Error('Failed to delete scans');
         }
         
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to delete scans');
+        }
+        
+        return result;
     }
 
     async loadUserScans(stocktakeId, username) {
-        if (!this.token) {
-            throw new Error('Not authenticated');
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        const response = await fetch(`${CONFIG.WORKER_URL}/counting/scans/${stocktakeId}/${username}`, {
-            headers: { 'Authorization': `Bearer ${this.token}` }
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'loadUserScans',
+                stocktakeId,
+                username
+            })
         });
         
         if (!response.ok) {
             throw new Error('Failed to load user scans');
         }
         
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to load user scans');
+        }
+        
+        return result;
     }
 
     async syncKegs(stocktakeId, kegs, location, user) {
-        if (!this.token) {
-            throw new Error('Not authenticated');
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        const response = await fetch(`${CONFIG.WORKER_URL}/counting/kegs/sync`, {
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ stocktakeId, kegs, location, user })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'syncKegs',
+                stocktakeId,
+                kegs,
+                location,
+                user
+            })
         });
         
         if (!response.ok) {
             throw new Error('Failed to sync kegs');
         }
         
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to sync kegs');
+        }
+        
+        return result;
     }
 
     async syncManualEntries(stocktakeId, manualEntries) {
-        if (!this.token) {
-            throw new Error('Not authenticated');
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        const response = await fetch(`${CONFIG.WORKER_URL}/counting/manual/sync`, {
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ stocktakeId, manualEntries })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'syncManualEntries',
+                stocktakeId,
+                manualEntries
+            })
         });
         
         if (!response.ok) {
             throw new Error('Failed to sync manual entries');
         }
         
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to sync manual entries');
+        }
+        
+        return result;
     }
 
     // ============================================

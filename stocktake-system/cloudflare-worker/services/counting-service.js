@@ -308,41 +308,50 @@ export class CountingService {
         let driveUrl;
         
         if (cleanFolderId) {
-            // First, try to verify folder exists with a simple query
-            // Query format: parents in 'FOLDER_ID' (correct Google Drive API syntax)
-            const simpleQuery = `parents in '${cleanFolderId}'`;
-            const simpleUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(simpleQuery)}&fields=files(id,name,mimeType)&pageSize=1`;
+            // First, verify the folder exists and is accessible by getting its metadata
+            const folderUrl = `https://www.googleapis.com/drive/v3/files/${cleanFolderId}?fields=id,name,mimeType,capabilities`;
+            console.log('Testing folder access directly:', folderUrl);
             
-            console.log('Testing folder access with simple query:', simpleQuery);
-            const testResponse = await fetch(simpleUrl, {
+            const folderTestResponse = await fetch(folderUrl, {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
             
-            if (!testResponse.ok) {
-                const testError = await testResponse.text();
-                console.error('Simple query failed:', testError);
-                let testErrorMsg = `Cannot access folder ${cleanFolderId}.`;
+            if (!folderTestResponse.ok) {
+                const folderError = await folderTestResponse.text();
+                console.error('Folder access test failed:', folderError);
+                let folderErrorMsg = `Cannot access folder ${cleanFolderId}.`;
                 try {
-                    const testErrorJson = JSON.parse(testError);
-                    const testErrorCode = testErrorJson.error?.code;
-                    const testErrorText = testErrorJson.error?.message || testError;
+                    const folderErrorJson = JSON.parse(folderError);
+                    const folderErrorCode = folderErrorJson.error?.code;
+                    const folderErrorText = folderErrorJson.error?.message || folderError;
                     
-                    if (testErrorCode === 400) {
-                        testErrorMsg = `Invalid folder ID: ${cleanFolderId}. The folder may not exist or the ID is incorrect. Please verify the folder ID from the Google Drive URL.`;
-                    } else if (testErrorCode === 403 || testErrorCode === 404) {
-                        testErrorMsg = `Permission denied: The service account cannot access folder ${cleanFolderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission.`;
+                    if (folderErrorCode === 400) {
+                        folderErrorMsg = `Invalid folder ID: ${cleanFolderId}. The folder may not exist or the ID is incorrect. Please verify the folder ID from the Google Drive URL: https://drive.google.com/drive/folders/${cleanFolderId}`;
+                    } else if (folderErrorCode === 403) {
+                        folderErrorMsg = `Permission denied: The service account cannot access folder ${cleanFolderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission. Then wait 10-30 seconds for permissions to propagate.`;
+                    } else if (folderErrorCode === 404) {
+                        folderErrorMsg = `Folder not found: ${cleanFolderId}. The folder may not exist, may have been deleted, or the service account does not have access. Please verify the folder ID and sharing settings.`;
                     } else {
-                        testErrorMsg = `${testErrorMsg} Error: ${testErrorText}`;
+                        folderErrorMsg = `${folderErrorMsg} Error: ${folderErrorText} (Code: ${folderErrorCode})`;
                     }
                 } catch (e) {
-                    testErrorMsg = `${testErrorMsg} Raw error: ${testError}`;
+                    folderErrorMsg = `${folderErrorMsg} Raw error: ${folderError}`;
                 }
-                throw new Error(testErrorMsg);
+                throw new Error(folderErrorMsg);
+            }
+            
+            const folderData = await folderTestResponse.json();
+            console.log('Folder accessible:', folderData.name, folderData.mimeType);
+            
+            // Verify it's actually a folder
+            if (folderData.mimeType !== 'application/vnd.google-apps.folder') {
+                throw new Error(`The ID ${cleanFolderId} is not a folder. It is a ${folderData.mimeType}. Please provide a folder ID.`);
             }
             
             // Folder is accessible, now use full query
-            // Query format: parents in 'FOLDER_ID' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'
-            query = `parents in '${cleanFolderId}' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+            // Try different query formats - Google Drive API can be picky about syntax
+            // Format 1: parents in 'FOLDER_ID' (most common)
+            query = `'${cleanFolderId}' in parents and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         } else {
             query = `title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         }

@@ -309,8 +309,9 @@ export class CountingService {
         
         if (cleanFolderId) {
             // First, verify the folder exists and is accessible by getting its metadata
+            // Folder ID: 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE
             const folderUrl = `https://www.googleapis.com/drive/v3/files/${cleanFolderId}?fields=id,name,mimeType,capabilities`;
-            console.log('Testing folder access directly:', folderUrl);
+            console.log(`Testing folder access: ${cleanFolderId} (1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE)`);
             
             const folderTestResponse = await fetch(folderUrl, {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -319,39 +320,39 @@ export class CountingService {
             if (!folderTestResponse.ok) {
                 const folderError = await folderTestResponse.text();
                 console.error('Folder access test failed:', folderError);
-                let folderErrorMsg = `Cannot access folder ${cleanFolderId}.`;
+                let folderErrorMsg = `Cannot access folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE.`;
                 try {
                     const folderErrorJson = JSON.parse(folderError);
                     const folderErrorCode = folderErrorJson.error?.code;
                     const folderErrorText = folderErrorJson.error?.message || folderError;
                     
                     if (folderErrorCode === 400) {
-                        folderErrorMsg = `Invalid folder ID: ${cleanFolderId}. The folder may not exist or the ID is incorrect. Please verify the folder ID from the Google Drive URL: https://drive.google.com/drive/folders/${cleanFolderId}`;
+                        folderErrorMsg = `Invalid folder ID: 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE. The folder may not exist. Check: https://drive.google.com/drive/folders/1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE`;
                     } else if (folderErrorCode === 403) {
-                        folderErrorMsg = `Permission denied: The service account cannot access folder ${cleanFolderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission. Then wait 10-30 seconds for permissions to propagate.`;
+                        folderErrorMsg = `Permission denied for folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE. Share it with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com (Editor permission). Wait 10-30 seconds after sharing.`;
                     } else if (folderErrorCode === 404) {
-                        folderErrorMsg = `Folder not found: ${cleanFolderId}. The folder may not exist, may have been deleted, or the service account does not have access. Please verify the folder ID and sharing settings.`;
+                        folderErrorMsg = `Folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE not found. It may have been deleted or the service account doesn't have access.`;
                     } else {
-                        folderErrorMsg = `${folderErrorMsg} Error: ${folderErrorText} (Code: ${folderErrorCode})`;
+                        folderErrorMsg = `Error accessing folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE: ${folderErrorText} (Code: ${folderErrorCode})`;
                     }
                 } catch (e) {
-                    folderErrorMsg = `${folderErrorMsg} Raw error: ${folderError}`;
+                    folderErrorMsg = `Error accessing folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE. Raw error: ${folderError}`;
                 }
                 throw new Error(folderErrorMsg);
             }
             
             const folderData = await folderTestResponse.json();
-            console.log('Folder accessible:', folderData.name, folderData.mimeType);
+            console.log(`Folder accessible: ${folderData.name} (${folderData.mimeType})`);
             
             // Verify it's actually a folder
             if (folderData.mimeType !== 'application/vnd.google-apps.folder') {
-                throw new Error(`The ID ${cleanFolderId} is not a folder. It is a ${folderData.mimeType}. Please provide a folder ID.`);
+                throw new Error(`1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE is not a folder. It is a ${folderData.mimeType}.`);
             }
             
             // Folder is accessible, now use full query
-            // Try different query formats - Google Drive API can be picky about syntax
-            // Format 1: parents in 'FOLDER_ID' (most common)
+            // Using: 'FOLDER_ID' in parents format
             query = `'${cleanFolderId}' in parents and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+            console.log(`Query for folder 1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE: ${query}`);
         } else {
             query = `title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
         }

@@ -295,22 +295,28 @@ export class CountingService {
     static async listStocktakes(folderId, env) {
         const accessToken = await GoogleSheetsAPI.getAccessToken(env);
         
-        let query;
-        if (folderId && folderId.trim() !== '') {
-            // Clean folder ID - remove any invalid characters
-            const cleanFolderId = folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-            if (!cleanFolderId || cleanFolderId.length < 10) {
-                throw new Error(`Invalid folder ID format: ${folderId}. Folder ID should be alphanumeric with dashes/underscores.`);
-            }
-            query = `'${cleanFolderId}'+in+parents+and+title+contains+'Stocktake -'+and+mimeType='application/vnd.google-apps.spreadsheet'`;
-        } else {
-            query = `title+contains+'Stocktake -'+and+mimeType='application/vnd.google-apps.spreadsheet'`;
+        // Clean folder ID - remove any invalid characters
+        const cleanFolderId = folderId ? folderId.trim().replace(/[^a-zA-Z0-9_-]/g, '') : '';
+        
+        if (cleanFolderId && cleanFolderId.length < 10) {
+            throw new Error(`Invalid folder ID format: ${folderId}. Folder ID should be alphanumeric with dashes/underscores.`);
         }
         
-        const driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc`;
+        // Build query - use proper Google Drive API query syntax
+        // Note: Use "parents in" (not "+in+parents") and proper spacing
+        let query;
+        if (cleanFolderId) {
+            // Query format: parents in 'FOLDER_ID' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'
+            query = `parents in '${cleanFolderId}' and title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+        } else {
+            query = `title contains 'Stocktake -' and mimeType = 'application/vnd.google-apps.spreadsheet'`;
+        }
+        
+        const driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`;
         
         console.log('Drive API Query:', query);
         console.log('Drive API URL:', driveUrl);
+        console.log('Folder ID:', cleanFolderId);
         
         const response = await fetch(driveUrl, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -324,11 +330,26 @@ export class CountingService {
                 const errorCode = errorJson.error?.code;
                 const errorMsg = errorJson.error?.message || errorJson.error || errorMessage;
                 
-                // Add more context for permission errors
-                if (errorCode === 403 || errorCode === 404) {
-                    errorMessage = `Permission denied: The service account does not have access to folder ${folderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Viewer" permission (or "Editor" if you want to create stocktakes).`;
+                console.error('Google Drive API Error:', {
+                    code: errorCode,
+                    message: errorMsg,
+                    folderId: cleanFolderId,
+                    query: query,
+                    rawError: errorText
+                });
+                
+                // Handle specific error codes
+                if (errorCode === 400) {
+                    // Invalid Value usually means bad folder ID or query syntax
+                    if (errorMsg.includes('Invalid Value') || errorMsg.includes('invalid')) {
+                        errorMessage = `Invalid folder ID or query syntax. Error: ${errorMsg}\n\nTroubleshooting:\n1. Verify folder ID: ${cleanFolderId}\n2. Check folder exists: https://drive.google.com/drive/folders/${cleanFolderId}\n3. Ensure folder is shared with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com\n4. Try a simpler query first (without filters)`;
+                    } else {
+                        errorMessage = `Bad Request (400): ${errorMsg}\nFolder ID: ${cleanFolderId}\nQuery: ${query}`;
+                    }
+                } else if (errorCode === 403 || errorCode === 404) {
+                    errorMessage = `Permission denied: The service account does not have access to folder ${cleanFolderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission.`;
                 } else if (errorCode === 500 || errorText.includes('PERMISSION_DENIED') || errorMsg.includes('permission') || errorMsg.includes('Permission')) {
-                    errorMessage = `Permission denied: The service account cannot access folder ${folderId}. Error: ${errorMsg}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission.`;
+                    errorMessage = `Permission denied: The service account cannot access folder ${cleanFolderId}. Error: ${errorMsg}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission.`;
                 } else {
                     errorMessage = `${errorMsg} (Code: ${errorCode || 'unknown'})`;
                 }
@@ -336,7 +357,9 @@ export class CountingService {
                 // If we can't parse the error, include the raw text
                 errorMessage = errorText || errorMessage;
                 if (errorText.includes('permission') || errorText.includes('Permission')) {
-                    errorMessage = `Permission denied: The service account cannot access folder ${folderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission.`;
+                    errorMessage = `Permission denied: The service account cannot access folder ${cleanFolderId}. Please share the folder with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com and grant "Editor" permission.`;
+                } else if (errorText.includes('Invalid') || errorText.includes('invalid')) {
+                    errorMessage = `Invalid folder ID or query: ${cleanFolderId}. Please verify the folder ID is correct and share it with: stocktake-worker@stocktake-reconciliation.iam.gserviceaccount.com`;
                 }
             }
             throw new Error(errorMessage);

@@ -1814,8 +1814,11 @@ function updateKegsTable() {
             </thead>
             <tbody>
                 ${state.kegsList.map((keg, idx) => {
-                    const isUnsynced = (keg.count > 0 || parseFloat(keg.count) > 0) && !keg.synced;
-                    const rowClass = isUnsynced ? 'unsynced-row' : (keg.synced ? 'synced-row' : '');
+                    const count = parseFloat(keg.count) || 0;
+                    const hasCount = count > 0;
+                    const isUnsynced = hasCount && !keg.synced;
+                    const isSynced = hasCount && keg.synced;
+                    const rowClass = isUnsynced ? 'unsynced-row' : (isSynced ? 'synced-row' : '');
                     const displayValue = (keg.count === 0 || keg.count === '0') ? '' : (keg.count || '');
                     return `
                     <tr class="${rowClass}" data-keg-index="${idx}">

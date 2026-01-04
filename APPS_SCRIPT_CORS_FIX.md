@@ -66,3 +66,4 @@ If you see an error or login prompt, the deployment settings are wrong.
 - "Anyone" access allows cross-origin requests
 - Apps Script automatically adds CORS headers when deployed correctly
 
+

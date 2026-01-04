@@ -29,6 +29,7 @@ const state = {
     sortDirection: 'desc', // 'asc' or 'desc'
     selectedStockGroups: [],
     currentStage: '1', // Stocktake stage (1-7)
+    theoreticalProducts: [], // Products from HnL import (for search)
     stageNames: {
         '1': 'Create Stocktake',
         '2': 'First Counts',
@@ -410,6 +411,39 @@ function setupCountingScreenListeners() {
     // Complete first counts button
     const completeFirstCountsBtn = document.getElementById('complete-first-counts-btn');
     if (completeFirstCountsBtn) completeFirstCountsBtn.addEventListener('click', handleCompleteFirstCounts);
+    
+    // First Counts Review buttons
+    const continueReviewBtn = document.getElementById('continue-review-btn');
+    if (continueReviewBtn) {
+        continueReviewBtn.addEventListener('click', async () => {
+            // Progress to stage 4 (Variance Report)
+            try {
+                await apiService.updateStocktakeStage(state.currentStocktake.id, '4', true);
+                state.currentStage = '4';
+                updateStageDisplay();
+                applyStageRestrictions();
+                
+                // Go to reconciliation screen
+                showScreen('reconciliation-screen');
+                loadReconciliationScreen();
+            } catch (error) {
+                console.error('Failed to progress to stage 4:', error);
+                alert('Failed to progress stage: ' + error.message);
+            }
+        });
+    }
+    
+    const backToCountingBtn = document.getElementById('back-to-counting-btn');
+    if (backToCountingBtn) {
+        backToCountingBtn.addEventListener('click', () => {
+            // Go back to stage 2 (First Counts)
+            apiService.updateStocktakeStage(state.currentStocktake.id, '2', true).then(() => {
+                state.currentStage = '2';
+                updateStageDisplay();
+                applyStageRestrictions();
+            }).catch(err => console.warn('Failed to go back to stage 2:', err));
+        });
+    }
     
     // Settings button
     const settingsBtn = document.getElementById('counting-settings-btn');
@@ -861,11 +895,18 @@ function updateCurrentStocktakeCard() {
 async function updateStageDisplay() {
     const stageInfo = document.getElementById('stocktake-stage-text');
     const progressBtn = document.getElementById('progress-stage-btn');
+    const stageIndicator = document.getElementById('stage-indicator-text');
+    
+    const stageNum = state.currentStage || '1';
+    const stageName = state.stageNames[stageNum] || `Stage ${stageNum}`;
+    const stageText = `${stageNum}: ${stageName}`;
     
     if (stageInfo) {
-        const stageNum = state.currentStage || '1';
-        const stageName = state.stageNames[stageNum] || `Stage ${stageNum}`;
-        stageInfo.textContent = `${stageNum}: ${stageName}`;
+        stageInfo.textContent = stageText;
+    }
+    
+    if (stageIndicator) {
+        stageIndicator.textContent = stageText;
     }
     
     // Show progress button only for admins
@@ -876,6 +917,9 @@ async function updateStageDisplay() {
             progressBtn.style.display = 'none';
         }
     }
+    
+    // Show/hide sections based on stage
+    applyStageRestrictions();
 }
 
 async function handleProgressStage() {
@@ -917,11 +961,25 @@ function applyStageRestrictions() {
     // Stage-based UI blocking
     // Stage 1: Only create stocktake
     // Stage 2: Allow counting
-    // Stage 3: Review mode - highlight uncounted items
+    // Stage 3: Review mode - show uncounted items
     // Stage 4: Variance report uploaded - allow viewing
     // Stage 5: Variance review - allow editing
     // Stage 6: Complete and export
     // Stage 7: Read-only
+    
+    // Hide/show sections based on stage
+    const completeSection = document.getElementById('complete-first-counts-section');
+    const reviewSection = document.getElementById('first-counts-review-section');
+    
+    if (stageNum === 3) {
+        // Stage 3: Show review section, hide complete button
+        if (completeSection) completeSection.style.display = 'none';
+        if (reviewSection) reviewSection.style.display = 'block';
+    } else {
+        // Other stages: Show complete button, hide review section
+        if (completeSection) completeSection.style.display = 'block';
+        if (reviewSection) reviewSection.style.display = 'none';
+    }
     
     // Hide/show buttons based on stage
     const continueBtn = document.getElementById('continue-stocktake-btn');
@@ -940,6 +998,82 @@ function applyStageRestrictions() {
         completeBtn.disabled = stageNum < 2 || stageNum >= 3;
     }
 }
+
+async function showFirstCountsReview() {
+    // Get variance data to find items with 0 counts
+    await reloadVarianceData();
+    
+    // Find items with 0 counted quantity
+    const uncountedItems = state.varianceData.filter(item => {
+        const countedQty = item.countedQty || item.countQty || 0;
+        return countedQty === 0 && (item.theoreticalQty || 0) > 0; // Only show items that should have stock
+    });
+    
+    const uncountedList = document.getElementById('uncounted-items-list');
+    if (!uncountedList) return;
+    
+    if (uncountedItems.length === 0) {
+        uncountedList.innerHTML = '<p class="info-text">✅ All items have been counted!</p>';
+    } else {
+        uncountedList.innerHTML = `
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--slate-200); border-radius: 8px; padding: 16px;">
+                <p style="margin-bottom: 12px; font-weight: 600;">Found ${uncountedItems.length} items with 0 counts:</p>
+                ${uncountedItems.map(item => `
+                    <div class="uncounted-item" style="padding: 12px; margin-bottom: 8px; background: var(--slate-50); border-radius: 6px; border-left: 4px solid var(--orange-400);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>${item.description || item.product || 'Unknown'}</strong>
+                                <p style="font-size: 12px; color: var(--slate-600); margin-top: 4px;">
+                                    Code: ${item.productCode || item.barcode || 'N/A'} • 
+                                    Theoretical: ${item.theoreticalQty || 0} • 
+                                    ${item.barcode ? `Barcode: ${item.barcode}` : '✍️ No Barcode'}
+                                </p>
+                            </div>
+                            <button class="btn-secondary" onclick="addUncountedItem('${item.productCode || item.barcode || ''}', '${(item.description || item.product || '').replace(/'/g, "\\'")}')" style="font-size: 12px; padding: 6px 12px;">
+                                Add Count
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    hideLoading();
+}
+
+async function reloadVarianceData() {
+    const varianceResult = await apiService.getVarianceData(state.currentStocktake.id);
+    if (varianceResult.success && varianceResult.varianceData) {
+        // Extract items array if varianceData is an object with items property
+        if (varianceResult.varianceData.items && Array.isArray(varianceResult.varianceData.items)) {
+            state.varianceData = varianceResult.varianceData.items;
+        } else if (Array.isArray(varianceResult.varianceData)) {
+            state.varianceData = varianceResult.varianceData;
+        } else {
+            state.varianceData = [];
+        }
+        await dbService.saveVarianceData(state.currentStocktake.id, state.varianceData);
+    }
+}
+
+// Global function for adding uncounted items
+window.addUncountedItem = function(productCode, description) {
+    // Switch to search mode and pre-fill the search
+    state.currentMode = 'search';
+    state.searchQuery = description;
+    handleSearch();
+    updateCountingScreen();
+    
+    // Focus search input
+    setTimeout(() => {
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
+        }
+    }, 100);
+};
 
 async function handleCreateStocktake(e) {
     e.preventDefault();
@@ -1025,6 +1159,19 @@ async function selectStocktake(stocktake) {
             state.currentStage = '1';
         }
         updateStageDisplay();
+        
+        // Load theoretical products for search
+        try {
+            const theoreticalResult = await apiService.getTheoreticalProducts(stocktake.id);
+            if (theoreticalResult.success && theoreticalResult.products) {
+                state.theoreticalProducts = theoreticalResult.products;
+            } else {
+                state.theoreticalProducts = [];
+            }
+        } catch (error) {
+            console.warn('Error loading theoretical products:', error);
+            state.theoreticalProducts = [];
+        }
         
         // Load and merge scans from Google Sheets and local storage
         if (state.user) {
@@ -1193,6 +1340,7 @@ async function handleUploadVariance(e) {
             }
             
             hideModal('upload-variance-modal');
+            // Go straight to counting screen after upload
             showScreen('counting-screen');
             loadCountingScreen();
         } else {
@@ -1235,6 +1383,18 @@ async function loadCountingScreen() {
     // Load products and locations if not loaded
     if (state.productDatabase.length === 0 || state.locations.length === 0) {
         await loadProductsAndLocations();
+    }
+    
+    // Load theoretical products for search if not already loaded
+    if (state.theoreticalProducts.length === 0 && state.currentStocktake) {
+        try {
+            const theoreticalResult = await apiService.getTheoreticalProducts(state.currentStocktake.id);
+            if (theoreticalResult.success && theoreticalResult.products) {
+                state.theoreticalProducts = theoreticalResult.products;
+            }
+        } catch (error) {
+            console.warn('Error loading theoretical products:', error);
+        }
     }
     
     // Update location selector
@@ -1471,12 +1631,17 @@ function updateSearchResults() {
             </div>
         `;
     } else if (state.searchResults.length > 0) {
-        results.innerHTML = state.searchResults.map(product => `
-            <div class="search-result-item" onclick="selectSearchResult('${product.barcode}')">
-                <h4>${product.product}</h4>
-                <p>Barcode: ${product.barcode} • Stock: ${product.currentStock || 0}</p>
+        results.innerHTML = state.searchResults.map(product => {
+            const identifier = product.barcode || product.productCode || product.invCode || 'No Code';
+            const description = product.description || product.product || 'Unknown';
+            const hasBarcode = product.barcode && product.barcode !== '';
+            return `
+            <div class="search-result-item ${!hasBarcode ? 'no-barcode-item' : ''}" onclick="selectSearchResult('${identifier}')">
+                <h4>${description}</h4>
+                <p>${hasBarcode ? `Barcode: ${product.barcode}` : '✍️ No Barcode - Manual Entry'} • ${product.productCode || product.invCode ? `Code: ${product.productCode || product.invCode}` : ''} • Qty: ${product.theoreticalQty || 0}</p>
             </div>
-        `).join('');
+        `;
+        }).join('');
     } else {
         results.innerHTML = '';
     }
@@ -1628,18 +1793,47 @@ function handleSearch() {
         return;
     }
     
-    state.searchResults = state.productDatabase.filter(p =>
-        p.product.toLowerCase().includes(query) ||
-        p.barcode.toString().includes(query)
-    );
+    // Use theoretical products (from HnL import) for search, not master sheet
+    // Master sheet is only used for barcode lookups when scanning
+    const searchSource = state.theoreticalProducts.length > 0 
+        ? state.theoreticalProducts 
+        : state.productDatabase; // Fallback to master sheet if no theoretical data
+    
+    state.searchResults = searchSource.filter(p => {
+        const description = (p.description || p.product || '').toLowerCase();
+        const barcode = (p.barcode || '').toString().toLowerCase();
+        const productCode = (p.productCode || p.invCode || '').toString().toLowerCase();
+        return description.includes(query) || 
+               barcode.includes(query) || 
+               productCode.includes(query);
+    });
     
     updateSearchResults();
 }
 
-function selectSearchResult(barcode) {
-    const product = state.productDatabase.find(p => p.barcode === barcode);
+function selectSearchResult(productCodeOrBarcode) {
+    // Search in theoretical products first, then fallback to master sheet
+    let product = state.theoreticalProducts.find(p => 
+        (p.barcode || '').toString() === productCodeOrBarcode ||
+        (p.productCode || p.invCode || '').toString() === productCodeOrBarcode
+    );
+    
+    if (!product && state.productDatabase.length > 0) {
+        product = state.productDatabase.find(p => p.barcode === productCodeOrBarcode);
+    }
+    
     if (product) {
-        state.currentProduct = product;
+        // Convert theoretical product format to scan format
+        state.currentProduct = {
+            barcode: product.barcode || '',
+            product: product.description || product.product || 'Unknown',
+            currentStock: product.theoreticalQty || 0,
+            value: product.theoreticalValue || product.unitCost || 0,
+            isManualEntry: !product.barcode || product.barcode === '', // No barcode = manual entry
+            productCode: product.productCode || product.invCode || '',
+            unit: product.unit || '',
+            unitCost: product.unitCost || 0
+        };
         state.currentMode = 'scan';
         state.searchQuery = '';
         state.searchResults = [];
@@ -1853,27 +2047,17 @@ async function handleCompleteFirstCounts() {
                 state.currentStage = '3';
                 updateStageDisplay();
                 applyStageRestrictions();
+                
+                // Show First Counts Review section with uncounted items
+                await showFirstCountsReview();
             } catch (error) {
                 console.warn('Failed to auto-progress to stage 3:', error);
+                // Still reload variance data even if stage update fails
+                await reloadVarianceData();
+                hideLoading();
+                showScreen('reconciliation-screen');
+                loadReconciliationScreen();
             }
-            
-            // Reload variance data
-            const varianceResult = await apiService.getVarianceData(state.currentStocktake.id);
-            if (varianceResult.success && varianceResult.varianceData) {
-                // Extract items array if varianceData is an object with items property
-                if (varianceResult.varianceData.items && Array.isArray(varianceResult.varianceData.items)) {
-                    state.varianceData = varianceResult.varianceData.items;
-                } else if (Array.isArray(varianceResult.varianceData)) {
-                    state.varianceData = varianceResult.varianceData;
-                } else {
-                    state.varianceData = [];
-                }
-                await dbService.saveVarianceData(state.currentStocktake.id, state.varianceData);
-            }
-            
-            hideLoading();
-            showScreen('reconciliation-screen');
-            loadReconciliationScreen();
         } else {
             throw new Error(result.message || 'Failed to complete first counts');
         }

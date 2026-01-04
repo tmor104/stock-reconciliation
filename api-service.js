@@ -793,6 +793,23 @@ class UnifiedAPIService {
         
         return await response.json();
     }
+
+    async getTheoreticalProducts(stocktakeId) {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+        
+        const response = await fetch(`${CONFIG.WORKER_URL}/stocktake/${stocktakeId}/theoretical`, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to get theoretical products' }));
+            throw new Error(error.error || 'Failed to get theoretical products');
+        }
+        
+        return await response.json();
+    }
 }
 
 // Export singleton instance

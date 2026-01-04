@@ -113,3 +113,4 @@ const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
 
 That's it! 🎉
 
+

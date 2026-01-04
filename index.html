@@ -133,6 +133,9 @@
                 <div>
                     <h1 class="header-title">STOCK <span class="logo-wizard">WIZARD</span></h1>
                     <p id="counting-stocktake-info" class="user-info"></p>
+                    <div id="stage-indicator" style="font-size: 12px; color: var(--slate-500); margin-top: 4px;">
+                        <strong>Stage:</strong> <span id="stage-indicator-text">Loading...</span>
+                    </div>
                 </div>
             </div>
             <div class="header-actions">
@@ -231,11 +234,22 @@
             </div>
 
             <!-- Complete First Counts Button -->
-            <div class="complete-section">
+            <div class="complete-section" id="complete-first-counts-section">
                 <button id="complete-first-counts-btn" class="btn-primary btn-large">
                     ✅ Complete First Counts
                 </button>
                 <p class="info-text">This will match your counts with the variance report and calculate differences.</p>
+            </div>
+            
+            <!-- First Counts Review Section (Stage 3) -->
+            <div id="first-counts-review-section" class="first-counts-review-section" style="display: none;">
+                <h2>🔍 First Counts Review</h2>
+                <p class="info-text">Items with 0 counts. Add them manually or continue if they should be 0.</p>
+                <div id="uncounted-items-list" class="uncounted-items-list"></div>
+                <div class="review-actions">
+                    <button id="continue-review-btn" class="btn-primary">Continue to Variance Report</button>
+                    <button id="back-to-counting-btn" class="btn-secondary">← Back to Counting</button>
+                </div>
             </div>
         </div>
     </div>

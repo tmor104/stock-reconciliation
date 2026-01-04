@@ -991,6 +991,29 @@ router.get('/export/manual/:stocktakeId', async (request, env) => {
     }
 });
 
+// Stocktake - Get Theoretical Products (for search)
+// stocktakeId is the Apps Script spreadsheet ID
+router.get('/stocktake/:stocktakeId/theoretical', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId } = request.params;
+        // stocktakeId IS the spreadsheet ID - no KV lookup needed
+        
+        const theoretical = await GoogleSheetsAPI.getTheoreticalData(stocktakeId, env);
+        
+        return new Response(JSON.stringify({ success: true, products: theoretical }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
 // Export - DAT File
 // stocktakeId is the Apps Script spreadsheet ID
 router.get('/export/dat/:stocktakeId', async (request, env) => {

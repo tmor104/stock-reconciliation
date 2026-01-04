@@ -309,3 +309,4 @@ If AI gets confused:
 Remember: AI only sees what you show it. Keep contexts clean and explicit!
 
 
+

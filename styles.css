@@ -1062,6 +1062,50 @@ body {
     color: var(--slate-600);
 }
 
+.search-result-item.no-barcode-item {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 2px solid var(--orange-300);
+}
+
+.search-result-item.no-barcode-item:hover {
+    background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+    border-color: var(--orange-400);
+}
+
+/* First Counts Review Section */
+.first-counts-review-section {
+    margin-top: 32px;
+    padding: 24px;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-radius: 12px;
+    border: 2px solid var(--orange-300);
+}
+
+.first-counts-review-section h2 {
+    margin-bottom: 12px;
+    color: var(--slate-800);
+}
+
+.uncounted-items-list {
+    margin-top: 16px;
+}
+
+.uncounted-item {
+    transition: all 0.2s;
+}
+
+.uncounted-item:hover {
+    background: var(--slate-100) !important;
+    transform: translateX(4px);
+}
+
+.review-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 /* Kegs Table */
 .kegs-table-container {
     overflow-x: auto;
@@ -1252,55 +1296,337 @@ body {
     font-size: 18px;
 }
 
-/* Responsive */
+/* Stage Info */
+.stage-info {
+    margin: 16px 0;
+    padding: 12px 16px;
+    background: var(--blue-50);
+    border-radius: 8px;
+    border-left: 4px solid var(--blue-500);
+    font-size: 14px;
+}
+
+.stage-info strong {
+    color: var(--blue-700);
+}
+
+.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: 20px;
+}
+
+.sortable:hover {
+    background-color: var(--slate-100);
+}
+
+.sort-indicator {
+    position: absolute;
+    right: 4px;
+    color: var(--blue-600);
+    font-weight: bold;
+}
+
+/* Responsive - Mobile First Approach */
 @media (max-width: 768px) {
+    body {
+        font-size: 14px;
+    }
+    
     .header {
-        padding: 16px 20px;
+        padding: 12px 16px;
         flex-direction: column;
         align-items: flex-start;
         gap: 12px;
     }
     
+    .header-logo-section {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .header-logo {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .header-title {
+        font-size: 1.25rem;
+    }
+    
     .header-actions {
         width: 100%;
         justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .header-actions button {
+        flex: 1;
+        min-width: 100px;
+        font-size: 13px;
+        padding: 10px 16px;
     }
     
     .home-content,
     .counting-content,
     .reconciliation-content {
-        padding: 20px 12px;
+        padding: 16px 12px;
     }
     
     .section-card,
     .info-card {
-        padding: 20px;
+        padding: 16px;
+        border-radius: 16px;
+        margin-bottom: 16px;
+    }
+    
+    .section-card h2,
+    .info-card h2 {
+        font-size: 1.25rem;
+        margin-bottom: 12px;
     }
     
     .stocktakes-grid {
         grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .stocktake-card {
+        padding: 16px;
+    }
+    
+    .card-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .card-actions button {
+        width: 100%;
     }
     
     .scan-type-selector {
         flex-direction: column;
+        gap: 8px;
+    }
+    
+    .scan-type-btn {
+        width: 100%;
     }
     
     .quick-add-buttons {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    
+    .input-section {
+        padding: 20px;
+    }
+    
+    .input-section input {
+        font-size: 18px;
+        padding: 14px;
+    }
+    
+    .input-actions {
+        flex-direction: column;
+    }
+    
+    .input-actions button {
+        width: 100%;
     }
     
     .table-header {
         flex-direction: column;
         align-items: stretch;
+        gap: 12px;
+    }
+    
+    .table-header h2 {
+        font-size: 1.25rem;
     }
     
     .table-filters {
         flex-direction: column;
+        gap: 8px;
+    }
+    
+    .table-filters input,
+    .table-filters select {
+        width: 100%;
+        font-size: 14px;
+        padding: 10px 12px;
+    }
+    
+    .table-filters select[multiple] {
+        min-height: 100px;
+        font-size: 13px;
+    }
+    
+    .table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .variance-table,
+    .kegs-table,
+    .user-counts-table,
+    .admin-counts-table {
+        font-size: 13px;
+        min-width: 600px;
+    }
+    
+    .variance-table th,
+    .variance-table td,
+    .kegs-table th,
+    .kegs-table td {
+        padding: 8px 6px;
+        white-space: nowrap;
+    }
+    
+    .modal {
+        padding: 10px;
     }
     
     .modal-content {
-        padding: 24px;
-        margin: 20px;
+        padding: 20px;
+        margin: 10px;
+        max-width: calc(100% - 20px);
+        max-height: calc(100vh - 20px);
+    }
+    
+    .modal-content h2 {
+        font-size: 1.25rem;
+        margin-bottom: 16px;
+    }
+    
+    .form-group {
+        margin-bottom: 16px;
+    }
+    
+    .form-group input,
+    .form-group select {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 12px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .form-actions button {
+        width: 100%;
+    }
+    
+    .btn-primary,
+    .btn-secondary {
+        padding: 12px 20px;
+        font-size: 14px;
+        width: 100%;
+    }
+    
+    .scanned-items-list,
+    .manual-entries-list {
+        max-height: 300px;
+    }
+    
+    .scan-item,
+    .manual-entry-item {
+        padding: 12px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .scan-item-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    
+    .location-selector {
+        padding: 16px;
+    }
+    
+    .stage-info {
+        font-size: 13px;
+        padding: 10px 12px;
+    }
+    
+    .admin-panel {
+        padding: 16px 12px;
+    }
+    
+    .admin-tabs {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .admin-tab {
+        flex: 1;
+        min-width: 80px;
+        font-size: 13px;
+        padding: 10px 12px;
+    }
+    
+    .admin-tab-content {
+        padding: 16px 12px;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+    .header-title {
+        font-size: 1.1rem;
+    }
+    
+    .quick-add-buttons {
+        grid-template-columns: 1fr;
+    }
+    
+    .variance-table,
+    .kegs-table {
+        font-size: 12px;
+        min-width: 500px;
+    }
+    
+    .variance-table th,
+    .variance-table td {
+        padding: 6px 4px;
+    }
+    
+    .modal-content {
+        padding: 16px;
+        margin: 8px;
+    }
+}
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+    .btn-primary,
+    .btn-secondary,
+    .scan-type-btn,
+    button {
+        min-height: 44px; /* iOS touch target minimum */
+        min-width: 44px;
+    }
+    
+    .scan-item-actions button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+    
+    input[type="text"],
+    input[type="number"],
+    select {
+        min-height: 44px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .table-wrapper {
+        -webkit-overflow-scrolling: touch;
     }
 }
 

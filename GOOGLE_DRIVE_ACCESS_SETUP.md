@@ -125,3 +125,4 @@ This way:
 - [ ] Worker redeployed after updating `wrangler.toml`
 
 
+

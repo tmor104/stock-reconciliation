@@ -470,6 +470,35 @@
                 </div>
             </div>
             
+            <!-- Stage Management Tab -->
+            <div id="admin-stages-tab" class="admin-tab-content">
+                <div class="section-card">
+                    <h2>Current Stocktake Stage</h2>
+                    <div id="admin-stage-info" class="info-card">
+                        <p><strong>Stocktake:</strong> <span id="admin-stage-stocktake-name">-</span></p>
+                        <p><strong>Current Stage:</strong> <span id="admin-stage-current">Loading...</span></p>
+                    </div>
+                </div>
+                
+                <div class="section-card">
+                    <h2>Stage Controls</h2>
+                    <div class="stage-controls" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                        <button id="admin-progress-stage-btn" class="btn-primary" disabled>Progress Stage →</button>
+                        <button id="admin-rollback-stage-btn" class="btn-secondary" disabled>← Rollback Stage</button>
+                    </div>
+                    <p class="info-text" style="margin-top: 12px; color: var(--slate-600);">
+                        ⚠️ Rollback allows users to modify data that was already reviewed. Use with caution.
+                    </p>
+                </div>
+                
+                <div class="section-card">
+                    <h2>Stage Information</h2>
+                    <div id="admin-stage-details" class="info-card">
+                        <p>Select a stocktake to manage its stage.</p>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Settings Tab -->
             <div id="admin-settings-tab" class="admin-tab-content">
                 <div class="section-card">

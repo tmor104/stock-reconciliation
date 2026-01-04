@@ -2305,16 +2305,24 @@ async function handleCompleteFirstCounts() {
 async function loadReconciliationScreen() {
     if (!state.currentStocktake) return;
     
-    // Load stage if not loaded
-    if (!state.currentStage) {
-        try {
-            const stageResult = await apiService.getStocktakeStage(state.currentStocktake.id);
-            if (stageResult.success) {
-                state.currentStage = stageResult.stage || '1';
-            } else {
-                state.currentStage = '1';
+    // Always verify stage from backend to ensure UI is in sync
+    try {
+        const stageResult = await apiService.getStocktakeStage(state.currentStocktake.id);
+        if (stageResult.success && stageResult.stage) {
+            const actualStage = stageResult.stage;
+            // If UI state doesn't match backend, sync it
+            if (state.currentStage !== actualStage) {
+                console.warn(`Stage mismatch in reconciliation: UI=${state.currentStage}, Backend=${actualStage}. Syncing UI to backend.`);
+                state.currentStage = actualStage;
             }
-        } catch (error) {
+        } else if (!state.currentStage) {
+            // Fallback if no stage returned
+            state.currentStage = '1';
+        }
+    } catch (error) {
+        console.warn('Failed to load stage from backend:', error);
+        // Fallback to UI state or default
+        if (!state.currentStage) {
             state.currentStage = '1';
         }
     }

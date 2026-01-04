@@ -1037,6 +1037,11 @@ async function handleProgressStage(direction = 'forward') {
                 showScreen('counting-screen');
                 loadCountingScreen();
             }
+            
+            // If we're in admin panel, reload stage info
+            if (document.getElementById('admin-stages-tab')?.classList.contains('active')) {
+                await loadAdminStages();
+            }
         } else {
             throw new Error(result.error || 'Failed to update stage');
         }

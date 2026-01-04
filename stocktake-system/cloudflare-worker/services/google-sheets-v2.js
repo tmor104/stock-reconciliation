@@ -319,11 +319,19 @@ export class GoogleSheetsAPI {
         );
         
         if (!response.ok) {
+            // If sheet doesn't exist, return empty array (no theoretical data yet)
+            if (response.status === 400) {
+                return [];
+            }
             throw new Error('Failed to get theoretical data');
         }
         
         const data = await response.json();
         const rows = data.values || [];
+        
+        if (rows.length < 2) {
+            return []; // No data rows
+        }
         
         return rows.slice(1).map(row => ({
             category: row[0] || '',

@@ -2227,10 +2227,11 @@ async function syncToServer() {
         
         if (unsyncedKegs.length > 0) {
             try {
+                // Kegs always use "Cellar" as location
                 const result = await apiService.syncKegs(
                     state.currentStocktake.id,
                     unsyncedKegs,
-                    state.currentLocation,
+                    'Cellar', // Hardcoded location for kegs
                     state.user.username
                 );
                 if (result.success || result.ok) {

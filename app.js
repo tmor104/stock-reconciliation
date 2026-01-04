@@ -41,7 +41,8 @@ const state = {
     },
     isOnline: navigator.onLine,
     isSyncing: false,
-    unsyncedCount: 0
+    unsyncedCount: 0,
+    unsyncedKegsCount: 0
 };
 
 // ============================================
@@ -413,6 +414,10 @@ function setupCountingScreenListeners() {
     // Manual sync button
     const manualSyncBtn = document.getElementById('manual-sync-btn');
     if (manualSyncBtn) manualSyncBtn.addEventListener('click', syncToServer);
+    
+    // Keg sync button (also calls syncToServer which handles kegs)
+    const syncKegsBtn = document.getElementById('sync-kegs-btn');
+    if (syncKegsBtn) syncKegsBtn.addEventListener('click', syncToServer);
     
     // Complete first counts button
     const completeFirstCountsBtn = document.getElementById('complete-first-counts-btn');
@@ -1089,7 +1094,11 @@ function applyStageRestrictions() {
     if (stageNum === 3) {
         // Stage 3: Show review section, hide complete button
         if (completeSection) completeSection.style.display = 'none';
-        if (reviewSection) reviewSection.style.display = 'block';
+        if (reviewSection) {
+            reviewSection.style.display = 'block';
+            // Load review data when section is shown
+            showFirstCountsReview();
+        }
     } else {
         // Other stages: Show complete button, hide review section
         if (completeSection) completeSection.style.display = 'block';
@@ -1695,28 +1704,49 @@ function updateKegsTable() {
             </thead>
             <tbody>
                 ${state.kegsList.map((keg, idx) => {
-                    const isUnsynced = keg.count > 0 && !keg.synced;
-                    const rowClass = isUnsynced ? 'unsynced-row' : '';
+                    const isUnsynced = (keg.count > 0 || parseFloat(keg.count) > 0) && !keg.synced;
+                    const rowClass = isUnsynced ? 'unsynced-row' : (keg.synced ? 'synced-row' : '');
+                    const displayValue = (keg.count === 0 || keg.count === '0') ? '' : (keg.count || '');
                     return `
-                    <tr class="${rowClass}">
+                    <tr class="${rowClass}" data-keg-index="${idx}">
                         <td>${keg.name}</td>
                         <td>
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <input type="text" 
                                        id="keg-count-${idx}"
-                                       value="${keg.count || ''}" 
+                                       value="${displayValue}" 
                                        placeholder="0"
+                                       inputmode="decimal"
                                        onfocus="this.value = this.value === '0' ? '' : this.value"
                                        onblur="if (this.value === '') this.value = '0'; updateKegCount(${idx}, this.value)"
                                        onchange="updateKegCount(${idx}, this.value)"
-                                       style="width: 80px; padding: 8px; text-align: center; border: 2px solid var(--orange-300); border-radius: 8px; font-weight: bold; font-size: 18px; -moz-appearance: textfield;"
+                                       onkeypress="if(event.key==='Enter') { updateKegCount(${idx}, this.value); }"
+                                       style="width: 80px; padding: 8px; text-align: center; border: 2px solid ${isUnsynced ? 'var(--orange-500)' : 'var(--orange-300)'}; border-radius: 8px; font-weight: bold; font-size: 18px; -moz-appearance: textfield;"
                                        class="keg-count-input">
-                                <button onclick="addToKegCount(${idx})" 
+                                <button onclick="showAddToKegInput(${idx})" 
                                         class="btn-secondary" 
                                         style="padding: 8px 12px; min-width: 40px;"
-                                        title="Add 1 to count">
+                                        title="Add to count">
                                     <span style="font-size: 18px;">+</span>
                                 </button>
+                                <div id="keg-add-input-${idx}" style="display: none; gap: 4px; align-items: center;">
+                                    <input type="text" 
+                                           id="keg-add-value-${idx}"
+                                           placeholder="0.0"
+                                           inputmode="decimal"
+                                           style="width: 60px; padding: 4px; text-align: center; border: 1px solid var(--slate-300); border-radius: 4px;"
+                                           onkeypress="if(event.key==='Enter') { applyAddToKeg(${idx}); }">
+                                    <button onclick="applyAddToKeg(${idx})" 
+                                            class="btn-primary" 
+                                            style="padding: 4px 8px; font-size: 12px;">
+                                        Add
+                                    </button>
+                                    <button onclick="hideAddToKegInput(${idx})" 
+                                            class="btn-secondary" 
+                                            style="padding: 4px 8px; font-size: 12px;">
+                                        ✕
+                                    </button>
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -1729,22 +1759,63 @@ function updateKegsTable() {
 
 function updateKegCount(index, value) {
     if (state.kegsList[index]) {
-        const newCount = parseInt(value) || 0;
+        const newCount = parseFloat(value) || 0;
+        const oldCount = parseFloat(state.kegsList[index].count) || 0;
+        const wasSynced = state.kegsList[index].synced;
+        
         state.kegsList[index].count = newCount;
         state.kegsList[index].synced = false; // Mark as unsynced when count changes
+        
+        // Update unsynced count
+        if (wasSynced && newCount > 0) {
+            state.unsyncedKegsCount++;
+        } else if (!wasSynced && newCount === 0) {
+            state.unsyncedKegsCount = Math.max(0, state.unsyncedKegsCount - 1);
+        }
+        
         updateKegsTable();
         updateSyncButton();
+        
+        // Auto-sync after 10 keg changes (same as regular scans)
+        if (state.unsyncedKegsCount >= 10 && state.isOnline && !state.isSyncing) {
+            syncToServer();
+        }
     }
 }
 
-window.addToKegCount = function(index) {
-    if (state.kegsList[index]) {
-        const currentCount = state.kegsList[index].count || 0;
-        state.kegsList[index].count = currentCount + 1;
-        state.kegsList[index].synced = false; // Mark as unsynced
-        updateKegsTable();
-        updateSyncButton();
+window.showAddToKegInput = function(index) {
+    const addInputDiv = document.getElementById(`keg-add-input-${index}`);
+    const addInput = document.getElementById(`keg-add-value-${index}`);
+    if (addInputDiv && addInput) {
+        addInputDiv.style.display = 'flex';
+        addInput.focus();
     }
+};
+
+window.hideAddToKegInput = function(index) {
+    const addInputDiv = document.getElementById(`keg-add-input-${index}`);
+    const addInput = document.getElementById(`keg-add-value-${index}`);
+    if (addInputDiv && addInput) {
+        addInputDiv.style.display = 'none';
+        addInput.value = '';
+    }
+};
+
+window.applyAddToKeg = function(index) {
+    const addInput = document.getElementById(`keg-add-value-${index}`);
+    if (!addInput || !state.kegsList[index]) return;
+    
+    const addValue = parseFloat(addInput.value);
+    if (isNaN(addValue) || addValue <= 0) {
+        alert('Please enter a valid number to add');
+        return;
+    }
+    
+    const currentCount = parseFloat(state.kegsList[index].count) || 0;
+    const newCount = currentCount + addValue;
+    
+    updateKegCount(index, newCount.toString());
+    hideAddToKegInput(index);
 };
 
 function updateProductConfirmation() {

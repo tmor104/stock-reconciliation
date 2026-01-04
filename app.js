@@ -2419,6 +2419,86 @@ async function checkBlockingIssues() {
     return await hasUnacknowledgedIssues(state.currentStocktake.id);
 }
 
+async function editVarianceItem(productCode) {
+    if (!state.currentStocktake) return;
+    
+    // Find the item in variance data
+    const item = state.varianceData.find(v => 
+        (v.productCode || v.barcode) === productCode
+    );
+    
+    if (!item) {
+        alert('Item not found in variance data');
+        return;
+    }
+    
+    // Prompt for new count
+    const newCountStr = prompt(
+        `Edit count for: ${item.description || item.product || productCode}\n\n` +
+        `Theoretical: ${item.theoreticalQty || 0}\n` +
+        `Current Count: ${item.countedQty || 0}\n\n` +
+        `Enter new count:`,
+        item.countedQty || 0
+    );
+    
+    if (newCountStr === null) return; // User cancelled
+    
+    const newCount = parseFloat(newCountStr);
+    if (isNaN(newCount)) {
+        alert('Invalid number');
+        return;
+    }
+    
+    // Prompt for reason
+    const reason = prompt('Enter reason for adjustment:', '') || 'Manual adjustment';
+    
+    showLoading('Saving adjustment...');
+    
+    try {
+        // Save adjustment via API
+        const result = await apiService.updateVarianceData(
+            state.currentStocktake.id,
+            {
+                productCode: item.productCode || productCode,
+                newCount,
+                reason,
+                user: state.user.username,
+                timestamp: new Date().toISOString()
+            }
+        );
+        
+        if (result.success) {
+            // Reload variance data to get updated calculations
+            const varianceResult = await apiService.getVarianceData(state.currentStocktake.id);
+            if (varianceResult.success && varianceResult.varianceData) {
+                if (varianceResult.varianceData.items && Array.isArray(varianceResult.varianceData.items)) {
+                    state.varianceData = varianceResult.varianceData.items;
+                } else if (Array.isArray(varianceResult.varianceData)) {
+                    state.varianceData = varianceResult.varianceData;
+                } else {
+                    state.varianceData = [];
+                }
+                await dbService.saveVarianceData(state.currentStocktake.id, state.varianceData);
+            }
+            
+            // Refresh the table
+            updateVarianceStatus();
+            renderVarianceTable();
+            
+            hideLoading();
+            alert('Adjustment saved successfully');
+        } else {
+            throw new Error(result.message || 'Failed to save adjustment');
+        }
+    } catch (error) {
+        hideLoading();
+        alert('Error saving adjustment: ' + error.message);
+    }
+}
+
+// Make editVarianceItem available globally for onclick handlers
+window.editVarianceItem = editVarianceItem;
+
 function editVarianceItem(barcode) {
     // This would open an edit modal for variance items
     alert('Edit variance item functionality - to be implemented');

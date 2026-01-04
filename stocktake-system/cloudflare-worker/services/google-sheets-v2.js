@@ -459,6 +459,51 @@ export class GoogleSheetsAPI {
         return theoreticalData;
     }
     
+    static async getKegsFromStocktake(spreadsheetId, env) {
+        const accessToken = await this.getAccessToken(env);
+        
+        const response = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Kegs'!A:G`,
+            {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            }
+        );
+        
+        if (!response.ok) {
+            // If sheet doesn't exist, return empty array
+            if (response.status === 400) {
+                return [];
+            }
+            throw new Error('Failed to get kegs from stocktake');
+        }
+        
+        const data = await response.json();
+        const rows = data.values || [];
+        
+        if (rows.length < 2) {
+            return []; // No data rows (only header or empty)
+        }
+        
+        // Skip header row (index 0) and map data rows
+        // Format: Keg Product, Count, Location, User, Timestamp, Synced, Sync ID
+        const kegs = rows.slice(1).map(row => {
+            const productName = (row[0] || '').toString().trim();
+            if (!productName) return null; // Skip empty rows
+            
+            return {
+                name: productName,
+                count: parseFloat(row[1]) || 0,
+                location: (row[2] || '').toString().trim(),
+                user: (row[3] || '').toString().trim(),
+                timestamp: (row[4] || '').toString().trim(),
+                synced: row[5] === 'Yes' || row[5] === true,
+                syncId: (row[6] || '').toString().trim()
+            };
+        }).filter(keg => keg !== null); // Remove null entries
+        
+        return kegs;
+    }
+    
     static async getCountData(spreadsheetId, env) {
         const accessToken = await this.getAccessToken(env);
         

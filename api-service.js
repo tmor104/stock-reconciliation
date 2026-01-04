@@ -288,20 +288,26 @@ class UnifiedAPIService {
         return result.data || result;
     }
 
-    async loadUserScans(stocktakeId, username) {
+    async loadUserScans(stocktakeId, username = null) {
         if (!CONFIG.APPS_SCRIPT_URL) {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
         // Use Cloudflare Worker proxy (handles CORS properly)
+        const requestBody = {
+            action: 'loadUserScans',
+            stocktakeId
+        };
+        
+        // Only include username if provided (null means load all scans)
+        if (username !== null) {
+            requestBody.username = username;
+        }
+        
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'loadUserScans',
-                stocktakeId,
-                username
-            })
+            body: JSON.stringify(requestBody)
         });
         
         if (!response.ok) {

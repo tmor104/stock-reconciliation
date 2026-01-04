@@ -1029,39 +1029,39 @@ async function loadCountingScreen() {
         ).join('');
     }
     
-    // Load kegs if not loaded
-    if (state.kegsList.length === 0 && state.kegs.length > 0) {
-        state.kegsList = state.kegs.map(keg => ({ ...keg, count: 0 }));
-    }
-    
-    // Reload scans from Google Sheets to get latest data
+    // Load kegs from stocktake spreadsheet (if available), otherwise from master sheet
     try {
-        const result = await apiService.loadUserScans(state.currentStocktake.id, null); // null = load all scans
-        if (result.success && result.scans) {
-            // Clear existing scans for this stocktake and reload from server
-            const existingScans = await dbService.getAllScans(state.currentStocktake.id);
-            for (const scan of existingScans) {
-                await dbService.deleteScan(scan.id);
+        if (state.currentStocktake) {
+            const kegsResult = await apiService.getKegs(state.currentStocktake.id);
+            if (kegsResult.success && kegsResult.kegs && kegsResult.kegs.length > 0) {
+                // Use kegs from stocktake spreadsheet
+                state.kegsList = kegsResult.kegs.map(keg => ({ 
+                    name: keg.name, 
+                    count: keg.count || 0 
+                }));
+            } else {
+                // Fallback to master sheet kegs if stocktake has none
+                if (state.kegs.length > 0) {
+                    state.kegsList = state.kegs.map(keg => ({ ...keg, count: 0 }));
+                }
             }
-            
-            // Save all scans from server
-            for (const scan of result.scans) {
-                const scanWithMeta = {
-                    ...scan,
-                    stocktakeId: state.currentStocktake.id,
-                    stocktakeName: state.currentStocktake.name,
-                    synced: true
-                };
-                await dbService.saveScan(scanWithMeta);
-            }
+        } else if (state.kegs.length > 0) {
+            // No stocktake selected, use master sheet kegs
+            state.kegsList = state.kegs.map(keg => ({ ...keg, count: 0 }));
         }
     } catch (error) {
-        console.warn('Error reloading scans from server:', error);
+        console.warn('Error loading kegs from stocktake, using master sheet:', error);
+        if (state.kegs.length > 0) {
+            state.kegsList = state.kegs.map(keg => ({ ...keg, count: 0 }));
+        }
     }
     
-    // Load scans from IndexedDB
-    const scans = await dbService.getAllScans(state.currentStocktake.id);
-    state.scannedItems = scans;
+    // Reload and merge scans from Google Sheets and local storage
+    await loadScansForStocktake(state.currentStocktake.id, state.user.username);
+    
+    // Load scans from IndexedDB (filtered by current user only)
+    const allScans = await dbService.getAllScans(state.currentStocktake.id);
+    state.scannedItems = allScans.filter(scan => scan.user === state.user.username);
     
     const unsynced = await dbService.getUnsyncedScans(state.currentStocktake.id);
     state.unsyncedCount = unsynced.length;
@@ -1583,9 +1583,25 @@ async function syncToServer() {
             console.warn('Error reloading scans from server:', error);
         }
         
-        // Reload scans from IndexedDB
-        const scans = await dbService.getAllScans(state.currentStocktake.id);
-        state.scannedItems = scans;
+        // Reload and merge scans from Google Sheets and local storage
+        await loadScansForStocktake(state.currentStocktake.id, state.user.username);
+        
+        // Load scans from IndexedDB (filtered by current user only)
+        const allScans = await dbService.getAllScans(state.currentStocktake.id);
+        state.scannedItems = allScans.filter(scan => scan.user === state.user.username);
+        
+        // Reload kegs from stocktake
+        try {
+            const kegsResult = await apiService.getKegs(state.currentStocktake.id);
+            if (kegsResult.success && kegsResult.kegs && kegsResult.kegs.length > 0) {
+                state.kegsList = kegsResult.kegs.map(keg => ({ 
+                    name: keg.name, 
+                    count: keg.count || 0 
+                }));
+            }
+        } catch (error) {
+            console.warn('Error reloading kegs:', error);
+        }
         
         updateCountingScreen();
         

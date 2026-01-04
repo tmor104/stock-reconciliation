@@ -1062,13 +1062,32 @@ router.get('/counting/locations', async (request, env) => {
     }
 });
 
-// Get Kegs
+// Get Kegs (from Master Sheet - for initial list)
 router.get('/counting/kegs', async (request, env) => {
     const authError = await requireAuth(request, env);
     if (authError) return authError;
     
     try {
         const kegs = await CountingService.getKegs(env);
+        return new Response(JSON.stringify({ success: true, kegs }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Get Kegs from Stocktake (from Kegs sheet in stocktake spreadsheet)
+router.get('/stocktake/:stocktakeId/kegs', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId } = request.params;
+        const kegs = await GoogleSheetsAPI.getKegsFromStocktake(stocktakeId, env);
         return new Response(JSON.stringify({ success: true, kegs }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

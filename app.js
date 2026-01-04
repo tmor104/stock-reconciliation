@@ -645,25 +645,50 @@ async function handleLogin(e) {
     }
     
     hideError('login-error');
-    showLoading('Signing in...');
     
-    try {
-        const result = await apiService.login(username, password);
-        
-        if (result.token) {
-            state.user = { username: result.username, role: result.role };
-            state.token = result.token;
-            apiService.setToken(result.token);
+    // Hide logo and show video
+    const logoImg = document.querySelector('.logo-container .main-logo');
+    const logoEmoji = document.querySelector('.logo-container .main-logo[style*="font-size"]');
+    const loginVideo = document.getElementById('login-video');
+    const logoText = document.querySelector('.logo-text');
+    const logoTagline = document.querySelector('.logo-tagline');
+    
+    if (logoImg && logoImg.tagName === 'IMG') logoImg.style.display = 'none';
+    if (logoEmoji) logoEmoji.style.display = 'none';
+    if (logoText) logoText.style.display = 'none';
+    if (logoTagline) logoTagline.style.display = 'none';
+    
+    if (loginVideo) {
+        loginVideo.style.display = 'block';
+        loginVideo.currentTime = 0; // Reset to start
+        loginVideo.play().catch(err => console.warn('Video play failed:', err));
+    }
+    
+    // Disable form during animation
+    const loginForm = document.getElementById('login-form');
+    const loginBtn = document.getElementById('login-btn');
+    if (loginForm) loginForm.style.pointerEvents = 'none';
+    if (loginBtn) loginBtn.disabled = true;
+    
+    // Wait 4 seconds, then proceed with login
+    setTimeout(async () => {
+        try {
+            const result = await apiService.login(username, password);
             
-            // Save to IndexedDB
-            await dbService.saveState('user', state.user);
-            await dbService.saveState('token', state.token);
-            
-            // Load folder ID if saved
-            const savedFolderId = await dbService.getState('folderId');
-            if (savedFolderId) {
-                state.folderId = savedFolderId;
-            }
+            if (result.token) {
+                state.user = { username: result.username, role: result.role };
+                state.token = result.token;
+                apiService.setToken(result.token);
+                
+                // Save to IndexedDB
+                await dbService.saveState('user', state.user);
+                await dbService.saveState('token', state.token);
+                
+                // Load folder ID if saved
+                const savedFolderId = await dbService.getState('folderId');
+                if (savedFolderId) {
+                    state.folderId = savedFolderId;
+                }
             
             // Load products and locations
             await loadProductsAndLocations();

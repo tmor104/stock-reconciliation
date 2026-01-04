@@ -361,7 +361,11 @@
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay" style="display: none;">
-        <div class="spinner"></div>
+        <video id="loading-video" class="loading-video" autoplay loop muted playsinline>
+            <source src="./assets/videos/loading.mp4" type="video/mp4">
+            <!-- Fallback to spinner if video doesn't load -->
+        </video>
+        <div class="spinner" style="display: none;"></div>
         <p id="loading-message">Loading...</p>
     </div>
 

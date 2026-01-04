@@ -68,15 +68,39 @@ function hideModal(modalId) {
 function showLoading(message = 'Loading...') {
     const overlay = document.getElementById('loading-overlay');
     const messageEl = document.getElementById('loading-message');
+    const video = document.getElementById('loading-video');
+    const spinner = overlay?.querySelector('.spinner');
+    
     if (overlay) {
         overlay.style.display = 'flex';
         if (messageEl) messageEl.textContent = message;
+        
+        // Try to play video, fallback to spinner if video fails
+        if (video) {
+            video.style.display = 'block';
+            video.play().catch(err => {
+                console.warn('Video autoplay failed, using spinner fallback:', err);
+                if (video) video.style.display = 'none';
+                if (spinner) spinner.style.display = 'block';
+            });
+        } else if (spinner) {
+            spinner.style.display = 'block';
+        }
     }
 }
 
 function hideLoading() {
     const overlay = document.getElementById('loading-overlay');
-    if (overlay) overlay.style.display = 'none';
+    const video = document.getElementById('loading-video');
+    
+    if (overlay) {
+        overlay.style.display = 'none';
+        // Pause video when hiding
+        if (video) {
+            video.pause();
+            video.currentTime = 0; // Reset to start
+        }
+    }
 }
 
 function showError(elementId, message) {

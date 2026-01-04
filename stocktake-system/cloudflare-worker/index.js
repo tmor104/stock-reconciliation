@@ -877,35 +877,21 @@ router.post('/stocktake/:stocktakeId/finish', async (request, env) => {
     
     try {
         const { stocktakeId } = request.params;
+        // stocktakeId IS the spreadsheet ID - no KV lookup needed
         
-        const currentStocktake = await env.STOCKTAKE_KV.get('current_stocktake', { type: 'json' });
+        // Update metadata: set status to 'completed' and stage to '6' (Complete and Export)
+        await GoogleSheetsAPI.updateStocktakeMetadata(stocktakeId, 'status', 'completed', env);
+        await GoogleSheetsAPI.updateStocktakeStage(stocktakeId, '6', env);
         
-        if (!currentStocktake || currentStocktake.id !== stocktakeId) {
-            return new Response('Stocktake not found', { status: 404, headers: corsHeaders });
-        }
-        
-        // Update status
-        currentStocktake.status = 'completed';
-        currentStocktake.completedAt = new Date().toISOString();
-        currentStocktake.completedBy = request.user.username;
-        
-        // Add to history
-        const historyJson = await env.STOCKTAKE_KV.get('stocktake_history', { type: 'json' });
-        const history = historyJson || [];
-        history.unshift(currentStocktake);
-        
-        await env.STOCKTAKE_KV.put('stocktake_history', JSON.stringify(history));
-        
-        // Clear current stocktake
-        await env.STOCKTAKE_KV.delete('current_stocktake');
-        
-        // Lock the spreadsheet (set to view-only)
-        await GoogleSheetsAPI.lockSpreadsheet(currentStocktake.spreadsheetId, env);
+        // Also set completed date and user if metadata supports it
+        await GoogleSheetsAPI.updateStocktakeMetadata(stocktakeId, 'completed_at', new Date().toISOString(), env);
+        await GoogleSheetsAPI.updateStocktakeMetadata(stocktakeId, 'completed_by', request.user.username, env);
         
         return new Response(JSON.stringify({ success: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
+        console.error('Error finishing stocktake:', error);
         return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }

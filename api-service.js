@@ -580,6 +580,30 @@ class UnifiedAPIService {
         document.body.removeChild(a);
     }
 
+    async exportPdfManualEntries(stocktakeId) {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+        
+        const response = await fetch(`${CONFIG.WORKER_URL}/export/manual-pdf/${stocktakeId}`, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to export PDF manual entries');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `manual-entry-${stocktakeId}.html`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    }
+
     async exportDatFile(stocktakeId) {
         if (!this.token) {
             throw new Error('Not authenticated');
@@ -722,6 +746,49 @@ class UnifiedAPIService {
         if (!response.ok) {
             const error = await response.json().catch(() => ({ error: 'Failed to update folder ID' }));
             throw new Error(error.error || 'Failed to update folder ID');
+        }
+        
+        return await response.json();
+    }
+
+    // ============================================
+    // STOCKTAKE STAGES
+    // ============================================
+
+    async getStocktakeStage(stocktakeId) {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+        
+        const response = await fetch(`${CONFIG.WORKER_URL}/stocktake/${stocktakeId}/stage`, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to get stage' }));
+            throw new Error(error.error || 'Failed to get stage');
+        }
+        
+        return await response.json();
+    }
+
+    async updateStocktakeStage(stocktakeId, stage) {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+        
+        const response = await fetch(`${CONFIG.WORKER_URL}/stocktake/${stocktakeId}/stage`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ stage })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to update stage' }));
+            throw new Error(error.error || 'Failed to update stage');
         }
         
         return await response.json();

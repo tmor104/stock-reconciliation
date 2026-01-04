@@ -827,4 +827,76 @@ export class GoogleSheetsAPI {
             throw error;
         }
     }
+    
+    static async updateStocktakeMetadata(spreadsheetId, property, value, env) {
+        const accessToken = await this.getAccessToken(env);
+        
+        try {
+            // First, get current metadata to find property row
+            const getResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!A:B`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (!getResponse.ok) {
+                throw new Error('Failed to read metadata');
+            }
+            
+            const data = await getResponse.json();
+            const rows = data.values || [];
+            
+            // Find property row index
+            let propertyRowIndex = -1;
+            const propertyLower = property.toLowerCase();
+            for (let i = 0; i < rows.length; i++) {
+                if (rows[i][0] && rows[i][0].toString().toLowerCase() === propertyLower) {
+                    propertyRowIndex = i + 1; // 1-based index
+                    break;
+                }
+            }
+            
+            if (propertyRowIndex === -1) {
+                // Property row doesn't exist, append it
+                const appendResponse = await fetch(
+                    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!A:append?valueInputOption=RAW`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            values: [[property, value.toString()]]
+                        })
+                    }
+                );
+                
+                if (!appendResponse.ok) {
+                    throw new Error(`Failed to add ${property}`);
+                }
+            } else {
+                // Update existing property row
+                const updateResponse = await fetch(
+                    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!B${propertyRowIndex}?valueInputOption=RAW`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            values: [[value.toString()]]
+                        })
+                    }
+                );
+                
+                if (!updateResponse.ok) {
+                    throw new Error(`Failed to update ${property}`);
+                }
+            }
+        } catch (error) {
+            console.error(`Error updating metadata ${property}:`, error);
+            throw error;
+        }
+    }
 }

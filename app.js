@@ -28,6 +28,16 @@ const state = {
     sortColumn: null,
     sortDirection: 'desc', // 'asc' or 'desc'
     selectedStockGroups: [],
+    currentStage: '1', // Stocktake stage (1-7)
+    stageNames: {
+        '1': 'Create Stocktake',
+        '2': 'First Counts',
+        '3': 'First Counts Review',
+        '4': 'Variance Report',
+        '5': 'Variance Review and Recounts',
+        '6': 'Complete and Export',
+        '7': 'Save Data for Comparison'
+    },
     isOnline: navigator.onLine,
     isSyncing: false,
     unsyncedCount: 0
@@ -235,6 +245,12 @@ function setupEventListeners() {
             showScreen('admin-screen');
             await loadAdminPanel();
         });
+    }
+    
+    // Progress stage button
+    const progressStageBtn = document.getElementById('progress-stage-btn');
+    if (progressStageBtn) {
+        progressStageBtn.addEventListener('click', handleProgressStage);
     }
     
     // Folder ID settings (removed from main page, now in admin panel)
@@ -835,9 +851,93 @@ function updateCurrentStocktakeCard() {
                 <p><strong>Name:</strong> ${state.currentStocktake.name}</p>
                 <p><strong>ID:</strong> ${state.currentStocktake.id}</p>
             `;
+            updateStageDisplay();
         } else {
             card.style.display = 'none';
         }
+    }
+}
+
+async function updateStageDisplay() {
+    const stageInfo = document.getElementById('stocktake-stage-text');
+    const progressBtn = document.getElementById('progress-stage-btn');
+    
+    if (stageInfo) {
+        const stageNum = state.currentStage || '1';
+        const stageName = state.stageNames[stageNum] || `Stage ${stageNum}`;
+        stageInfo.textContent = `${stageNum}: ${stageName}`;
+    }
+    
+    // Show progress button only for admins
+    if (progressBtn) {
+        if (state.user && state.user.role === 'admin' && state.currentStocktake) {
+            progressBtn.style.display = 'inline-block';
+        } else {
+            progressBtn.style.display = 'none';
+        }
+    }
+}
+
+async function handleProgressStage() {
+    if (!state.currentStocktake) return;
+    
+    const currentStageNum = parseInt(state.currentStage || '1');
+    if (currentStageNum >= 7) {
+        alert('Stocktake is already at the final stage.');
+        return;
+    }
+    
+    const nextStage = (currentStageNum + 1).toString();
+    const nextStageName = state.stageNames[nextStage] || `Stage ${nextStage}`;
+    
+    if (!confirm(`Progress to Stage ${nextStage}: ${nextStageName}?`)) return;
+    
+    showLoading('Progressing stage...');
+    
+    try {
+        const result = await apiService.updateStocktakeStage(state.currentStocktake.id, nextStage);
+        if (result.success) {
+            state.currentStage = nextStage;
+            updateStageDisplay();
+            applyStageRestrictions();
+            hideLoading();
+            alert(`Stocktake progressed to Stage ${nextStage}: ${nextStageName}`);
+        } else {
+            throw new Error(result.error || 'Failed to progress stage');
+        }
+    } catch (error) {
+        hideLoading();
+        alert('Failed to progress stage: ' + error.message);
+    }
+}
+
+function applyStageRestrictions() {
+    const stageNum = parseInt(state.currentStage || '1');
+    
+    // Stage-based UI blocking
+    // Stage 1: Only create stocktake
+    // Stage 2: Allow counting
+    // Stage 3: Review mode - highlight uncounted items
+    // Stage 4: Variance report uploaded - allow viewing
+    // Stage 5: Variance review - allow editing
+    // Stage 6: Complete and export
+    // Stage 7: Read-only
+    
+    // Hide/show buttons based on stage
+    const continueBtn = document.getElementById('continue-stocktake-btn');
+    const viewReconBtn = document.getElementById('view-reconciliation-btn');
+    const completeBtn = document.getElementById('complete-first-counts-btn');
+    
+    if (continueBtn) {
+        continueBtn.disabled = stageNum < 2 || stageNum >= 7;
+    }
+    
+    if (viewReconBtn) {
+        viewReconBtn.disabled = stageNum < 4 || stageNum >= 7;
+    }
+    
+    if (completeBtn) {
+        completeBtn.disabled = stageNum < 2 || stageNum >= 3;
     }
 }
 
@@ -911,6 +1011,20 @@ async function selectStocktake(stocktake) {
         
         await dbService.saveState('currentStocktake', state.currentStocktake);
         await dbService.saveStocktake(state.currentStocktake);
+        
+        // Load stage
+        try {
+            const stageResult = await apiService.getStocktakeStage(stocktake.id);
+            if (stageResult.success) {
+                state.currentStage = stageResult.stage || '1';
+            } else {
+                state.currentStage = '1';
+            }
+        } catch (error) {
+            console.warn('Error loading stage (defaulting to 1):', error);
+            state.currentStage = '1';
+        }
+        updateStageDisplay();
         
         // Load and merge scans from Google Sheets and local storage
         if (state.user) {
@@ -1714,6 +1828,16 @@ async function handleCompleteFirstCounts() {
         const result = await apiService.completeFirstCounts(state.currentStocktake.id);
         
         if (result.success) {
+            // Progress to stage 3 (First Counts Review)
+            try {
+                await apiService.updateStocktakeStage(state.currentStocktake.id, '3');
+                state.currentStage = '3';
+                updateStageDisplay();
+                applyStageRestrictions();
+            } catch (error) {
+                console.warn('Failed to progress stage:', error);
+            }
+            
             // Reload variance data
             const varianceResult = await apiService.getVarianceData(state.currentStocktake.id);
             if (varianceResult.success && varianceResult.varianceData) {
@@ -1747,6 +1871,22 @@ async function handleCompleteFirstCounts() {
 
 async function loadReconciliationScreen() {
     if (!state.currentStocktake) return;
+    
+    // Load stage if not loaded
+    if (!state.currentStage) {
+        try {
+            const stageResult = await apiService.getStocktakeStage(state.currentStocktake.id);
+            if (stageResult.success) {
+                state.currentStage = stageResult.stage || '1';
+            } else {
+                state.currentStage = '1';
+            }
+        } catch (error) {
+            state.currentStage = '1';
+        }
+    }
+    updateStageDisplay();
+    applyStageRestrictions();
     
     // Update stocktake info
     const stocktakeInfo = document.getElementById('reconciliation-stocktake-info');
@@ -2638,7 +2778,7 @@ async function handleCompleteStocktake() {
         if (result.success) {
             // Export files
             await apiService.exportDatFile(state.currentStocktake.id);
-            await apiService.exportManualEntries(state.currentStocktake.id);
+            await apiService.exportPdfManualEntries(state.currentStocktake.id);
             
             hideLoading();
             alert('Stocktake completed! Files have been downloaded.');

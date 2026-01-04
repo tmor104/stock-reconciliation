@@ -19,8 +19,8 @@
                      onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='block';"
                      onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <div class="main-logo" style="font-size: 64px; text-align: center; display: none;">📦</div>
-                <!-- Login screen video animation -->
-                <video id="login-video" class="login-video" autoplay loop muted playsinline>
+                <!-- Login screen video animation (hidden by default, shown during login) -->
+                <video id="login-video" class="login-video" muted playsinline style="display: none;">
                     <source src="./assets/videos/loading.mp4" type="video/mp4">
                 </video>
                 <h1 class="logo-text">STOCK <span class="logo-wizard">WIZARD</span></h1>

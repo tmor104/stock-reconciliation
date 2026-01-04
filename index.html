@@ -14,8 +14,9 @@
         <div class="login-container">
             <div class="logo-container">
                 <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
-                <img src="assets/images/logo.png" alt="Stock Wizard Logo" class="main-logo" 
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <img src="./assets/images/logo.png" alt="Stock Wizard Logo" class="main-logo" 
+                     onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='block';"
+                     onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <div class="main-logo" style="font-size: 64px; text-align: center; display: none;">📦</div>
                 <h1 class="logo-text">STOCK <span class="logo-wizard">WIZARD</span></h1>
                 <p class="logo-tagline">Simplicity in beverage management</p>
@@ -35,8 +36,9 @@
         <div class="header">
             <div class="header-logo-section">
                 <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
-                <img src="assets/images/logo.png" alt="Logo" class="header-logo" 
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+                <img src="./assets/images/logo.png" alt="Logo" class="header-logo" 
+                     onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                     onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
                 <div>
                     <h1 class="header-title">STOCK <span class="logo-wizard">WIZARD</span></h1>
@@ -138,8 +140,9 @@
         <div class="header">
             <div class="header-logo-section">
                 <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
-                <img src="assets/images/logo.png" alt="Logo" class="header-logo" 
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+                <img src="./assets/images/logo.png" alt="Logo" class="header-logo" 
+                     onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                     onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
                 <div>
                     <h1 class="header-title">STOCK <span class="logo-wizard">WIZARD</span></h1>
@@ -256,8 +259,9 @@
         <div class="header">
             <div class="header-logo-section">
                 <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
-                <img src="assets/images/logo.png" alt="Logo" class="header-logo" 
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+                <img src="./assets/images/logo.png" alt="Logo" class="header-logo" 
+                     onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                     onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
                 <div>
                     <h1 class="header-title">📊 Reconciliation</h1>

@@ -3,15 +3,21 @@ export class VarianceCalculator {
         // Create a map of product codes to counted quantities
         const countMap = new Map();
         
-        // Group counts by barcode, sum quantities
+        // Group counts by barcode (or product name if no barcode), sum quantities
+        // Use composite key to handle items without barcodes properly
         counts.forEach(count => {
-            const barcode = count.barcode;
+            const barcode = count.barcode || '';
+            const product = count.product || '';
             const qty = parseFloat(count.quantity) || 0;
             
-            if (countMap.has(barcode)) {
-                countMap.set(barcode, countMap.get(barcode) + qty);
+            // For items without barcode, use product name as key to avoid grouping all together
+            // For items with barcode, use barcode as key
+            const key = barcode || `NO_BARCODE_${product}`;
+            
+            if (countMap.has(key)) {
+                countMap.set(key, countMap.get(key) + qty);
             } else {
-                countMap.set(barcode, qty);
+                countMap.set(key, qty);
             }
         });
         
@@ -35,10 +41,12 @@ export class VarianceCalculator {
         });
         
         // Map barcode counts to product codes
-        for (const [barcode, qty] of countMap) {
+        for (const [key, qty] of countMap) {
             let productCode = null;
-            const countEntry = counts.find(c => c.barcode === barcode);
-            const productName = countEntry?.product || '';
+            // Extract barcode and product name from key
+            const isNoBarcode = key.startsWith('NO_BARCODE_');
+            const barcode = isNoBarcode ? '' : key;
+            const productName = isNoBarcode ? key.replace('NO_BARCODE_', '') : (counts.find(c => (c.barcode || '') === barcode)?.product || '');
             
             // First try: barcode mapping (most reliable)
             if (barcode && barcode.trim()) {
@@ -74,18 +82,8 @@ export class VarianceCalculator {
                 // Log unmatched barcodes for debugging
                 console.warn(`Unmatched barcode in counts: ${barcode}, product: ${productName || 'unknown'}`);
             } else if (!barcode && productName) {
-                // Item without barcode - try to match by name only
-                const productDesc = productName.toLowerCase().trim();
-                productCode = productDescriptionMap.get(productDesc);
-                if (productCode) {
-                    if (productCountMap.has(productCode)) {
-                        productCountMap.set(productCode, productCountMap.get(productCode) + qty);
-                    } else {
-                        productCountMap.set(productCode, qty);
-                    }
-                } else {
-                    console.warn(`Unmatched item (no barcode): ${productName}`);
-                }
+                // Item without barcode - already tried matching above, log if still unmatched
+                console.warn(`Unmatched item (no barcode): ${productName}`);
             }
         }
         

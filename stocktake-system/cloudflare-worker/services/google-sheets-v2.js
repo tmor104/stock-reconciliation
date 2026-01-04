@@ -544,23 +544,32 @@ export class GoogleSheetsAPI {
             const rawData = await rawResponse.json();
             const rows = rawData.values || [];
             
-            // Aggregate Raw Scans by barcode
+            // Aggregate Raw Scans by barcode (or product name if no barcode)
+            // Use a composite key to handle items without barcodes properly
             const tally = {};
             rows.slice(1).forEach(row => {
                 const barcode = row[0] || '';
-                if (!barcode) return;
+                const product = row[1] || '';
+                const quantity = parseFloat(row[2]) || 0;
                 
-                if (!tally[barcode]) {
-                    tally[barcode] = {
+                // Skip completely empty rows
+                if (!barcode && !product) return;
+                
+                // For items without barcode, use product name as key to avoid grouping all together
+                // For items with barcode, use barcode as key
+                const key = barcode || `NO_BARCODE_${product}`;
+                
+                if (!tally[key]) {
+                    tally[key] = {
                         barcode: barcode,
-                        product: row[1] || '',
+                        product: product,
                         quantity: 0,
                         locations: new Set(),
                         stockLevel: row[6] || ''
                     };
                 }
-                tally[barcode].quantity += parseFloat(row[2]) || 0;
-                if (row[3]) tally[barcode].locations.add(row[3]);
+                tally[key].quantity += quantity;
+                if (row[3]) tally[key].locations.add(row[3]);
             });
             
             return Object.values(tally).map(item => ({

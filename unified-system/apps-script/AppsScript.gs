@@ -483,16 +483,27 @@ function updateTally(tallySheet, rawSheet) {
     
     data.forEach(row => {
       const barcode = String(row[0] || '');
-      if (!tally[barcode]) {
-        tally[barcode] = {
-          product: row[1],
+      const product = String(row[1] || '');
+      const quantity = parseFloat(row[2]) || 0;
+      
+      // Skip completely empty rows
+      if (!barcode && !product) return;
+      
+      // For items without barcode, use product name as key to avoid grouping all together
+      // For items with barcode, use barcode as key
+      const key = barcode || `NO_BARCODE_${product}`;
+      
+      if (!tally[key]) {
+        tally[key] = {
+          barcode: barcode,
+          product: product,
           totalQty: 0,
           locations: new Set(),
-          stockLevel: row[6]
+          stockLevel: row[6] || ''
         };
       }
-      tally[barcode].totalQty += parseFloat(row[2]) || 0;
-      tally[barcode].locations.add(row[3]);
+      tally[key].totalQty += quantity;
+      if (row[3]) tally[key].locations.add(String(row[3]));
     });
     
     // Clear and write tally
@@ -500,20 +511,24 @@ function updateTally(tallySheet, rawSheet) {
       tallySheet.getRange('A2:F' + tallySheet.getLastRow()).clearContent();
     }
     
-    const rows = Object.keys(tally).map(barcode => [
-      barcode,
-      tally[barcode].product,
-      tally[barcode].totalQty,
-      Array.from(tally[barcode].locations).join(', '),
-      Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'),
-      tally[barcode].stockLevel
-    ]);
+    const rows = Object.keys(tally).map(key => {
+      const item = tally[key];
+      return [
+        item.barcode, // Column A: Barcode (empty string for items without barcode)
+        item.product, // Column B: Product name
+        item.totalQty, // Column C: Total Quantity
+        Array.from(item.locations).join(', '), // Column D: Locations
+        Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'), // Column E: Last Updated
+        item.stockLevel // Column F: Stock Level
+      ];
+    });
     
     if (rows.length > 0) {
       tallySheet.getRange(2, 1, rows.length, 6).setValues(rows);
     }
   } catch (e) {
     // Silently fail tally update - not critical
+    console.error('Error updating tally:', e.toString());
   }
 }
 

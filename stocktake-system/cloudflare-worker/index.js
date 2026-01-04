@@ -1546,37 +1546,6 @@ router.get('/admin/counts/:stocktakeId', async (request, env) => {
         });
     }
 });
-                userCounts[username].manualCount += entry.quantity || 0;
-            });
-        }
-        
-        // Process kegs
-        if (countData && countData.kegs) {
-            countData.kegs.forEach(keg => {
-                const username = keg.user || 'unknown';
-                if (!userCounts[username]) {
-                    userCounts[username] = {
-                        username,
-                        scanCount: 0,
-                        manualCount: 0,
-                        kegCount: 0,
-                        lastSync: null
-                    };
-                }
-                userCounts[username].kegCount += keg.quantity || 0;
-            });
-        }
-        
-        return new Response(JSON.stringify(Object.values(userCounts)), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-    } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-    }
-});
 
 // 404 handler
 router.all('*', () => new Response('Not Found', { status: 404, headers: corsHeaders }));

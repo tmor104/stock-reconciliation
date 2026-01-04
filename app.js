@@ -251,7 +251,13 @@ function setupEventListeners() {
     // Progress stage button
     const progressStageBtn = document.getElementById('progress-stage-btn');
     if (progressStageBtn) {
-        progressStageBtn.addEventListener('click', handleProgressStage);
+        progressStageBtn.addEventListener('click', () => handleProgressStage('forward'));
+    }
+    
+    // Rollback stage button (admin only)
+    const rollbackStageBtn = document.getElementById('rollback-stage-btn');
+    if (rollbackStageBtn) {
+        rollbackStageBtn.addEventListener('click', () => handleProgressStage('backward'));
     }
     
     // Folder ID settings (removed from main page, now in admin panel)
@@ -454,9 +460,55 @@ function setupCountingScreenListeners() {
 }
 
 function setupReconciliationScreenListeners() {
-    // Refresh variance button
+    // Refresh variance button - reloads from sheet and updates reconciliation
     const refreshVarianceBtn = document.getElementById('refresh-variance-btn');
-    if (refreshVarianceBtn) refreshVarianceBtn.addEventListener('click', () => {
+    if (refreshVarianceBtn) refreshVarianceBtn.addEventListener('click', async () => {
+        if (!state.currentStocktake) return;
+        showLoading('Refreshing variance report from sheet...');
+        try {
+            // Reload variance data from Google Sheets (this will get latest counts)
+            const result = await apiService.getVarianceData(state.currentStocktake.id);
+            if (result.success && result.varianceData) {
+                if (result.varianceData.items && Array.isArray(result.varianceData.items)) {
+                    state.varianceData = result.varianceData.items;
+                } else if (Array.isArray(result.varianceData)) {
+                    state.varianceData = result.varianceData;
+                } else {
+                    state.varianceData = [];
+                }
+                await dbService.saveVarianceData(state.currentStocktake.id, state.varianceData);
+                state.filteredVarianceData = null; // Clear filter to show all data
+                updateVarianceStatus();
+                renderVarianceTable();
+                updateVarianceDashboard();
+                hideLoading();
+                alert('✓ Variance report refreshed from Google Sheets');
+            } else {
+                throw new Error('Failed to refresh variance data');
+            }
+        } catch (error) {
+            hideLoading();
+            alert('Failed to refresh variance report: ' + error.message);
+            console.error('Refresh variance error:', error);
+        }
+    });
+    
+    // Admin button from reconciliation screen
+    const adminFromReconBtn = document.getElementById('admin-from-recon-btn');
+    if (adminFromReconBtn) {
+        adminFromReconBtn.addEventListener('click', async () => {
+            showScreen('admin-screen');
+            await loadAdminPanel();
+        });
+        // Show only for admins
+        if (state.user && state.user.role === 'admin') {
+            adminFromReconBtn.style.display = 'inline-block';
+        }
+    }
+    
+    // Old refresh button handler (if exists)
+    const oldRefreshBtn = document.getElementById('refresh-variance-btn-old');
+    if (oldRefreshBtn) oldRefreshBtn.addEventListener('click', () => {
         showModal('upload-variance-modal');
     });
     
@@ -909,7 +961,7 @@ async function updateStageDisplay() {
         stageIndicator.textContent = stageText;
     }
     
-    // Show progress button only for admins
+    // Show progress/rollback buttons only for admins
     if (progressBtn) {
         if (state.user && state.user.role === 'admin' && state.currentStocktake) {
             progressBtn.style.display = 'inline-block';
@@ -918,40 +970,78 @@ async function updateStageDisplay() {
         }
     }
     
+    const rollbackBtn = document.getElementById('rollback-stage-btn');
+    if (rollbackBtn) {
+        const stageNum = parseInt(state.currentStage || '1');
+        if (state.user && state.user.role === 'admin' && state.currentStocktake && stageNum > 1) {
+            rollbackBtn.style.display = 'inline-block';
+        } else {
+            rollbackBtn.style.display = 'none';
+        }
+    }
+    
     // Show/hide sections based on stage
     applyStageRestrictions();
 }
 
-async function handleProgressStage() {
+async function handleProgressStage(direction = 'forward') {
     if (!state.currentStocktake) return;
     
     const currentStageNum = parseInt(state.currentStage || '1');
-    if (currentStageNum >= 7) {
-        alert('Stocktake is already at the final stage.');
-        return;
+    
+    let targetStage;
+    if (direction === 'backward') {
+        if (currentStageNum <= 1) {
+            alert('Stocktake is already at the first stage.');
+            return;
+        }
+        targetStage = (currentStageNum - 1).toString();
+    } else {
+        if (currentStageNum >= 7) {
+            alert('Stocktake is already at the final stage.');
+            return;
+        }
+        targetStage = (currentStageNum + 1).toString();
     }
     
-    const nextStage = (currentStageNum + 1).toString();
-    const nextStageName = state.stageNames[nextStage] || `Stage ${nextStage}`;
+    const targetStageName = state.stageNames[targetStage] || `Stage ${targetStage}`;
+    const currentStageName = state.stageNames[state.currentStage] || `Stage ${state.currentStage}`;
     
-    if (!confirm(`Progress to Stage ${nextStage}: ${nextStageName}?`)) return;
+    // Always confirm stage changes
+    const confirmMessage = direction === 'backward' 
+        ? `⚠️ Go BACK from Stage ${state.currentStage} (${currentStageName}) to Stage ${targetStage} (${targetStageName})?\n\nThis may allow users to modify data that was already reviewed. Continue?`
+        : `Progress from Stage ${state.currentStage} (${currentStageName}) to Stage ${targetStage} (${targetStageName})?`;
     
-    showLoading('Progressing stage...');
+    if (!confirm(confirmMessage)) return;
+    
+    showLoading(`${direction === 'backward' ? 'Rolling back' : 'Progressing'} stage...`);
     
     try {
-        const result = await apiService.updateStocktakeStage(state.currentStocktake.id, nextStage);
+        // For backward movement, require admin
+        if (direction === 'backward' && (!state.user || state.user.role !== 'admin')) {
+            throw new Error('Only admins can roll back stages');
+        }
+        
+        const result = await apiService.updateStocktakeStage(state.currentStocktake.id, targetStage, direction === 'backward' ? false : true);
         if (result.success) {
-            state.currentStage = nextStage;
+            state.currentStage = targetStage;
             updateStageDisplay();
             applyStageRestrictions();
             hideLoading();
-            alert(`Stocktake progressed to Stage ${nextStage}: ${nextStageName}`);
+            alert(`Stocktake ${direction === 'backward' ? 'rolled back' : 'progressed'} to Stage ${targetStage}: ${targetStageName}`);
+            
+            // If rolling back to stage 2, reload counting screen
+            if (direction === 'backward' && targetStage === '2') {
+                showScreen('counting-screen');
+                loadCountingScreen();
+            }
         } else {
-            throw new Error(result.error || 'Failed to progress stage');
+            throw new Error(result.error || 'Failed to update stage');
         }
     } catch (error) {
         hideLoading();
-        alert('Failed to progress stage: ' + error.message);
+        alert('Failed to update stage: ' + error.message);
+        console.error('Update stage error:', error);
     }
 }
 
@@ -1467,7 +1557,7 @@ function updateCountingScreen() {
     
     if (state.scanType === 'regular') {
         if (regularSection) regularSection.style.display = 'block';
-        if (manualSection) manualSection.style.display = state.manualEntries.length > 0 ? 'block' : 'none';
+        if (manualSection) manualSection.style.display = 'none'; // No separate manual entries - all in scanned items
         if (kegsSection) kegsSection.style.display = 'none';
         
         if (state.currentMode === 'search') {
@@ -1760,14 +1850,9 @@ async function handleQuantitySubmit() {
     // Save to IndexedDB
     await dbService.saveScan(scan);
     
-    if (scan.isManualEntry) {
-        // Add to manual entries
-        state.manualEntries.push(scan);
-        await dbService.saveManualEntry(scan);
-    } else {
-        // Add to scanned items
-        state.scannedItems.unshift(scan);
-    }
+    // All entries (barcoded or not) go to scanned items list
+    // No separate manual entries - everything is countable from search/kegs
+    state.scannedItems.unshift(scan);
     
     state.unsyncedCount++;
     state.currentProduct = null;
@@ -2013,12 +2098,33 @@ async function syncToServer() {
         
         updateCountingScreen();
         
+        // Show sync confirmation
+        const syncedCount = unsyncedScans.length + (kegsWithCounts.length > 0 ? kegsWithCounts.length : 0);
+        if (syncedCount > 0) {
+            showSyncConfirmation(syncedCount);
+        }
+        
     } catch (error) {
         console.error('Sync error:', error);
         alert('Sync failed: ' + error.message);
     } finally {
         state.isSyncing = false;
         updateSyncButton();
+    }
+}
+
+function showSyncConfirmation(count) {
+    // Show a brief confirmation message
+    const syncStatusText = document.getElementById('sync-status-text');
+    if (syncStatusText) {
+        const originalText = syncStatusText.textContent;
+        syncStatusText.textContent = `✓ Synced ${count} items`;
+        syncStatusText.style.color = 'var(--emerald-600)';
+        
+        setTimeout(() => {
+            syncStatusText.textContent = originalText;
+            syncStatusText.style.color = '';
+        }, 3000);
     }
 }
 
@@ -2127,8 +2233,33 @@ async function loadReconciliationScreen() {
     // Update variance status
     updateVarianceStatus();
     
+    // Populate stock group filter
+    populateStockGroupFilter();
+    
     // Render variance table
     renderVarianceTable();
+}
+
+function populateStockGroupFilter() {
+    const stockGroupFilter = document.getElementById('stock-group-filter');
+    if (!stockGroupFilter) return;
+    
+    // Get unique stock groups from variance data
+    const stockGroups = [...new Set(state.varianceData
+        .map(item => item.category)
+        .filter(cat => cat && cat.toString().trim())
+    )].sort();
+    
+    // Clear existing options (except "All Stock Groups")
+    stockGroupFilter.innerHTML = '<option value="">All Stock Groups</option>';
+    
+    // Add stock group options
+    stockGroups.forEach(group => {
+        const option = document.createElement('option');
+        option.value = group.toString().trim();
+        option.textContent = group.toString().trim();
+        stockGroupFilter.appendChild(option);
+    });
 }
 
 function updateVarianceStatus() {
@@ -2149,6 +2280,70 @@ function updateVarianceStatus() {
             <p><strong>Total Items:</strong> ${totalItems}</p>
             <p><strong>Items with Variance:</strong> ${withVariance}</p>
         `;
+    }
+    
+    // Also update dashboard
+    updateVarianceDashboard();
+}
+
+function updateVarianceDashboard() {
+    if (!Array.isArray(state.varianceData) || state.varianceData.length === 0) {
+        const totalVarianceEl = document.getElementById('total-variance-display');
+        const itemsCountedEl = document.getElementById('items-counted-display');
+        const stockGroupsEl = document.getElementById('stock-groups-totals');
+        if (totalVarianceEl) totalVarianceEl.textContent = '$0.00';
+        if (itemsCountedEl) itemsCountedEl.textContent = '0';
+        if (stockGroupsEl) stockGroupsEl.textContent = '-';
+        return;
+    }
+    
+    // Calculate total dollar variance
+    const totalDollarVariance = state.varianceData.reduce((sum, item) => {
+        return sum + (item.dollarVariance || 0);
+    }, 0);
+    
+    // Count items with counts > 0
+    const itemsCounted = state.varianceData.filter(item => {
+        const countedQty = item.countedQty || 0;
+        return countedQty > 0 || item.manuallyEntered;
+    }).length;
+    
+    // Calculate stock group totals
+    const stockGroupTotals = {};
+    state.varianceData.forEach(item => {
+        const category = item.category || 'Unknown';
+        if (!stockGroupTotals[category]) {
+            stockGroupTotals[category] = {
+                count: 0,
+                dollarVariance: 0
+            };
+        }
+        stockGroupTotals[category].count++;
+        stockGroupTotals[category].dollarVariance += (item.dollarVariance || 0);
+    });
+    
+    // Update displays
+    const totalVarianceEl = document.getElementById('total-variance-display');
+    if (totalVarianceEl) {
+        totalVarianceEl.textContent = formatCurrency(totalDollarVariance);
+        totalVarianceEl.style.color = totalDollarVariance >= 0 ? 'var(--emerald-600)' : 'var(--red-600)';
+    }
+    
+    const itemsCountedEl = document.getElementById('items-counted-display');
+    if (itemsCountedEl) {
+        itemsCountedEl.textContent = `${itemsCounted} / ${state.varianceData.length}`;
+    }
+    
+    const stockGroupsEl = document.getElementById('stock-groups-totals');
+    if (stockGroupsEl) {
+        const groupsList = Object.entries(stockGroupTotals)
+            .slice(0, 5) // Show top 5 groups
+            .map(([group, totals]) => `${group}: ${formatCurrency(totals.dollarVariance)}`)
+            .join(' • ');
+        stockGroupsEl.textContent = groupsList || '-';
+        stockGroupsEl.style.fontSize = '12px';
+        stockGroupsEl.style.maxHeight = '60px';
+        stockGroupsEl.style.overflowY = 'auto';
     }
 }
 
@@ -2213,6 +2408,17 @@ function filterVarianceTable(searchQuery = '', filterType = 'all') {
         });
     }
     
+    // Apply stock group filter
+    if (state.selectedStockGroups && state.selectedStockGroups.length > 0) {
+        filtered = filtered.filter(item => {
+            const itemCategory = (item.category || '').toString().trim();
+            return state.selectedStockGroups.some(group => {
+                const groupStr = group.toString().trim();
+                return itemCategory === groupStr || itemCategory.includes(groupStr);
+            });
+        });
+    }
+    
     // Apply type filter
     if (filterType !== 'all') {
         filtered = filtered.filter(item => {
@@ -2235,6 +2441,8 @@ function filterVarianceTable(searchQuery = '', filterType = 'all') {
                     return varianceQty > 0;
                 case 'quantity-under':
                     return varianceQty < 0;
+                case 'counted':
+                    return countedQty > 0; // New filter for testing
                 default:
                     return true;
             }

@@ -63,6 +63,7 @@
                     <button id="continue-stocktake-btn" class="btn-primary">Continue Stocktake</button>
                     <button id="view-reconciliation-btn" class="btn-primary">View Reconciliation</button>
                     <button id="progress-stage-btn" class="btn-secondary" style="display: none;">Progress Stage →</button>
+                    <button id="rollback-stage-btn" class="btn-secondary" style="display: none;">← Rollback Stage</button>
                 </div>
             </div>
 
@@ -270,6 +271,7 @@
             </div>
             <div class="header-actions">
                 <button id="refresh-variance-btn" class="btn-secondary">🔄 Refresh Variance Report</button>
+                <button id="admin-from-recon-btn" class="btn-secondary" style="display: none;">⚙️ Admin</button>
                 <button id="back-to-counting-btn" class="btn-secondary">← Back to Counting</button>
                 <button id="reconciliation-logout-btn" class="btn-secondary">Logout</button>
             </div>
@@ -298,6 +300,7 @@
                             <option value="negative">Negative Variance</option>
                             <option value="uncounted">Uncounted</option>
                             <option value="no-barcode">No Barcode</option>
+                            <option value="counted">Counted (Qty > 0)</option>
                             <option value="quantity-over">Quantity > 0</option>
                             <option value="quantity-under">Quantity < 0</option>
                         </select>

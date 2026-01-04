@@ -18,21 +18,51 @@ export class VarianceCalculator {
         // Convert barcode counts to product code counts using mapping
         const productCountMap = new Map();
         const reverseBarcodeMap = new Map();
+        const productDescriptionMap = new Map(); // For fallback matching by description
         
         // Create reverse mapping (barcode -> productCode)
         for (const [productCode, barcode] of barcodeMapping) {
             reverseBarcodeMap.set(barcode, productCode);
         }
         
+        // Create product description map for fallback matching
+        theoretical.forEach(item => {
+            const productCode = item.productCode || item.description;
+            const description = (item.description || '').toLowerCase().trim();
+            if (description && productCode) {
+                productDescriptionMap.set(description, productCode);
+            }
+        });
+        
         // Map barcode counts to product codes
         for (const [barcode, qty] of countMap) {
-            const productCode = reverseBarcodeMap.get(barcode);
+            let productCode = null;
+            
+            // First try: barcode mapping
+            if (barcode && barcode.trim()) {
+                productCode = reverseBarcodeMap.get(barcode);
+            }
+            
+            // Fallback: match by product description from count data
+            if (!productCode && counts.length > 0) {
+                // Find the count entry with this barcode to get its product description
+                const countEntry = counts.find(c => c.barcode === barcode);
+                if (countEntry && countEntry.product) {
+                    const productDesc = (countEntry.product || '').toLowerCase().trim();
+                    productCode = productDescriptionMap.get(productDesc);
+                }
+            }
+            
+            // If we found a productCode (via barcode mapping or description match), add it
             if (productCode) {
                 if (productCountMap.has(productCode)) {
                     productCountMap.set(productCode, productCountMap.get(productCode) + qty);
                 } else {
                     productCountMap.set(productCode, qty);
                 }
+            } else if (barcode && barcode.trim()) {
+                // Log unmatched barcodes for debugging (but don't fail)
+                console.warn(`Unmatched barcode in counts: ${barcode}, product: ${counts.find(c => c.barcode === barcode)?.product || 'unknown'}`);
             }
         }
         

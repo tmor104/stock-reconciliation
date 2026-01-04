@@ -873,6 +873,38 @@ body {
     padding: 40px 20px;
 }
 
+/* Variance Dashboard */
+.variance-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.dashboard-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+    backdrop-filter: blur(10px);
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid var(--slate-200);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-card h3 {
+    font-size: 14px;
+    color: var(--slate-600);
+    margin: 0 0 8px 0;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dashboard-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--slate-800);
+}
+
 .variance-table-container {
     background: white;
     border-radius: 12px;
@@ -936,8 +968,9 @@ body {
 }
 
 .variance-table td {
-    padding: 12px;
+    padding: 8px 12px; /* Closer rows - reduced vertical padding */
     border-bottom: 1px solid var(--slate-200);
+    font-size: 14px; /* Slightly smaller font to fit more */
 }
 
 .variance-table tbody tr:hover {

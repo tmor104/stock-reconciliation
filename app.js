@@ -2499,11 +2499,6 @@ async function editVarianceItem(productCode) {
 // Make editVarianceItem available globally for onclick handlers
 window.editVarianceItem = editVarianceItem;
 
-function editVarianceItem(barcode) {
-    // This would open an edit modal for variance items
-    alert('Edit variance item functionality - to be implemented');
-}
-
 // ============================================
 // COMPLETE STOCKTAKE
 // ============================================

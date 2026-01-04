@@ -1,0 +1,41 @@
+name: Deploy Apps Script
+
+on:
+  push:
+    branches:
+      - main
+      - claude/analyze-appscript-performance-70iMM
+    paths:
+      - 'unified-system/apps-script/**'
+      - '.github/workflows/deploy-appscript.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Google Apps Script
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Setup clasp credentials
+        working-directory: unified-system/apps-script
+        env:
+          CLASP_CREDS: ${{ secrets.CLASP_CREDS }}
+        run: |
+          echo "$CLASP_CREDS" > ~/.clasprc.json
+
+      - name: Push to Apps Script
+        working-directory: unified-system/apps-script
+        run: |
+          clasp push --force
+          clasp deploy --description "Auto-deploy from GitHub - ${{ github.sha }}"

@@ -568,6 +568,25 @@ router.post('/stocktake/create', async (request, env) => {
             env
         );
         
+        // Extract and populate kegs from stock groups 1 and 300
+        const kegStockGroups = ['1', '300', '1 Beer Keg', '300 Cider/Seltzer Keg'];
+        const kegItems = hnlData.items.filter(item => {
+            const category = (item.category || '').toString().trim();
+            return kegStockGroups.some(group => 
+                category === group || 
+                category.includes('Beer Keg') || 
+                category.includes('Cider/Seltzer Keg')
+            );
+        });
+        
+        if (kegItems.length > 0) {
+            await GoogleSheetsAPI.populateKegsSheet(
+                spreadsheetId,
+                kegItems,
+                env
+            );
+        }
+        
         // Link count sheet
         await GoogleSheetsAPI.linkCountSheet(
             spreadsheetId,

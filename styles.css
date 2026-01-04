@@ -987,6 +987,27 @@ body {
     font-weight: 600;
 }
 
+/* Unsynced row highlighting */
+.unsynced-row {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+    border-left: 4px solid var(--orange-500) !important;
+}
+
+.unsynced-row:hover {
+    background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%) !important;
+}
+
+/* Hide number input spinners */
+.keg-count-input::-webkit-outer-spin-button,
+.keg-count-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.keg-count-input[type=number] {
+    -moz-appearance: textfield;
+}
+
 .variance-positive-row {
     background-color: rgba(16, 185, 129, 0.1);
 }

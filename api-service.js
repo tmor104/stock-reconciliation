@@ -335,6 +335,15 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
+        // Format kegs for Apps Script (same format as syncScans)
+        const formattedKegs = kegs.map(keg => ({
+            product: keg.name,
+            quantity: keg.count,
+            location: location || '',
+            user: user || '',
+            timestamp: new Date().toISOString()
+        }));
+        
         // Use Cloudflare Worker proxy (handles CORS properly)
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
@@ -342,14 +351,15 @@ class UnifiedAPIService {
             body: JSON.stringify({
                 action: 'syncKegs',
                 stocktakeId,
-                kegs,
+                kegs: formattedKegs,
                 location,
                 user
             })
         });
         
         if (!response.ok) {
-            throw new Error('Failed to sync kegs');
+            const errorText = await response.text();
+            throw new Error(`Failed to sync kegs: ${errorText}`);
         }
         
         const result = await response.json();
@@ -358,8 +368,11 @@ class UnifiedAPIService {
             throw new Error(errorMsg);
         }
         
-        // New format: data is wrapped in data object
-        return result.data || result;
+        // Return success format
+        return {
+            success: true,
+            ...(result.data || result)
+        };
     }
 
     async syncManualEntries(stocktakeId, manualEntries) {

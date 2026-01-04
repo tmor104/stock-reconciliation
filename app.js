@@ -1669,18 +1669,34 @@ function updateKegsTable() {
                 </tr>
             </thead>
             <tbody>
-                ${state.kegsList.map((keg, idx) => `
-                    <tr>
+                ${state.kegsList.map((keg, idx) => {
+                    const isUnsynced = keg.count > 0 && !keg.synced;
+                    const rowClass = isUnsynced ? 'unsynced-row' : '';
+                    return `
+                    <tr class="${rowClass}">
                         <td>${keg.name}</td>
                         <td>
-                            <input type="number" 
-                                   value="${keg.count}" 
-                                   min="0"
-                                   onchange="updateKegCount(${idx}, this.value)"
-                                   style="width: 96px; padding: 8px; text-align: center; border: 2px solid var(--orange-300); border-radius: 8px; font-weight: bold; font-size: 18px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="text" 
+                                       id="keg-count-${idx}"
+                                       value="${keg.count || ''}" 
+                                       placeholder="0"
+                                       onfocus="this.value = this.value === '0' ? '' : this.value"
+                                       onblur="if (this.value === '') this.value = '0'; updateKegCount(${idx}, this.value)"
+                                       onchange="updateKegCount(${idx}, this.value)"
+                                       style="width: 80px; padding: 8px; text-align: center; border: 2px solid var(--orange-300); border-radius: 8px; font-weight: bold; font-size: 18px; -moz-appearance: textfield;"
+                                       class="keg-count-input">
+                                <button onclick="addToKegCount(${idx})" 
+                                        class="btn-secondary" 
+                                        style="padding: 8px 12px; min-width: 40px;"
+                                        title="Add 1 to count">
+                                    <span style="font-size: 18px;">+</span>
+                                </button>
+                            </div>
                         </td>
                     </tr>
-                `).join('')}
+                `;
+                }).join('')}
             </tbody>
         </table>
     `;
@@ -1688,9 +1704,23 @@ function updateKegsTable() {
 
 function updateKegCount(index, value) {
     if (state.kegsList[index]) {
-        state.kegsList[index].count = parseInt(value) || 0;
+        const newCount = parseInt(value) || 0;
+        state.kegsList[index].count = newCount;
+        state.kegsList[index].synced = false; // Mark as unsynced when count changes
+        updateKegsTable();
+        updateSyncButton();
     }
 }
+
+window.addToKegCount = function(index) {
+    if (state.kegsList[index]) {
+        const currentCount = state.kegsList[index].count || 0;
+        state.kegsList[index].count = currentCount + 1;
+        state.kegsList[index].synced = false; // Mark as unsynced
+        updateKegsTable();
+        updateSyncButton();
+    }
+};
 
 function updateProductConfirmation() {
     const productName = document.getElementById('product-name');
@@ -2077,7 +2107,6 @@ async function syncToServer() {
         // Sync kegs
         const kegsWithCounts = state.kegsList.filter(k => k.count > 0);
         if (kegsWithCounts.length > 0) {
-            showLoading(`Syncing ${kegsWithCounts.length} keg count(s)...`);
             try {
                 const result = await apiService.syncKegs(
                     state.currentStocktake.id,
@@ -2085,26 +2114,15 @@ async function syncToServer() {
                     state.currentLocation,
                     state.user.username
                 );
-                if (result.success) {
-                    // Reset keg counts
-                    state.kegsList = state.kegsList.map(k => ({ ...k, count: 0 }));
-                    hideLoading();
-                    // Show success message
-                    const syncKegsBtn = document.getElementById('sync-kegs-btn');
-                    if (syncKegsBtn) {
-                        const originalText = syncKegsBtn.textContent;
-                        syncKegsBtn.textContent = `✓ Synced ${kegsWithCounts.length} keg(s)`;
-                        syncKegsBtn.style.backgroundColor = 'var(--emerald-500)';
-                        setTimeout(() => {
-                            syncKegsBtn.textContent = originalText;
-                            syncKegsBtn.style.backgroundColor = '';
-                        }, 3000);
-                    }
+                if (result.success || result.ok) {
+                    // Mark kegs as synced and reset counts
+                    state.kegsList = state.kegsList.map(k => ({ ...k, count: 0, synced: true }));
+                    updateKegsTable();
                 } else {
                     throw new Error(result.message || 'Failed to sync kegs');
                 }
             } catch (error) {
-                hideLoading();
+                console.error('Keg sync error:', error);
                 alert('Failed to sync kegs: ' + error.message);
                 throw error;
             }
@@ -3346,3 +3364,4 @@ if (document.readyState === 'loading') {
 } else {
     init();
 }
+

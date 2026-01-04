@@ -69,7 +69,20 @@ router.post('/apps-script/proxy', async (request, env) => {
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
-            throw fetchError;
+            // Network error or other fetch failure - return 502 Bad Gateway
+            return new Response(JSON.stringify({
+                ok: false,
+                success: false,
+                error: {
+                    message: 'Failed to reach Apps Script: ' + fetchError.message,
+                    where: 'proxy',
+                    name: fetchError.name
+                },
+                requestId: requestId
+            }), {
+                status: 502,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
         }
         clearTimeout(timeoutId);
         

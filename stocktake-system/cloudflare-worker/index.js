@@ -1581,6 +1581,86 @@ router.get('/admin/counts/:stocktakeId', async (request, env) => {
     }
 });
 
+// Stocktake - Get Stage
+// stocktakeId is the Apps Script spreadsheet ID
+router.get('/stocktake/:stocktakeId/stage', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId } = request.params;
+        const stage = await GoogleSheetsAPI.getStocktakeStage(stocktakeId, env);
+        
+        return new Response(JSON.stringify({ success: true, stage }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Stocktake - Update Stage (Admin only)
+// stocktakeId is the Apps Script spreadsheet ID
+router.post('/stocktake/:stocktakeId/stage', async (request, env) => {
+    const authError = await requireAdmin(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId } = request.params;
+        const body = await request.json().catch(() => ({}));
+        const { stage } = body;
+        
+        if (!stage || !['1', '2', '3', '4', '5', '6', '7'].includes(stage.toString())) {
+            return new Response(JSON.stringify({ error: 'Invalid stage. Must be 1-7' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
+        // Validate stage progression requirements
+        const currentStage = await GoogleSheetsAPI.getStocktakeStage(stocktakeId, env);
+        const newStageNum = parseInt(stage);
+        const currentStageNum = parseInt(currentStage);
+        
+        // Stage 2 -> 3: Require at least one count
+        if (currentStageNum === 2 && newStageNum === 3) {
+            const counts = await GoogleSheetsAPI.getCountData(stocktakeId, env);
+            if (!counts || counts.length === 0) {
+                return new Response(JSON.stringify({ error: 'Cannot progress: No counts recorded yet' }), {
+                    status: 400,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+        }
+        
+        // Stage 3 -> 4: Require variance report uploaded
+        if (currentStageNum === 3 && newStageNum === 4) {
+            try {
+                await GoogleSheetsAPI.getTheoreticalData(stocktakeId, env);
+            } catch (e) {
+                return new Response(JSON.stringify({ error: 'Cannot progress: Variance report not uploaded yet' }), {
+                    status: 400,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+        }
+        
+        await GoogleSheetsAPI.updateStocktakeStage(stocktakeId, stage, env);
+        
+        return new Response(JSON.stringify({ success: true, stage }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
 // 404 handler
 router.all('*', () => new Response('Not Found', { status: 404, headers: corsHeaders }));
 

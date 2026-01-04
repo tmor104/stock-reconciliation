@@ -13,8 +13,10 @@
     <div id="login-screen" class="screen active">
         <div class="login-container">
             <div class="logo-container">
-                <!-- Logo placeholder - add logo.png to assets/images/ when available -->
-                <div class="main-logo" style="font-size: 64px; text-align: center;">📦</div>
+                <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
+                <img src="assets/images/logo.png" alt="Stock Wizard Logo" class="main-logo" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <div class="main-logo" style="font-size: 64px; text-align: center; display: none;">📦</div>
                 <h1 class="logo-text">STOCK <span class="logo-wizard">WIZARD</span></h1>
                 <p class="logo-tagline">Simplicity in beverage management</p>
             </div>
@@ -32,8 +34,10 @@
     <div id="home-screen" class="screen">
         <div class="header">
             <div class="header-logo-section">
-                <!-- Logo placeholder -->
-                <span class="header-logo" style="font-size: 32px;">📦</span>
+                <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
+                <img src="assets/images/logo.png" alt="Logo" class="header-logo" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+                <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
                 <div>
                     <h1 class="header-title">STOCK <span class="logo-wizard">WIZARD</span></h1>
                     <p id="user-info" class="user-info"></p>
@@ -133,8 +137,10 @@
     <div id="counting-screen" class="screen">
         <div class="header">
             <div class="header-logo-section">
-                <!-- Logo placeholder -->
-                <span class="header-logo" style="font-size: 32px;">📦</span>
+                <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
+                <img src="assets/images/logo.png" alt="Logo" class="header-logo" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+                <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
                 <div>
                     <h1 class="header-title">STOCK <span class="logo-wizard">WIZARD</span></h1>
                     <p id="counting-stocktake-info" class="user-info"></p>

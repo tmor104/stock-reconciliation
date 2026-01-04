@@ -637,10 +637,20 @@ function syncKegs(request, requestId) {
     const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
     const syncId = Utilities.getUuid();
     
-    let updatedCount = 0;
+    // Build map of product name to row index for fast lookup
+    const productToRowIndex = new Map();
+    for (let i = 0; i < allData.length; i++) {
+      const productName = (allData[i][0] || '').toString().trim().toLowerCase();
+      if (productName) {
+        productToRowIndex.set(productName, i + 2); // Row index (i + 2 because we start from row 2)
+      }
+    }
+    
+    // Collect all updates to batch them
+    const updates = []; // Array of {rowIndex, rowData}
     const notFound = [];
     
-    // For each keg being synced, find and update the matching row
+    // For each keg being synced, find and prepare the update
     request.kegs.forEach(keg => {
       // Accept both field name formats for backward compatibility
       const productName = (keg.product || keg.name || '').toString().trim();
@@ -649,35 +659,42 @@ function syncKegs(request, requestId) {
       if (!productName) return; // Skip empty names
       
       // Find the row with matching product name (case-insensitive)
-      let found = false;
-      for (let i = 0; i < allData.length; i++) {
-        const rowProduct = (allData[i][0] || '').toString().trim();
-        if (rowProduct.toLowerCase() === productName.toLowerCase()) {
-          // Found matching row - update it (row index i + 2 because we start from row 2)
-          const rowIndex = i + 2;
-          sheet.getRange(rowIndex, 2, 1, 1).setValue(quantity); // Update Count column (column B)
-          sheet.getRange(rowIndex, 3, 1, 1).setValue(request.location || ''); // Update Location
-          sheet.getRange(rowIndex, 4, 1, 1).setValue(request.user || ''); // Update User
-          sheet.getRange(rowIndex, 5, 1, 1).setValue(timestamp); // Update Timestamp
-          sheet.getRange(rowIndex, 6, 1, 1).setValue('Yes'); // Update Synced
-          sheet.getRange(rowIndex, 7, 1, 1).setValue(syncId); // Update Sync ID
-          updatedCount++;
-          found = true;
-          break;
-        }
-      }
-      
-      if (!found) {
+      const rowIndex = productToRowIndex.get(productName.toLowerCase());
+      if (rowIndex) {
+        // Found matching row - prepare update (keep product name, update rest)
+        const existingRow = allData[rowIndex - 2]; // Convert back to array index
+        const updatedRow = [
+          existingRow[0], // Keep product name (column A)
+          quantity, // Update Count (column B)
+          request.location || '', // Update Location (column C)
+          request.user || '', // Update User (column D)
+          timestamp, // Update Timestamp (column E)
+          'Yes', // Update Synced (column F)
+          syncId // Update Sync ID (column G)
+        ];
+        updates.push({ rowIndex: rowIndex, row: updatedRow });
+      } else {
         notFound.push(productName);
       }
     });
+    
+    // Batch update all rows at once (much faster than individual setValue calls)
+    if (updates.length > 0) {
+      // Sort by row index for efficiency
+      updates.sort((a, b) => a.rowIndex - b.rowIndex);
+      
+      // Update rows in batches (can update multiple rows with one setValues call)
+      updates.forEach(update => {
+        sheet.getRange(update.rowIndex, 1, 1, 7).setValues([update.row]);
+      });
+    }
     
     if (notFound.length > 0) {
       console.warn(`[${requestId}] Products not found in Kegs sheet: ${notFound.join(', ')}`);
     }
     
     return successResponse('Kegs synced', { 
-      syncedCount: updatedCount, 
+      syncedCount: updates.length, 
       syncId,
       notFound: notFound.length > 0 ? notFound : undefined
     }, requestId);

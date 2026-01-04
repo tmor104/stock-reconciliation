@@ -250,7 +250,12 @@ class UnifiedAPIService {
         }
         
         // New format: data is wrapped in data object
-        return result.data || result;
+        const data = result.data || result;
+        // Ensure success flag is set
+        return {
+            success: true,
+            ...data
+        };
     }
 
     async deleteScans(stocktakeId, syncIds) {

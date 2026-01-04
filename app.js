@@ -1060,7 +1060,9 @@ async function loadCountingScreen() {
     }
     
     // Reload and merge scans from Google Sheets and local storage
-    await loadScansForStocktake(state.currentStocktake.id, state.user.username);
+    if (state.user) {
+        await loadScansForStocktake(state.currentStocktake.id, state.user.username);
+    }
     
     // Load scans from IndexedDB (filtered by current user only)
     const allScans = await dbService.getAllScans(state.currentStocktake.id);
@@ -1743,8 +1745,8 @@ function filterVarianceTable(searchQuery = '', filterType = 'all') {
 
 async function loadScansForStocktake(stocktakeId, currentUsername) {
     try {
-        // Load scans from Google Sheets (all users)
-        const result = await apiService.loadUserScans(stocktakeId, null);
+        // Load scans from Google Sheets (all users) - pass undefined instead of null
+        const result = await apiService.loadUserScans(stocktakeId, undefined);
         const serverScans = result.success && result.scans ? result.scans : [];
         
         // Load local scans

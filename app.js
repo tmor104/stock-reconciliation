@@ -2146,15 +2146,58 @@ async function checkForIssues(stocktakeId, currentUsername) {
     const uniqueUsers = new Set(allScans.map(scan => scan.user).filter(Boolean));
     
     if (uniqueUsers.size > 1) {
+        // Get detailed breakdown by user
+        const userBreakdown = {};
+        allScans.forEach(scan => {
+            const user = scan.user || 'unknown';
+            if (!userBreakdown[user]) {
+                userBreakdown[user] = {
+                    scanCount: 0,
+                    totalQuantity: 0,
+                    uniqueProducts: new Set(),
+                    locations: new Set(),
+                    lastScan: null
+                };
+            }
+            userBreakdown[user].scanCount++;
+            userBreakdown[user].totalQuantity += scan.quantity || 0;
+            if (scan.product) userBreakdown[user].uniqueProducts.add(scan.product);
+            if (scan.location) userBreakdown[user].locations.add(scan.location);
+            if (scan.timestamp) {
+                const scanTime = new Date(scan.timestamp);
+                if (!userBreakdown[user].lastScan || scanTime > new Date(userBreakdown[user].lastScan)) {
+                    userBreakdown[user].lastScan = scan.timestamp;
+                }
+            }
+        });
+        
+        // Format breakdown for display
+        const breakdownText = Object.entries(userBreakdown).map(([user, stats]) => {
+            return `${user}: ${stats.scanCount} scans, ${stats.totalQuantity} total qty, ${stats.uniqueProducts.size} products, ${stats.locations.size} locations${stats.lastScan ? `, last scan: ${new Date(stats.lastScan).toLocaleString()}` : ''}`;
+        }).join('\n');
+        
         const issue = {
             id: `multi-user-${stocktakeId}-${Date.now()}`,
             type: 'multi_user_scans',
             stocktakeId,
             severity: 'high',
             message: `Multiple users' scans detected locally: ${Array.from(uniqueUsers).join(', ')}. This should not happen.`,
+            description: `Detailed breakdown:\n${breakdownText}`,
             details: {
                 users: Array.from(uniqueUsers),
-                scanCount: allScans.length
+                scanCount: allScans.length,
+                breakdown: Object.fromEntries(
+                    Object.entries(userBreakdown).map(([user, stats]) => [
+                        user,
+                        {
+                            scanCount: stats.scanCount,
+                            totalQuantity: stats.totalQuantity,
+                            uniqueProducts: Array.from(stats.uniqueProducts),
+                            locations: Array.from(stats.locations),
+                            lastScan: stats.lastScan
+                        }
+                    ])
+                )
             },
             timestamp: new Date().toISOString(),
             acknowledged: false

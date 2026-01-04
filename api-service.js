@@ -84,12 +84,18 @@ class UnifiedAPIService {
         return await response.json();
     }
 
-    async getKegs() {
+    async getKegs(stocktakeId = null) {
         if (!this.token) {
             throw new Error('Not authenticated');
         }
         
-        const response = await fetch(`${CONFIG.WORKER_URL}/counting/kegs`, {
+        // If stocktakeId provided, get kegs from stocktake's Kegs sheet
+        // Otherwise, get from master sheet
+        const url = stocktakeId 
+            ? `${CONFIG.WORKER_URL}/stocktake/${stocktakeId}/kegs`
+            : `${CONFIG.WORKER_URL}/counting/kegs`;
+        
+        const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${this.token}` }
         });
         

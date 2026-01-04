@@ -2757,6 +2757,17 @@ function setupAdminPanelListeners() {
         });
     });
     
+    // Admin stage management buttons
+    const adminProgressBtn = document.getElementById('admin-progress-stage-btn');
+    if (adminProgressBtn) {
+        adminProgressBtn.addEventListener('click', () => handleProgressStage('forward'));
+    }
+    
+    const adminRollbackBtn = document.getElementById('admin-rollback-stage-btn');
+    if (adminRollbackBtn) {
+        adminRollbackBtn.addEventListener('click', () => handleProgressStage('backward'));
+    }
+    
     // Add user form
     const addUserForm = document.getElementById('add-user-form');
     if (addUserForm) {
@@ -3160,6 +3171,78 @@ async function handleAcknowledgeIssue(issueId) {
         await loadIssues();
     } catch (error) {
         alert('Error acknowledging issue: ' + error.message);
+    }
+}
+
+async function loadAdminStages() {
+    if (!state.currentStocktake) {
+        // No current stocktake - show message
+        const stageInfo = document.getElementById('admin-stage-info');
+        const stageDetails = document.getElementById('admin-stage-details');
+        const progressBtn = document.getElementById('admin-progress-stage-btn');
+        const rollbackBtn = document.getElementById('admin-rollback-stage-btn');
+        
+        if (stageInfo) {
+            stageInfo.innerHTML = '<p style="color: var(--slate-600);">No stocktake selected. Please select a stocktake from the home screen first.</p>';
+        }
+        if (stageDetails) {
+            stageDetails.innerHTML = '<p style="color: var(--slate-600);">Go to the home screen and select a stocktake to manage its stage.</p>';
+        }
+        if (progressBtn) progressBtn.disabled = true;
+        if (rollbackBtn) rollbackBtn.disabled = true;
+        return;
+    }
+    
+    // Load current stage
+    try {
+        const stageResult = await apiService.getStocktakeStage(state.currentStocktake.id);
+        const currentStage = stageResult.success ? (stageResult.stage || '1') : '1';
+        state.currentStage = currentStage;
+        
+        const stageNum = parseInt(currentStage);
+        const stageName = state.stageNames[currentStage] || `Stage ${currentStage}`;
+        
+        // Update display
+        const stocktakeNameEl = document.getElementById('admin-stage-stocktake-name');
+        const currentStageEl = document.getElementById('admin-stage-current');
+        const stageDetailsEl = document.getElementById('admin-stage-details');
+        const progressBtn = document.getElementById('admin-progress-stage-btn');
+        const rollbackBtn = document.getElementById('admin-rollback-stage-btn');
+        
+        if (stocktakeNameEl) {
+            stocktakeNameEl.textContent = state.currentStocktake.name;
+        }
+        if (currentStageEl) {
+            currentStageEl.textContent = `${currentStage}: ${stageName}`;
+        }
+        if (stageDetailsEl) {
+            stageDetailsEl.innerHTML = `
+                <p><strong>Stage ${currentStage}:</strong> ${stageName}</p>
+                <p style="margin-top: 8px; color: var(--slate-600);">
+                    ${stageNum === 1 ? 'Stocktake created' : ''}
+                    ${stageNum === 2 ? 'First counts in progress' : ''}
+                    ${stageNum === 3 ? 'First counts review - checking for uncounted items' : ''}
+                    ${stageNum === 4 ? 'Variance report uploaded - ready for review' : ''}
+                    ${stageNum === 5 ? 'Variance review and recounts in progress' : ''}
+                    ${stageNum === 6 ? 'Complete and export - ready to finish' : ''}
+                    ${stageNum === 7 ? 'Data saved for comparison - stocktake complete' : ''}
+                </p>
+            `;
+        }
+        
+        // Enable/disable buttons
+        if (progressBtn) {
+            progressBtn.disabled = stageNum >= 7;
+        }
+        if (rollbackBtn) {
+            rollbackBtn.disabled = stageNum <= 1;
+        }
+    } catch (error) {
+        console.error('Error loading stage info:', error);
+        const currentStageEl = document.getElementById('admin-stage-current');
+        if (currentStageEl) {
+            currentStageEl.textContent = 'Error loading stage';
+        }
     }
 }
 

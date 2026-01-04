@@ -1898,10 +1898,22 @@ function updateSyncButton() {
         manualSyncBtn.disabled = !state.isOnline || state.isSyncing || state.unsyncedCount === 0;
     }
     
-    // Enable keg sync button if there are kegs with counts > 0
+    // Enable keg sync button if there are unsynced kegs (same logic as manual sync)
     if (syncKegsBtn) {
-        const hasKegCounts = state.kegsList && state.kegsList.some(k => k.count > 0);
-        syncKegsBtn.disabled = !state.isOnline || state.isSyncing || !hasKegCounts;
+        const hasUnsyncedKegs = state.unsyncedKegsCount > 0;
+        syncKegsBtn.disabled = !state.isOnline || state.isSyncing || !hasUnsyncedKegs;
+        
+        // Update button text and style based on sync state
+        if (state.isSyncing) {
+            syncKegsBtn.textContent = 'Syncing...';
+            syncKegsBtn.style.opacity = '0.6';
+        } else if (hasUnsyncedKegs) {
+            syncKegsBtn.textContent = `Sync Kegs (${state.unsyncedKegsCount})`;
+            syncKegsBtn.style.opacity = '1';
+        } else {
+            syncKegsBtn.textContent = 'Sync Kegs';
+            syncKegsBtn.style.opacity = '1';
+        }
     }
 }
 
@@ -2207,20 +2219,36 @@ async function syncToServer() {
             }
         }
         
-        // Sync kegs
-        const kegsWithCounts = state.kegsList.filter(k => k.count > 0);
-        if (kegsWithCounts.length > 0) {
+        // Sync kegs - only sync unsynced kegs with counts > 0
+        const unsyncedKegs = state.kegsList.filter(k => {
+            const count = parseFloat(k.count) || 0;
+            return count > 0 && !k.synced;
+        });
+        
+        if (unsyncedKegs.length > 0) {
             try {
                 const result = await apiService.syncKegs(
                     state.currentStocktake.id,
-                    kegsWithCounts,
+                    unsyncedKegs,
                     state.currentLocation,
                     state.user.username
                 );
                 if (result.success || result.ok) {
-                    // Mark kegs as synced and reset counts
-                    state.kegsList = state.kegsList.map(k => ({ ...k, count: 0, synced: true }));
+                    // Mark synced kegs as synced (but keep their counts for display)
+                    state.kegsList = state.kegsList.map(k => {
+                        const wasUnsynced = unsyncedKegs.some(uk => uk.name === k.name);
+                        if (wasUnsynced) {
+                            return { ...k, synced: true };
+                        }
+                        return k;
+                    });
+                    
+                    // Update unsynced count
+                    state.unsyncedKegsCount = Math.max(0, state.unsyncedKegsCount - unsyncedKegs.length);
+                    
+                    // Update UI to show synced state
                     updateKegsTable();
+                    updateSyncButton();
                 } else {
                     throw new Error(result.message || 'Failed to sync kegs');
                 }

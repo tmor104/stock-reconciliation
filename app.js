@@ -716,8 +716,13 @@ async function handleLogin(e) {
             }
             
             showError('login-error', error.message || 'Invalid credentials');
-        console.error('Login error:', error);
-    }
+            console.error('Login error:', error);
+        } finally {
+            // Re-enable form
+            if (loginForm) loginForm.style.pointerEvents = 'auto';
+            if (loginBtn) loginBtn.disabled = false;
+        }
+    }, 4000); // 4 seconds
 }
 
 async function handleLogout(skipConfirm = false) {

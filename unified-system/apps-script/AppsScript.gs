@@ -327,13 +327,33 @@ function listStocktakes(request, requestId) {
         const nameMatch = fileName.match(/^Stocktake - (.+?) - (\d{4}-\d{2}-\d{2})/);
         const displayName = nameMatch ? nameMatch[1] : fileName.replace(/^Stocktake - /, '');
         
+        // Try to get status from Metadata sheet
+        let status = 'Active';
+        try {
+          const ss = SpreadsheetApp.openById(file.getId());
+          const metadataSheet = ss.getSheetByName('Metadata');
+          if (metadataSheet) {
+            const metadataRange = metadataSheet.getRange('A:B');
+            const metadataValues = metadataRange.getValues();
+            for (let i = 0; i < metadataValues.length; i++) {
+              if (metadataValues[i][0] && metadataValues[i][0].toString().toLowerCase() === 'status') {
+                status = metadataValues[i][1] || 'Active';
+                break;
+              }
+            }
+          }
+        } catch (metadataError) {
+          // If we can't read metadata, default to Active
+          console.log(`[${requestId}] Could not read metadata for ${file.getId()}: ${metadataError.toString()}`);
+        }
+        
         stocktakes.push({
           id: file.getId(),
           name: fileName, // Full name
           displayName: displayName, // Extracted name without prefix/date
           createdBy: 'Unknown',
           createdDate: nameMatch ? nameMatch[2] : 'Unknown',
-          status: 'Active',
+          status: status,
           url: file.getUrl(),
           lastModified: file.getLastUpdated()
         });

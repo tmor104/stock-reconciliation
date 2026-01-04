@@ -1610,6 +1610,45 @@ router.get('/admin/counts/:stocktakeId', async (request, env) => {
     }
 });
 
+// Stocktake - Update Status (Archive/Unarchive)
+router.put('/stocktake/:stocktakeId/status', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    // Check admin role
+    const user = await getUserFromRequest(request, env);
+    if (!user || user.role !== 'admin') {
+        return new Response(JSON.stringify({ error: 'Admin access required' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+    
+    try {
+        const { stocktakeId } = request.params;
+        const { status } = await request.json();
+        
+        if (!status || !['Active', 'Archived', 'Completed'].includes(status)) {
+            return new Response(JSON.stringify({ error: 'Invalid status. Must be Active, Archived, or Completed' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
+        await GoogleSheetsAPI.updateStocktakeMetadata(stocktakeId, 'status', status, env);
+        
+        return new Response(JSON.stringify({ success: true, message: `Stocktake status updated to ${status}` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        console.error('Update stocktake status error:', error);
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
 // Stocktake - Get Stage
 // stocktakeId is the Apps Script spreadsheet ID
 router.get('/stocktake/:stocktakeId/stage', async (request, env) => {

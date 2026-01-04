@@ -1628,6 +1628,26 @@ async function loadCountingScreen() {
             state.kegsList = state.kegs.map(keg => ({ ...keg, count: 0, synced: true }));
         }
         
+        // Try to load kegs from IndexedDB to restore counts
+        if (state.currentStocktake && state.kegsList.length > 0) {
+            try {
+                const savedKegs = await dbService.getKegs(state.currentStocktake.id);
+                if (savedKegs && savedKegs.length > 0) {
+                    // Merge saved kegs with loaded kegs (preserve counts from IndexedDB)
+                    const savedKegsMap = new Map(savedKegs.map(k => [k.name, k]));
+                    state.kegsList = state.kegsList.map(keg => {
+                        const saved = savedKegsMap.get(keg.name);
+                        if (saved) {
+                            return { ...keg, count: saved.count || 0, synced: saved.synced || false };
+                        }
+                        return keg;
+                    });
+                }
+            } catch (error) {
+                console.warn('Error loading kegs from IndexedDB:', error);
+            }
+        }
+        
         // Count unsynced kegs
         state.unsyncedKegsCount = state.kegsList.filter(k => {
             const count = parseFloat(k.count) || 0;
@@ -1865,6 +1885,11 @@ function updateKegCount(index, value) {
         
         updateKegsTable();
         updateSyncButton();
+        
+        // Save kegs to IndexedDB to persist state
+        if (state.currentStocktake) {
+            await dbService.saveKegs(state.currentStocktake.id, state.kegsList);
+        }
         
         // Auto-sync after 10 keg changes (same as regular scans)
         if (state.unsyncedKegsCount >= 10 && state.isOnline && !state.isSyncing) {

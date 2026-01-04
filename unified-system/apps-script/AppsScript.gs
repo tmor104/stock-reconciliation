@@ -327,8 +327,11 @@ function listStocktakes(request, requestId) {
         const nameMatch = fileName.match(/^Stocktake - (.+?) - (\d{4}-\d{2}-\d{2})/);
         const displayName = nameMatch ? nameMatch[1] : fileName.replace(/^Stocktake - /, '');
         
-        // Try to get status from Metadata sheet
+        // Try to get status and created_by from Metadata sheet
         let status = 'Active';
+        let createdBy = 'Unknown';
+        let createdDate = nameMatch ? nameMatch[2] : 'Unknown';
+        
         try {
           const ss = SpreadsheetApp.openById(file.getId());
           const metadataSheet = ss.getSheetByName('Metadata');
@@ -336,14 +339,20 @@ function listStocktakes(request, requestId) {
             const metadataRange = metadataSheet.getRange('A:B');
             const metadataValues = metadataRange.getValues();
             for (let i = 0; i < metadataValues.length; i++) {
-              if (metadataValues[i][0] && metadataValues[i][0].toString().toLowerCase() === 'status') {
-                status = metadataValues[i][1] || 'Active';
-                break;
+              const key = (metadataValues[i][0] || '').toString().toLowerCase();
+              const value = metadataValues[i][1];
+              
+              if (key === 'status') {
+                status = value || 'Active';
+              } else if (key === 'created_by') {
+                createdBy = value || 'Unknown';
+              } else if (key === 'created_date') {
+                createdDate = value || createdDate;
               }
             }
           }
         } catch (metadataError) {
-          // If we can't read metadata, default to Active
+          // If we can't read metadata, use defaults
           console.log(`[${requestId}] Could not read metadata for ${file.getId()}: ${metadataError.toString()}`);
         }
         
@@ -351,8 +360,8 @@ function listStocktakes(request, requestId) {
           id: file.getId(),
           name: fileName, // Full name
           displayName: displayName, // Extracted name without prefix/date
-          createdBy: 'Unknown',
-          createdDate: nameMatch ? nameMatch[2] : 'Unknown',
+          createdBy: createdBy,
+          createdDate: createdDate,
           status: status,
           url: file.getUrl(),
           lastModified: file.getLastUpdated()

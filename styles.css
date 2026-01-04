@@ -997,6 +997,12 @@ body {
     background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%) !important;
 }
 
+/* Synced row highlighting */
+.synced-row {
+    background: rgba(16, 185, 129, 0.05) !important;
+    border-left: 4px solid var(--emerald-500) !important;
+}
+
 /* Hide number input spinners */
 .keg-count-input::-webkit-outer-spin-button,
 .keg-count-input::-webkit-inner-spin-button {

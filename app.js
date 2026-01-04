@@ -22,6 +22,7 @@ const state = {
     currentProduct: null,
     searchQuery: '',
     searchResults: [],
+    hasBlockingIssues: false,
     varianceData: [],
     isOnline: navigator.onLine,
     isSyncing: false,

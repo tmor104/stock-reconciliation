@@ -3,7 +3,7 @@
 
 const MASTER_SHEET_ID = '1e3rsYW4RoEpxpH8ZMckLP7VdtnpbbfQpd8N_NB9fRgM';
 const STOCKTAKE_FOLDER_ID = '1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE';
-const API_SECRET = 'CHANGE_THIS_SECRET'; // Set via Script Properties or hardcode
+// API_SECRET is set via Script Properties only (not hardcoded)
 
 // ============================================
 // HTTP HANDLERS - ALWAYS RETURN JSON
@@ -25,13 +25,14 @@ function doPost(e) {
       return errorResponse('Invalid JSON in request body', 'doPost', requestId);
     }
     
-    // Basic authentication check
+    // Basic authentication check (only uses Script Properties, no hardcoded fallback)
     const providedSecret = request.secret || request.apiSecret;
-    const expectedSecret = PropertiesService.getScriptProperties().getProperty('API_SECRET') || API_SECRET;
-    if (expectedSecret !== 'CHANGE_THIS_SECRET' && providedSecret !== expectedSecret) {
+    const expectedSecret = PropertiesService.getScriptProperties().getProperty('API_SECRET');
+    if (expectedSecret && providedSecret !== expectedSecret) {
       console.error(`[${requestId}] Authentication failed`);
       return errorResponse('Unauthorized', 'doPost', requestId, 'UNAUTHORIZED');
     }
+    // If no secret is set in Script Properties, authentication is disabled (for development)
     
     // Validate action
     if (!request.action || typeof request.action !== 'string') {

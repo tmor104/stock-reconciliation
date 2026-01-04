@@ -255,8 +255,10 @@
     <div id="reconciliation-screen" class="screen">
         <div class="header">
             <div class="header-logo-section">
-                <!-- Logo placeholder -->
-                <span class="header-logo" style="font-size: 32px;">📦</span>
+                <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
+                <img src="assets/images/logo.png" alt="Logo" class="header-logo" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+                <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
                 <div>
                     <h1 class="header-title">📊 Reconciliation</h1>
                     <p id="reconciliation-stocktake-info" class="user-info"></p>

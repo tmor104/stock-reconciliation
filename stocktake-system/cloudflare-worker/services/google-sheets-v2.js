@@ -218,7 +218,8 @@ export class GoogleSheetsAPI {
         
         const allData = [headers, ...rows];
         
-        const response = await fetch(
+        // Try to write to Theoretical sheet (create if needed)
+        let response = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Theoretical!A1?valueInputOption=RAW`,
             {
                 method: 'PUT',
@@ -232,8 +233,52 @@ export class GoogleSheetsAPI {
             }
         );
         
+        // If sheet doesn't exist (400 error), create it first
+        if (!response.ok && response.status === 400) {
+            // Create Theoretical sheet
+            const createResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        requests: [{
+                            addSheet: {
+                                properties: {
+                                    title: 'Theoretical'
+                                }
+                            }
+                        }]
+                    })
+                }
+            );
+            
+            if (!createResponse.ok) {
+                throw new Error('Failed to create Theoretical sheet');
+            }
+            
+            // Retry writing data
+            response = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Theoretical!A1?valueInputOption=RAW`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        values: allData
+                    })
+                }
+            );
+        }
+        
         if (!response.ok) {
-            throw new Error('Failed to populate theoretical sheet');
+            const errorText = await response.text();
+            throw new Error(`Failed to populate theoretical sheet: ${errorText}`);
         }
     }
     

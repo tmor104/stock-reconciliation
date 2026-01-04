@@ -1,3 +1,5 @@
+// Stocktake Reconciliation Worker - v2.0.0
+// Major architecture overhaul: Fixed variance calculation, preserved counts, optimized performance
 import { Router } from 'itty-router';
 import { parseHnLExcel } from './parsers/hnl-parser';
 // Use v2 which has proper JWT signing with jose library

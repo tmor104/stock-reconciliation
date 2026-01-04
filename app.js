@@ -1537,18 +1537,25 @@ async function loadCountingScreen() {
                 // Use kegs from stocktake spreadsheet
                 state.kegsList = kegsResult.kegs.map(keg => ({ 
                     name: keg.name, 
-                    count: keg.count || 0 
+                    count: parseFloat(keg.count) || 0,
+                    synced: true // Kegs loaded from server are already synced
                 }));
             } else {
                 // Fallback to master sheet kegs if stocktake has none
                 if (state.kegs.length > 0) {
-                    state.kegsList = state.kegs.map(keg => ({ ...keg, count: 0 }));
+                    state.kegsList = state.kegs.map(keg => ({ ...keg, count: 0, synced: true }));
                 }
             }
         } else if (state.kegs.length > 0) {
             // No stocktake selected, use master sheet kegs
-            state.kegsList = state.kegs.map(keg => ({ ...keg, count: 0 }));
+            state.kegsList = state.kegs.map(keg => ({ ...keg, count: 0, synced: true }));
         }
+        
+        // Count unsynced kegs
+        state.unsyncedKegsCount = state.kegsList.filter(k => {
+            const count = parseFloat(k.count) || 0;
+            return count > 0 && !k.synced;
+        }).length;
     } catch (error) {
         console.warn('Error loading kegs from stocktake, using master sheet:', error);
         if (state.kegs.length > 0) {

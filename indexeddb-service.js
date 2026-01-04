@@ -69,6 +69,14 @@ class IndexedDBService {
                     const kegsStore = db.createObjectStore('kegs', { keyPath: 'id' });
                     kegsStore.createIndex('stocktakeId', 'stocktakeId', { unique: false });
                 }
+                
+                // Store for issues
+                if (!db.objectStoreNames.contains('issues')) {
+                    const issuesStore = db.createObjectStore('issues', { keyPath: 'id', autoIncrement: true });
+                    issuesStore.createIndex('stocktakeId', 'stocktakeId', { unique: false });
+                    issuesStore.createIndex('acknowledged', 'acknowledged', { unique: false });
+                    issuesStore.createIndex('type', 'type', { unique: false });
+                }
             };
         });
     }

@@ -135,13 +135,19 @@ async function init() {
                 
                 // Check if we have a current stocktake
                 if (state.currentStocktake) {
-                    // Load scans for current stocktake
-                    const scans = await dbService.getAllScans(state.currentStocktake.id);
-                    state.scannedItems = scans;
+                    // Load scans from Google Sheets and merge with local
+                    await loadScansForStocktake(state.currentStocktake.id, state.user.username);
                     
-                    // Count unsynced
+                    // Load scans for current stocktake (filtered by current user)
+                    const allScans = await dbService.getAllScans(state.currentStocktake.id);
+                    state.scannedItems = allScans.filter(scan => scan.user === state.user.username);
+                    
+                    // Count unsynced (only current user's scans)
                     const unsynced = await dbService.getUnsyncedScans(state.currentStocktake.id);
-                    state.unsyncedCount = unsynced.length;
+                    state.unsyncedCount = unsynced.filter(scan => scan.user === state.user.username).length;
+                    
+                    // Check for issues
+                    await checkForIssues(state.currentStocktake.id, state.user.username);
                 }
                 
                 // Show home screen
@@ -1710,6 +1716,147 @@ function renderVarianceTable() {
 function filterVarianceTable(searchQuery = '', filterType = 'all') {
     // This would filter the variance table - implementation depends on requirements
     renderVarianceTable();
+}
+
+// ============================================
+// SCAN LOADING AND MERGING
+// ============================================
+
+async function loadScansForStocktake(stocktakeId, currentUsername) {
+    try {
+        // Load scans from Google Sheets (all users)
+        const result = await apiService.loadUserScans(stocktakeId, null);
+        const serverScans = result.success && result.scans ? result.scans : [];
+        
+        // Load local scans
+        const localScans = await dbService.getAllScans(stocktakeId);
+        
+        // Create a map of syncIds for deduplication
+        const scanMap = new Map();
+        
+        // First, add all server scans (server takes precedence)
+        serverScans.forEach(scan => {
+            if (scan.syncId) {
+                scanMap.set(scan.syncId, {
+                    ...scan,
+                    stocktakeId,
+                    synced: true
+                });
+            }
+        });
+        
+        // Then, add local scans that don't exist on server
+        localScans.forEach(scan => {
+            if (scan.syncId && !scanMap.has(scan.syncId)) {
+                scanMap.set(scan.syncId, scan);
+            } else if (!scan.syncId) {
+                // Local scan without syncId (not yet synced) - add it
+                const tempId = `local-${Date.now()}-${Math.random()}`;
+                scanMap.set(tempId, scan);
+            }
+        });
+        
+        // Clear existing scans for this stocktake
+        await dbService.clearScans(stocktakeId);
+        
+        // Save all merged scans
+        for (const scan of scanMap.values()) {
+            await dbService.saveScan(scan);
+        }
+        
+        return Array.from(scanMap.values());
+    } catch (error) {
+        console.error('Error loading scans:', error);
+        // Return local scans as fallback
+        return await dbService.getAllScans(stocktakeId);
+    }
+}
+
+// ============================================
+// ISSUE DETECTION AND TRACKING
+// ============================================
+
+async function checkForIssues(stocktakeId, currentUsername) {
+    const issues = [];
+    
+    // Check 1: Multiple users' scans in local storage
+    const allScans = await dbService.getAllScans(stocktakeId);
+    const uniqueUsers = new Set(allScans.map(scan => scan.user).filter(Boolean));
+    
+    if (uniqueUsers.size > 1) {
+        const issue = {
+            id: `multi-user-${stocktakeId}-${Date.now()}`,
+            type: 'multi_user_scans',
+            stocktakeId,
+            severity: 'high',
+            message: `Multiple users' scans detected locally: ${Array.from(uniqueUsers).join(', ')}. This should not happen.`,
+            details: {
+                users: Array.from(uniqueUsers),
+                scanCount: allScans.length
+            },
+            timestamp: new Date().toISOString(),
+            acknowledged: false
+        };
+        issues.push(issue);
+    }
+    
+    // Check 2: Data conflicts (same syncId, different data)
+    const syncIdMap = new Map();
+    allScans.forEach(scan => {
+        if (scan.syncId) {
+            if (!syncIdMap.has(scan.syncId)) {
+                syncIdMap.set(scan.syncId, []);
+            }
+            syncIdMap.get(scan.syncId).push(scan);
+        }
+    });
+    
+    syncIdMap.forEach((scans, syncId) => {
+        if (scans.length > 1) {
+            // Check if data differs
+            const firstScan = scans[0];
+            const hasConflict = scans.some(scan => 
+                scan.barcode !== firstScan.barcode ||
+                scan.quantity !== firstScan.quantity ||
+                scan.product !== firstScan.product
+            );
+            
+            if (hasConflict) {
+                const issue = {
+                    id: `conflict-${syncId}-${Date.now()}`,
+                    type: 'data_conflict',
+                    stocktakeId,
+                    severity: 'high',
+                    message: `Data conflict detected for scan ${syncId}. Multiple versions exist with different data.`,
+                    details: {
+                        syncId,
+                        versions: scans.length,
+                        conflicts: scans.map(s => ({
+                            barcode: s.barcode,
+                            product: s.product,
+                            quantity: s.quantity,
+                            user: s.user
+                        }))
+                    },
+                    timestamp: new Date().toISOString(),
+                    acknowledged: false
+                };
+                issues.push(issue);
+            }
+        }
+    });
+    
+    // Save issues
+    for (const issue of issues) {
+        await dbService.saveIssue(issue);
+    }
+    
+    return issues;
+}
+
+async function hasUnacknowledgedIssues(stocktakeId) {
+    const issues = await dbService.getIssues(stocktakeId, false);
+    return issues.length > 0;
 }
 
 function editVarianceItem(barcode) {

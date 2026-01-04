@@ -143,4 +143,66 @@ export class ExportService {
         
         return datContent;
     }
+    
+    static generateManualEntryPDF(varianceData) {
+        // Get items without barcodes that have been counted
+        const manualItems = varianceData.items.filter(item => {
+            const hasBarcode = item.hasBarcode !== false;
+            const countedQty = item.countedQty || 0;
+            return !hasBarcode && countedQty > 0;
+        });
+        
+        if (manualItems.length === 0) {
+            return null; // No items to export
+        }
+        
+        // Generate HTML table for PDF
+        let html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Manual Entry List</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4A5568; color: white; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Manual Entry List</h1>
+    <p>Items without barcodes - Counted quantities</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Product Name</th>
+                <th>Quantity</th>
+            </tr>
+        </thead>
+        <tbody>
+`;
+        
+        manualItems.forEach(item => {
+            const productName = item.description || item.product || 'N/A';
+            const quantity = item.countedQty || 0;
+            html += `
+            <tr>
+                <td>${productName}</td>
+                <td>${quantity}</td>
+            </tr>
+`;
+        });
+        
+        html += `
+        </tbody>
+    </table>
+</body>
+</html>
+`;
+        
+        return html;
+    }
 }

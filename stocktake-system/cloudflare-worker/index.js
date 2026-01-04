@@ -1006,30 +1006,18 @@ router.get('/export/manual/:stocktakeId', async (request, env) => {
 });
 
 // Export - DAT File
+// stocktakeId is the Apps Script spreadsheet ID
 router.get('/export/dat/:stocktakeId', async (request, env) => {
     const authError = await requireAuth(request, env);
     if (authError) return authError;
     
     try {
         const { stocktakeId } = request.params;
-        const currentStocktake = await env.STOCKTAKE_KV.get('current_stocktake', { type: 'json' });
+        // stocktakeId IS the spreadsheet ID - no KV lookup needed
         
-        if (!currentStocktake || currentStocktake.id !== stocktakeId) {
-            return new Response('Stocktake not found', { status: 404, headers: corsHeaders });
-        }
-        
-        const theoretical = await GoogleSheetsAPI.getTheoreticalData(
-            currentStocktake.spreadsheetId,
-            env
-        );
-        const counts = await GoogleSheetsAPI.getCountData(
-            currentStocktake.countSheetId,
-            env
-        );
-        const adjustments = await GoogleSheetsAPI.getAdjustments(
-            currentStocktake.spreadsheetId,
-            env
-        );
+        const theoretical = await GoogleSheetsAPI.getTheoreticalData(stocktakeId, env);
+        const counts = await GoogleSheetsAPI.getCountData(stocktakeId, env);
+        const adjustments = await GoogleSheetsAPI.getAdjustments(stocktakeId, env);
         const barcodeMapping = await GoogleSheetsAPI.getBarcodeMapping(env);
         
         const varianceData = VarianceCalculator.calculate(
@@ -1048,7 +1036,53 @@ router.get('/export/dat/:stocktakeId', async (request, env) => {
             headers: {
                 ...corsHeaders,
                 'Content-Type': 'text/plain',
-                'Content-Disposition': `attachment; filename="stocktake-${currentStocktake.name}.dat"`
+                'Content-Disposition': `attachment; filename="stocktake-${stocktakeId}.dat"`
+            }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
+// Export - Manual Entry PDF (items without barcodes)
+// stocktakeId is the Apps Script spreadsheet ID
+router.get('/export/manual-pdf/:stocktakeId', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId } = request.params;
+        // stocktakeId IS the spreadsheet ID - no KV lookup needed
+        
+        const theoretical = await GoogleSheetsAPI.getTheoreticalData(stocktakeId, env);
+        const counts = await GoogleSheetsAPI.getCountData(stocktakeId, env);
+        const adjustments = await GoogleSheetsAPI.getAdjustments(stocktakeId, env);
+        const barcodeMapping = await GoogleSheetsAPI.getBarcodeMapping(env);
+        
+        const varianceData = VarianceCalculator.calculate(
+            theoretical,
+            counts,
+            adjustments,
+            barcodeMapping
+        );
+        
+        const pdfHtml = ExportService.generateManualEntryPDF(varianceData);
+        
+        if (!pdfHtml) {
+            return new Response(JSON.stringify({ error: 'No manual items to export' }), {
+                status: 404,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
+        return new Response(pdfHtml, {
+            headers: {
+                ...corsHeaders,
+                'Content-Type': 'text/html',
+                'Content-Disposition': `attachment; filename="manual-entry-${stocktakeId}.html"`
             }
         });
     } catch (error) {

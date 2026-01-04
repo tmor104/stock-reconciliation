@@ -726,4 +726,105 @@ export class GoogleSheetsAPI {
             throw new Error('Failed to lock spreadsheet');
         }
     }
+    
+    static async getStocktakeStage(spreadsheetId, env) {
+        const accessToken = await this.getAccessToken(env);
+        
+        try {
+            const response = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!A:B`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (!response.ok) {
+                return '1'; // Default to stage 1 if metadata not found
+            }
+            
+            const data = await response.json();
+            const rows = data.values || [];
+            
+            // Find stage row
+            for (const row of rows) {
+                if (row[0] && row[0].toString().toLowerCase() === 'stage') {
+                    return (row[1] || '1').toString();
+                }
+            }
+            
+            return '1'; // Default to stage 1
+        } catch (error) {
+            console.error('Error getting stage:', error);
+            return '1'; // Default to stage 1
+        }
+    }
+    
+    static async updateStocktakeStage(spreadsheetId, stage, env) {
+        const accessToken = await this.getAccessToken(env);
+        
+        try {
+            // First, get current metadata to find stage row
+            const getResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!A:B`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (!getResponse.ok) {
+                throw new Error('Failed to read metadata');
+            }
+            
+            const data = await getResponse.json();
+            const rows = data.values || [];
+            
+            // Find stage row index
+            let stageRowIndex = -1;
+            for (let i = 0; i < rows.length; i++) {
+                if (rows[i][0] && rows[i][0].toString().toLowerCase() === 'stage') {
+                    stageRowIndex = i + 1; // 1-based index
+                    break;
+                }
+            }
+            
+            if (stageRowIndex === -1) {
+                // Stage row doesn't exist, append it
+                const appendResponse = await fetch(
+                    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!A:append?valueInputOption=RAW`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            values: [['stage', stage.toString()]]
+                        })
+                    }
+                );
+                
+                if (!appendResponse.ok) {
+                    throw new Error('Failed to add stage');
+                }
+            } else {
+                // Update existing stage row
+                const updateResponse = await fetch(
+                    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!B${stageRowIndex}?valueInputOption=RAW`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            values: [[stage.toString()]]
+                        })
+                    }
+                );
+                
+                if (!updateResponse.ok) {
+                    throw new Error('Failed to update stage');
+                }
+            }
+        } catch (error) {
+            console.error('Error updating stage:', error);
+            throw error;
+        }
+    }
 }

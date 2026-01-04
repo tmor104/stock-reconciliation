@@ -286,31 +286,42 @@ function listStocktakes(request, requestId) {
   try {
     const MAX_RESULTS = 100; // Cap to prevent timeouts
     const folderId = request.folderId || STOCKTAKE_FOLDER_ID;
-    let files;
+    let allFiles;
     
     // Validate folder access if folder ID provided
     if (folderId) {
       try {
         const folder = DriveApp.getFolderById(folderId);
         const folderName = folder.getName();
-        files = folder.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
+        // folder.searchFiles() doesn't support mimeType in query - get all files and filter
+        allFiles = folder.getFiles();
         console.log(`[${requestId}] Searching folder: ${folderName}`);
       } catch (folderError) {
         // Don't fallback to Drive-wide search - it's too slow and risky
         return errorResponse('Folder not accessible: ' + folderError.toString(), 'listStocktakes', requestId);
       }
     } else {
-      // Cap Drive-wide search tightly
-      files = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
+      // Drive-wide search supports mimeType
+      allFiles = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
     }
     
     const stocktakes = [];
     let count = 0;
     
-    // Use file properties only - don't open spreadsheets (too slow)
-    while (files.hasNext() && count < MAX_RESULTS) {
+    // Filter files and extract metadata
+    while (allFiles.hasNext() && count < MAX_RESULTS) {
       try {
-        const file = files.next();
+        const file = allFiles.next();
+        
+        // If searching in folder, filter by mimeType and name here
+        if (folderId) {
+          const mimeType = file.getMimeType();
+          const fileName = file.getName();
+          if (mimeType !== 'application/vnd.google-apps.spreadsheet' || !fileName.includes('Stocktake -')) {
+            continue; // Skip non-spreadsheets or files not matching pattern
+          }
+        }
+        
         count++;
         
         // Extract metadata from filename pattern: "Stocktake - {name} - {date}"

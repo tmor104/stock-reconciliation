@@ -333,6 +333,135 @@
         <p id="loading-message">Loading...</p>
     </div>
 
+    <!-- Admin Panel Screen -->
+    <div id="admin-screen" class="screen">
+        <div class="header">
+            <div class="header-logo-section">
+                <img src="./assets/images/logo.png" alt="Logo" class="header-logo" 
+                     onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                     onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
+                <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
+                <div>
+                    <h1 class="header-title">⚙️ Admin Panel</h1>
+                    <p id="admin-user-info" class="user-info"></p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="admin-back-btn" class="btn-secondary">← Back</button>
+                <button id="admin-logout-btn" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+        
+        <div class="admin-content">
+            <!-- Tabs -->
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="users">👥 Users</button>
+                <button class="admin-tab" data-tab="counts">📊 User Counts</button>
+                <button class="admin-tab" data-tab="variance">📈 Variance Reports</button>
+                <button class="admin-tab" data-tab="issues">⚠️ Issues</button>
+                <button class="admin-tab" data-tab="settings">⚙️ Settings</button>
+            </div>
+            
+            <!-- Users Tab -->
+            <div id="admin-users-tab" class="admin-tab-content active">
+                <div class="section-card">
+                    <h2>Manage Users</h2>
+                    <form id="add-user-form">
+                        <div class="form-group">
+                            <label for="new-username">Username</label>
+                            <input type="text" id="new-username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">Password</label>
+                            <input type="password" id="new-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-role">Role</label>
+                            <select id="new-role" required>
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary">Add User</button>
+                    </form>
+                </div>
+                
+                <div class="section-card">
+                    <h2>Existing Users</h2>
+                    <div id="users-list" class="users-list">
+                        <p class="loading-text">Loading users...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- User Counts Tab -->
+            <div id="admin-counts-tab" class="admin-tab-content">
+                <div class="section-card">
+                    <h2>User Counts by Stocktake</h2>
+                    <div class="form-group">
+                        <label for="counts-stocktake-select">Select Stocktake</label>
+                        <select id="counts-stocktake-select"></select>
+                    </div>
+                    <div id="user-counts-display" class="user-counts-table">
+                        <p class="info-text">Select a stocktake to view user counts</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Variance Reports Tab -->
+            <div id="admin-variance-tab" class="admin-tab-content">
+                <div class="section-card">
+                    <h2>Variance Reports</h2>
+                    <div class="form-group">
+                        <label for="variance-stocktake-select">Select Stocktake</label>
+                        <select id="variance-stocktake-select"></select>
+                    </div>
+                    <div id="admin-variance-display">
+                        <p class="info-text">Select a stocktake to view variance report</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Issues Tab -->
+            <div id="admin-issues-tab" class="admin-tab-content">
+                <div class="section-card">
+                    <h2>Issue Tracker</h2>
+                    <div class="form-group">
+                        <label for="issues-stocktake-select">Select Stocktake</label>
+                        <select id="issues-stocktake-select">
+                            <option value="">All Stocktakes</option>
+                        </select>
+                    </div>
+                    <div id="issues-list" class="issues-list">
+                        <p class="loading-text">Loading issues...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Settings Tab -->
+            <div id="admin-settings-tab" class="admin-tab-content">
+                <div class="section-card">
+                    <h2>System Settings</h2>
+                    <div class="form-group">
+                        <label for="admin-folder-id-input">Google Drive Folder ID or URL</label>
+                        <p class="info-text">Enter your Google Drive folder ID or paste the full folder URL. This is required to create stocktakes.</p>
+                        <input 
+                            type="text" 
+                            id="admin-folder-id-input" 
+                            placeholder="e.g., 1a2b3c4d5e6f7g8h9i0j or https://drive.google.com/drive/folders/1a2b3c4d5e6f7g8h9i0j"
+                            class="folder-input"
+                        >
+                        <div id="admin-folder-id-status" class="folder-status"></div>
+                    </div>
+                    <div class="card-actions">
+                        <button id="admin-save-folder-id-btn" class="btn-primary">Save Folder ID</button>
+                        <button id="admin-clear-folder-id-btn" class="btn-secondary">Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="indexeddb-service.js"></script>
     <script src="api-service.js"></script>
     <script src="app.js"></script>

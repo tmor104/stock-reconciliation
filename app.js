@@ -2358,6 +2358,29 @@ async function syncToServer() {
                     // Update unsynced count
                     state.unsyncedKegsCount = Math.max(0, state.unsyncedKegsCount - unsyncedKegs.length);
                     
+                    // Reload kegs from server to get updated synced status
+                    try {
+                        const kegsResult = await apiService.getKegs(state.currentStocktake.id);
+                        if (kegsResult.success && kegsResult.kegs && kegsResult.kegs.length > 0) {
+                            // Merge server data with local state (preserve local counts if they match server)
+                            const serverKegsMap = new Map(kegsResult.kegs.map(k => [k.name, k]));
+                            state.kegsList = state.kegsList.map(localKeg => {
+                                const serverKeg = serverKegsMap.get(localKeg.name);
+                                if (serverKeg) {
+                                    // Use server count and synced status
+                                    return {
+                                        ...localKeg,
+                                        count: parseFloat(serverKeg.count) || 0,
+                                        synced: serverKeg.synced !== false // Server kegs are synced
+                                    };
+                                }
+                                return localKeg;
+                            });
+                        }
+                    } catch (error) {
+                        console.warn('Error reloading kegs after sync:', error);
+                    }
+                    
                     // Save kegs to IndexedDB to persist state
                     if (state.currentStocktake) {
                         await dbService.saveKegs(state.currentStocktake.id, state.kegsList);

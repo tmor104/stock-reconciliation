@@ -704,10 +704,14 @@ router.post('/stocktake/:stocktakeId/upload', async (request, env) => {
         const arrayBuffer = await hnlFile.arrayBuffer();
         const theoreticalData = await parseHnLExcel(arrayBuffer);
         
-        // Save to Theoretical sheet in spreadsheet
-        await GoogleSheetsAPI.saveTheoreticalData(
+        // Get barcode mapping for saving theoretical data
+        const barcodeMapping = await GoogleSheetsAPI.getBarcodeMapping(env);
+        
+        // Save to Theoretical sheet in spreadsheet (creates sheet if needed)
+        await GoogleSheetsAPI.populateTheoreticalSheet(
             stocktakeId,
             theoreticalData,
+            barcodeMapping,
             env
         );
         

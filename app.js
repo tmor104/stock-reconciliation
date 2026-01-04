@@ -2412,14 +2412,28 @@ async function syncToServer() {
         const allScans = await dbService.getAllScans(state.currentStocktake.id);
         state.scannedItems = state.user ? allScans.filter(scan => scan.user === state.user.username) : allScans;
         
-        // Reload kegs from stocktake
+        // Reload kegs from stocktake (preserve synced status)
         try {
             const kegsResult = await apiService.getKegs(state.currentStocktake.id);
             if (kegsResult.success && kegsResult.kegs && kegsResult.kegs.length > 0) {
-                state.kegsList = kegsResult.kegs.map(keg => ({ 
-                    name: keg.name, 
-                    count: keg.count || 0 
-                }));
+                // Merge server data with existing state (preserve synced status)
+                const serverKegsMap = new Map(kegsResult.kegs.map(k => [k.name, k]));
+                state.kegsList = state.kegsList.map(localKeg => {
+                    const serverKeg = serverKegsMap.get(localKeg.name);
+                    if (serverKeg) {
+                        // Use server count, but preserve synced status if already synced
+                        const serverCount = parseFloat(serverKeg.count) || 0;
+                        const localCount = parseFloat(localKeg.count) || 0;
+                        // If counts match, keep synced status; if different, mark as unsynced
+                        const isSynced = (serverCount === localCount) && localKeg.synced;
+                        return {
+                            ...localKeg,
+                            count: serverCount,
+                            synced: isSynced
+                        };
+                    }
+                    return localKeg;
+                });
             }
         } catch (error) {
             console.warn('Error reloading kegs:', error);

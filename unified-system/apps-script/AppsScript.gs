@@ -270,11 +270,12 @@ function setupStocktakeSheets(ss, name, user, dateStr) {
   });
   
   const metadataSheet = ss.getSheetByName('Metadata');
-  metadataSheet.getRange('A2:B5').setValues([
+  metadataSheet.getRange('A2:B6').setValues([
     ['stocktake_name', name],
     ['created_by', user],
     ['created_date', dateStr],
-    ['status', 'Active']
+    ['status', 'Active'],
+    ['stage', '1'] // Stage 1: Create stocktake
   ]);
 }
 

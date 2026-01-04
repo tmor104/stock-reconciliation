@@ -24,6 +24,10 @@ const state = {
     searchResults: [],
     hasBlockingIssues: false,
     varianceData: [],
+    filteredVarianceData: null,
+    sortColumn: null,
+    sortDirection: 'desc', // 'asc' or 'desc'
+    selectedStockGroups: [],
     isOnline: navigator.onLine,
     isSyncing: false,
     unsyncedCount: 0
@@ -437,6 +441,55 @@ function setupReconciliationScreenListeners() {
         varianceFilter.addEventListener('change', (e) => {
             filterVarianceTable(document.getElementById('variance-search').value, e.target.value);
         });
+    }
+    
+    // Stock group filter
+    const stockGroupFilter = document.getElementById('stock-group-filter');
+    if (stockGroupFilter) {
+        stockGroupFilter.addEventListener('change', (e) => {
+            const selected = Array.from(e.target.selectedOptions).map(opt => opt.value).filter(v => v);
+            state.selectedStockGroups = selected;
+            filterVarianceTable(
+                document.getElementById('variance-search').value,
+                document.getElementById('variance-filter').value
+            );
+        });
+    }
+    
+    // Sortable column headers
+    document.querySelectorAll('.sortable').forEach(header => {
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', () => {
+            const sortColumn = header.dataset.sort;
+            if (state.sortColumn === sortColumn) {
+                // Toggle direction
+                state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                state.sortColumn = sortColumn;
+                state.sortDirection = 'desc'; // Default to descending
+            }
+            updateSortIndicators();
+            filterVarianceTable(
+                document.getElementById('variance-search').value,
+                document.getElementById('variance-filter').value
+            );
+        });
+    });
+}
+
+function updateSortIndicators() {
+    document.querySelectorAll('.sort-indicator').forEach(indicator => {
+        indicator.textContent = '';
+    });
+    
+    if (state.sortColumn) {
+        const header = document.querySelector(`[data-sort="${state.sortColumn}"]`);
+        if (header) {
+            const indicator = header.querySelector('.sort-indicator');
+            if (indicator) {
+                indicator.textContent = state.sortDirection === 'asc' ? ' ↑' : ' ↓';
+            }
+        }
     }
 }
 
@@ -1782,7 +1835,7 @@ function renderVarianceTable() {
         const productCode = item.productCode || item.barcode || 'N/A';
         const hasBarcode = item.hasBarcode !== false && (item.productCode || item.barcode);
         const rowClass = !hasBarcode ? 'no-barcode-row' : (varianceQty > 0 ? 'variance-positive-row' : varianceQty < 0 ? 'variance-negative-row' : '');
-        const canEdit = !hasBarcode || true; // Items without barcodes should always be editable
+        const canEdit = true; // All items are editable
         
         return `
             <tr class="${rowClass}">

@@ -14,7 +14,7 @@
         <div class="login-container">
             <div class="logo-container">
                 <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
-                <img src="./assets/images/logo.png" alt="Stock Wizard Logo" class="main-logo" 
+                <img src="./assets/images/logo.jpg" alt="Stock Wizard Logo" class="main-logo" 
                      onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='block';"
                      onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <div class="main-logo" style="font-size: 64px; text-align: center; display: none;">📦</div>
@@ -36,7 +36,7 @@
         <div class="header">
             <div class="header-logo-section">
                 <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
-                <img src="./assets/images/logo.png" alt="Logo" class="header-logo" 
+                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo" 
                      onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
                      onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
@@ -56,9 +56,13 @@
             <div id="current-stocktake-card" class="info-card" style="display: none;">
                 <h2>Current Stocktake</h2>
                 <div id="current-stocktake-info"></div>
+                <div id="stocktake-stage-info" class="stage-info" style="margin: 16px 0; padding: 12px; background: var(--blue-50); border-radius: 8px; border-left: 4px solid var(--blue-500);">
+                    <strong>Stage:</strong> <span id="stocktake-stage-text">Loading...</span>
+                </div>
                 <div class="card-actions">
                     <button id="continue-stocktake-btn" class="btn-primary">Continue Stocktake</button>
                     <button id="view-reconciliation-btn" class="btn-primary">View Reconciliation</button>
+                    <button id="progress-stage-btn" class="btn-secondary" style="display: none;">Progress Stage →</button>
                 </div>
             </div>
 
@@ -122,7 +126,7 @@
         <div class="header">
             <div class="header-logo-section">
                 <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
-                <img src="./assets/images/logo.png" alt="Logo" class="header-logo" 
+                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo" 
                      onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
                      onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
@@ -241,7 +245,7 @@
         <div class="header">
             <div class="header-logo-section">
                 <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
-                <img src="./assets/images/logo.png" alt="Logo" class="header-logo" 
+                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo" 
                      onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
                      onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
@@ -283,6 +287,9 @@
                             <option value="quantity-over">Quantity > 0</option>
                             <option value="quantity-under">Quantity < 0</option>
                         </select>
+                        <select id="stock-group-filter" multiple style="min-width: 200px; height: 38px; padding: 4px;">
+                            <option value="">All Stock Groups</option>
+                        </select>
                     </div>
                 </div>
                 <div id="variance-table-wrapper" class="table-wrapper">
@@ -292,8 +299,8 @@
                                 <th>Product</th>
                                 <th>Theoretical</th>
                                 <th>Counted</th>
-                                <th>Variance Qty</th>
-                                <th>Variance $</th>
+                                <th class="sortable" data-sort="qtyVariance">Variance Qty <span class="sort-indicator"></span></th>
+                                <th class="sortable" data-sort="dollarVariance">Variance $ <span class="sort-indicator"></span></th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -338,7 +345,7 @@
     <div id="admin-screen" class="screen">
         <div class="header">
             <div class="header-logo-section">
-                <img src="./assets/images/logo.png" alt="Logo" class="header-logo" 
+                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo" 
                      onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
                      onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <span class="header-logo" style="font-size: 32px; display: none;">📦</span>

@@ -859,35 +859,44 @@ async function selectStocktake(stocktake) {
         await dbService.saveState('currentStocktake', state.currentStocktake);
         await dbService.saveStocktake(state.currentStocktake);
         
-        // Load ALL scans for this stocktake (not just current user) - non-blocking
-        try {
-            const result = await apiService.loadUserScans(stocktake.id, undefined); // undefined = load all scans
-            if (result.success && result.scans) {
-                // Clear existing scans for this stocktake first
-                await dbService.clearScans(stocktake.id);
-                
-                // Save all scans from server
-                for (const scan of result.scans) {
-                    const scanWithMeta = {
-                        ...scan,
-                        stocktakeId: stocktake.id,
-                        stocktakeName: stocktake.name,
-                        synced: true
-                    };
-                    await dbService.saveScan(scanWithMeta);
-                }
+        // Load and merge scans from Google Sheets and local storage
+        if (state.user) {
+            try {
+                await loadScansForStocktake(stocktake.id, state.user.username);
+            } catch (error) {
+                console.warn('Error loading scans (continuing anyway):', error);
             }
-        } catch (error) {
-            console.warn('Error loading scans (continuing anyway):', error);
-            // Continue even if loading scans fails
         }
         
-        // Load local scans
-        const scans = await dbService.getAllScans(stocktake.id);
-        state.scannedItems = scans || [];
+        // Load scans for current stocktake (filtered by current user only)
+        const allScans = await dbService.getAllScans(stocktake.id);
+        state.scannedItems = state.user ? allScans.filter(scan => scan.user === state.user.username) : allScans;
         
+        // Count unsynced (only current user's scans)
         const unsynced = await dbService.getUnsyncedScans(stocktake.id);
-        state.unsyncedCount = unsynced ? unsynced.length : 0;
+        state.unsyncedCount = state.user ? unsynced.filter(scan => scan.user === state.user.username).length : unsynced.length;
+        
+        // Check for issues
+        if (state.user) {
+            try {
+                await checkForIssues(stocktake.id, state.user.username);
+            } catch (error) {
+                console.warn('Error checking for issues:', error);
+            }
+        }
+        
+        // Check if there are unacknowledged issues
+        try {
+            const hasIssues = await hasUnacknowledgedIssues(stocktake.id);
+            if (hasIssues) {
+                state.hasBlockingIssues = true;
+                // Don't alert on init - just set the flag
+            } else {
+                state.hasBlockingIssues = false;
+            }
+        } catch (error) {
+            console.warn('Error checking issues:', error);
+        }
         
         // Check if variance report exists
         const varianceData = await dbService.getVarianceData(stocktake.id);

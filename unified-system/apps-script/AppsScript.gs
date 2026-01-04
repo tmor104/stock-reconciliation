@@ -301,31 +301,29 @@ function listStocktakes(request, requestId) {
         return errorResponse('Folder not accessible: ' + folderError.toString(), 'listStocktakes', requestId);
       }
     } else {
-      // Drive-wide search supports mimeType
-      allFiles = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
+      // DriveApp.searchFiles() also doesn't reliably support mimeType - use name only and filter
+      allFiles = DriveApp.searchFiles('name contains "Stocktake -"');
     }
     
     const stocktakes = [];
     let count = 0;
     
-    // Filter files and extract metadata
+    // Filter files by mimeType and extract metadata
     while (allFiles.hasNext() && count < MAX_RESULTS) {
       try {
         const file = allFiles.next();
         
-        // If searching in folder, filter by mimeType and name here
-        if (folderId) {
-          const mimeType = file.getMimeType();
-          const fileName = file.getName();
-          if (mimeType !== 'application/vnd.google-apps.spreadsheet' || !fileName.includes('Stocktake -')) {
-            continue; // Skip non-spreadsheets or files not matching pattern
-          }
+        // Filter by mimeType (must be spreadsheet) and name pattern
+        const mimeType = file.getMimeType();
+        const fileName = file.getName();
+        
+        if (mimeType !== 'application/vnd.google-apps.spreadsheet' || !fileName.includes('Stocktake -')) {
+          continue; // Skip non-spreadsheets or files not matching pattern
         }
         
         count++;
         
         // Extract metadata from filename pattern: "Stocktake - {name} - {date}"
-        const fileName = file.getName();
         const nameMatch = fileName.match(/Stocktake - (.+?) - (\d{4}-\d{2}-\d{2})/);
         const displayName = nameMatch ? nameMatch[1] : fileName;
         

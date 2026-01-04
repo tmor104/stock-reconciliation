@@ -1867,7 +1867,7 @@ function updateKegsTable() {
     `;
 }
 
-function updateKegCount(index, value) {
+async function updateKegCount(index, value) {
     if (state.kegsList[index]) {
         const newCount = parseFloat(value) || 0;
         const oldCount = parseFloat(state.kegsList[index].count) || 0;

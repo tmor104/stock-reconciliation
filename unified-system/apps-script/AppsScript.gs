@@ -492,9 +492,6 @@ function loadUserScans(request, requestId) {
     if (!request.stocktakeId) {
       return errorResponse('Missing stocktakeId', 'loadUserScans', requestId);
     }
-    if (!request.username) {
-      return errorResponse('Missing username', 'loadUserScans', requestId);
-    }
     
     const ss = SpreadsheetApp.openById(request.stocktakeId);
     const sheet = ss.getSheetByName('Raw Scans');
@@ -509,22 +506,27 @@ function loadUserScans(request, requestId) {
     }
     
     const data = sheet.getRange('A2:J' + lastRow).getValues();
-    const scans = data
-      .filter(row => row[4] === request.username)
-      .map(row => ({
-        barcode: String(row[0] || ''),
-        product: row[1],
-        quantity: row[2],
-        location: row[3],
-        user: row[4],
-        timestamp: row[5],
-        stockLevel: row[6],
-        value: row[7],
-        synced: row[8] === 'Yes',
-        syncId: row[9]
-      }));
     
-    return successResponse('User scans loaded', { scans, count: scans.length }, requestId);
+    // If username provided, filter by user; otherwise return all scans
+    let filteredData = data;
+    if (request.username) {
+      filteredData = data.filter(row => row[4] === request.username);
+    }
+    
+    const scans = filteredData.map(row => ({
+      barcode: String(row[0] || ''),
+      product: String(row[1] || ''),
+      quantity: parseFloat(row[2]) || 0,
+      location: String(row[3] || ''),
+      user: String(row[4] || ''),
+      timestamp: String(row[5] || ''),
+      stockLevel: String(row[6] || ''),
+      value: parseFloat(row[7]) || 0,
+      synced: row[8] === 'Yes' || row[8] === true,
+      syncId: String(row[9] || '')
+    }));
+    
+    return successResponse('Scans loaded', { scans, count: scans.length }, requestId);
   } catch (error) {
     return errorResponse('Error loading scans: ' + error.toString(), 'loadUserScans', requestId);
   }

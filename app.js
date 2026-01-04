@@ -853,11 +853,19 @@ async function selectStocktake(stocktake) {
         await dbService.saveState('currentStocktake', state.currentStocktake);
         await dbService.saveStocktake(state.currentStocktake);
         
-        // Load scans for this stocktake (non-blocking - continue even if this fails)
+        // Load ALL scans for this stocktake (not just current user) - non-blocking
         try {
-            const result = await apiService.loadUserScans(stocktake.id, state.user.username);
+            const result = await apiService.loadUserScans(stocktake.id, null); // null = load all scans
             if (result.success && result.scans) {
-                // Save scans to IndexedDB
+                // Clear existing scans for this stocktake first
+                const existingScans = await dbService.getAllScans(stocktake.id);
+                for (const scan of existingScans) {
+                    if (scan.syncId) {
+                        await dbService.deleteScan(scan.syncId);
+                    }
+                }
+                
+                // Save all scans from server
                 for (const scan of result.scans) {
                     const scanWithMeta = {
                         ...scan,
@@ -869,7 +877,7 @@ async function selectStocktake(stocktake) {
                 }
             }
         } catch (error) {
-            console.warn('Error loading user scans (continuing anyway):', error);
+            console.warn('Error loading scans (continuing anyway):', error);
             // Continue even if loading scans fails
         }
         
@@ -1025,7 +1033,32 @@ async function loadCountingScreen() {
         state.kegsList = state.kegs.map(keg => ({ ...keg, count: 0 }));
     }
     
-    // Load scans
+    // Reload scans from Google Sheets to get latest data
+    try {
+        const result = await apiService.loadUserScans(state.currentStocktake.id, null); // null = load all scans
+        if (result.success && result.scans) {
+            // Clear existing scans for this stocktake and reload from server
+            const existingScans = await dbService.getAllScans(state.currentStocktake.id);
+            for (const scan of existingScans) {
+                await dbService.deleteScan(scan.id);
+            }
+            
+            // Save all scans from server
+            for (const scan of result.scans) {
+                const scanWithMeta = {
+                    ...scan,
+                    stocktakeId: state.currentStocktake.id,
+                    stocktakeName: state.currentStocktake.name,
+                    synced: true
+                };
+                await dbService.saveScan(scanWithMeta);
+            }
+        }
+    } catch (error) {
+        console.warn('Error reloading scans from server:', error);
+    }
+    
+    // Load scans from IndexedDB
     const scans = await dbService.getAllScans(state.currentStocktake.id);
     state.scannedItems = scans;
     
@@ -1527,7 +1560,34 @@ async function syncToServer() {
             }
         }
         
-        // Reload scans to get updated state
+        // Reload scans from Google Sheets to get latest data
+        try {
+            const result = await apiService.loadUserScans(state.currentStocktake.id, null); // null = load all scans
+            if (result.success && result.scans) {
+                // Clear existing scans for this stocktake and reload from server
+                const existingScans = await dbService.getAllScans(state.currentStocktake.id);
+                for (const scan of existingScans) {
+                    if (scan.syncId) {
+                        await dbService.deleteScan(scan.syncId);
+                    }
+                }
+                
+                // Save all scans from server
+                for (const scan of result.scans) {
+                    const scanWithMeta = {
+                        ...scan,
+                        stocktakeId: state.currentStocktake.id,
+                        stocktakeName: state.currentStocktake.name,
+                        synced: true
+                    };
+                    await dbService.saveScan(scanWithMeta);
+                }
+            }
+        } catch (error) {
+            console.warn('Error reloading scans from server:', error);
+        }
+        
+        // Reload scans from IndexedDB
         const scans = await dbService.getAllScans(state.currentStocktake.id);
         state.scannedItems = scans;
         

@@ -3060,6 +3060,8 @@ function switchAdminTab(tabName) {
         loadIssues();
     } else if (tabName === 'stages') {
         loadAdminStages();
+    } else if (tabName === 'stocktakes') {
+        loadAdminStocktakes();
     } else if (tabName === 'settings') {
         loadAdminSettings();
     }

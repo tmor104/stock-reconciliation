@@ -218,11 +218,20 @@ function setupEventListeners() {
     const createStocktakeBtn = document.getElementById('create-stocktake-btn');
     if (createStocktakeBtn) createStocktakeBtn.addEventListener('click', () => {
         if (!state.folderId) {
-            alert('Please configure a Google Drive folder ID in Settings before creating a stocktake.');
+            alert('Please configure a Google Drive folder ID in Admin Settings before creating a stocktake.');
             return;
         }
         showModal('create-stocktake-modal');
     });
+    
+    // Admin panel button (on home screen)
+    const adminPanelBtn = document.getElementById('admin-panel-btn');
+    if (adminPanelBtn) {
+        adminPanelBtn.addEventListener('click', async () => {
+            showScreen('admin-screen');
+            await loadAdminPanel();
+        });
+    }
     
     // Folder ID settings (removed from main page, now in admin panel)
     // These buttons are only in the admin panel now

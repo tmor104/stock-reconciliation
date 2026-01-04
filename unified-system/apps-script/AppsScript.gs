@@ -1,62 +1,109 @@
 // Stock Wizard - Google Apps Script Backend
-// Handles file operations: creating spreadsheets, syncing data, listing stocktakes
+// Requirements: Always returns JSON, never HTML. Handles all errors gracefully.
 
 const MASTER_SHEET_ID = '1e3rsYW4RoEpxpH8ZMckLP7VdtnpbbfQpd8N_NB9fRgM';
 const STOCKTAKE_FOLDER_ID = '1lJiAO7sdEk_BeYLlTxx-dswmttjiDfRE';
 
 // ============================================
-// HTTP HANDLERS
+// HTTP HANDLERS - ALWAYS RETURN JSON
 // ============================================
 
 function doPost(e) {
+  const requestId = Utilities.getUuid();
   try {
-    if (!e?.postData?.contents) {
-      return jsonResponse(false, 'No request data');
+    // Validate request structure
+    if (!e || !e.postData || !e.postData.contents) {
+      return errorResponse('No request data received', 'doPost', {}, requestId);
     }
     
-    const request = JSON.parse(e.postData.contents);
-    if (!request.action) {
-      return jsonResponse(false, 'Missing action');
+    // Parse JSON safely
+    let request;
+    try {
+      request = JSON.parse(e.postData.contents);
+    } catch (parseError) {
+      return errorResponse('Invalid JSON in request body', 'doPost', {
+        parseError: parseError.toString(),
+        bodyPreview: String(e.postData.contents).substring(0, 100)
+      }, requestId);
     }
     
+    // Validate action
+    if (!request.action || typeof request.action !== 'string') {
+      return errorResponse('Missing or invalid action parameter', 'doPost', {
+        requestKeys: Object.keys(request)
+      }, requestId);
+    }
+    
+    // Route to handler
     const handlers = {
-      getProductDatabase: () => getProductDatabase(),
-      getLocations: () => getLocations(),
-      createStocktake: () => createStocktake(request),
-      listStocktakes: () => listStocktakes(request),
-      syncScans: () => syncScans(request),
-      deleteScans: () => deleteScans(request),
-      loadUserScans: () => loadUserScans(request),
-      syncKegs: () => syncKegs(request),
-      syncManualEntries: () => syncManualEntries(request)
+      getProductDatabase: () => getProductDatabase(requestId),
+      getLocations: () => getLocations(requestId),
+      createStocktake: () => createStocktake(request, requestId),
+      listStocktakes: () => listStocktakes(request, requestId),
+      syncScans: () => syncScans(request, requestId),
+      deleteScans: () => deleteScans(request, requestId),
+      loadUserScans: () => loadUserScans(request, requestId),
+      syncKegs: () => syncKegs(request, requestId),
+      syncManualEntries: () => syncManualEntries(request, requestId)
     };
     
     const handler = handlers[request.action];
     if (!handler) {
-      return jsonResponse(false, 'Unknown action: ' + request.action);
+      return errorResponse('Unknown action: ' + request.action, 'doPost', {
+        availableActions: Object.keys(handlers)
+      }, requestId);
     }
     
     return handler();
   } catch (error) {
-    return jsonResponse(false, error.toString());
+    return errorResponse(error.toString(), 'doPost', {
+      name: error.name,
+      stack: error.stack
+    }, requestId);
   }
 }
 
 function doGet(e) {
-  return jsonResponse(true, 'API is running', { timestamp: new Date().toISOString() });
+  const requestId = Utilities.getUuid();
+  try {
+    return successResponse('API is running', { timestamp: new Date().toISOString() }, requestId);
+  } catch (error) {
+    return errorResponse(error.toString(), 'doGet', { stack: error.stack }, requestId);
+  }
 }
 
 // ============================================
-// RESPONSE HELPERS
+// RESPONSE HELPERS - ALWAYS JSON
 // ============================================
 
-function jsonResponse(success, message, data = {}) {
+function successResponse(message, data = {}, requestId = null) {
   const response = {
-    success: success,
-    ok: success,
+    ok: true,
+    success: true,
     message: message,
+    requestId: requestId || Utilities.getUuid(),
     ...data
   };
+  return ContentService.createTextOutput(JSON.stringify(response))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function errorResponse(message, where, inputSummary = {}, requestId = null) {
+  const response = {
+    ok: false,
+    success: false,
+    error: {
+      message: String(message),
+      where: String(where),
+      name: inputSummary.name || 'Error'
+    },
+    requestId: requestId || Utilities.getUuid(),
+    inputSummary: inputSummary
+  };
+  
+  // Log error for debugging
+  console.error(`[${response.requestId}] Error in ${where}:`, message, inputSummary);
+  
   return ContentService.createTextOutput(JSON.stringify(response))
     .setMimeType(ContentService.MimeType.JSON);
 }
@@ -65,14 +112,17 @@ function jsonResponse(success, message, data = {}) {
 // PRODUCT DATABASE & LOCATIONS
 // ============================================
 
-function getProductDatabase() {
+function getProductDatabase(requestId) {
   try {
     const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
     const sheet = ss.getSheetByName('Product Database');
-    const lastRow = sheet.getLastRow();
+    if (!sheet) {
+      return errorResponse('Product Database sheet not found', 'getProductDatabase', {}, requestId);
+    }
     
+    const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      return jsonResponse(true, 'No products found', { products: [] });
+      return successResponse('No products found', { products: [] }, requestId);
     }
     
     const data = sheet.getRange('A2:D' + lastRow).getValues();
@@ -83,28 +133,37 @@ function getProductDatabase() {
       value: row[3] || 0
     }));
     
-    return jsonResponse(true, 'Products loaded', { products });
+    return successResponse('Products loaded', { products }, requestId);
   } catch (error) {
-    return jsonResponse(false, 'Error loading products: ' + error.toString());
+    return errorResponse('Error loading products: ' + error.toString(), 'getProductDatabase', {
+      name: error.name,
+      stack: error.stack
+    }, requestId);
   }
 }
 
-function getLocations() {
+function getLocations(requestId) {
   try {
     const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
     const sheet = ss.getSheetByName('Locations');
-    const lastRow = sheet.getLastRow();
+    if (!sheet) {
+      return errorResponse('Locations sheet not found', 'getLocations', {}, requestId);
+    }
     
+    const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      return jsonResponse(true, 'No locations found', { locations: [] });
+      return successResponse('No locations found', { locations: [] }, requestId);
     }
     
     const data = sheet.getRange('A2:A' + lastRow).getValues();
     const locations = data.map(row => row[0]).filter(loc => loc);
     
-    return jsonResponse(true, 'Locations loaded', { locations });
+    return successResponse('Locations loaded', { locations }, requestId);
   } catch (error) {
-    return jsonResponse(false, 'Error loading locations: ' + error.toString());
+    return errorResponse('Error loading locations: ' + error.toString(), 'getLocations', {
+      name: error.name,
+      stack: error.stack
+    }, requestId);
   }
 }
 
@@ -112,38 +171,74 @@ function getLocations() {
 // STOCKTAKE MANAGEMENT
 // ============================================
 
-function createStocktake(request) {
+function createStocktake(request, requestId) {
   try {
-    if (!request.name || !request.user) {
-      return jsonResponse(false, 'Missing name or user');
+    // Validate required parameters
+    if (!request.name || typeof request.name !== 'string') {
+      return errorResponse('Missing or invalid name parameter', 'createStocktake', {
+        requestKeys: Object.keys(request)
+      }, requestId);
+    }
+    if (!request.user || typeof request.user !== 'string') {
+      return errorResponse('Missing or invalid user parameter', 'createStocktake', {
+        requestKeys: Object.keys(request)
+      }, requestId);
     }
     
     const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
     const stocktakeName = `Stocktake - ${request.name} - ${dateStr}`;
-    const ss = SpreadsheetApp.create(stocktakeName);
+    
+    // Create spreadsheet
+    let ss;
+    try {
+      ss = SpreadsheetApp.create(stocktakeName);
+    } catch (createError) {
+      return errorResponse('Failed to create spreadsheet: ' + createError.toString(), 'createStocktake', {
+        createError: createError.toString(),
+        name: createError.name
+      }, requestId);
+    }
+    
     const stocktakeId = ss.getId();
     
-    // Move to folder if specified
+    // Move to folder if specified - validate folder access
     const folderId = request.folderId || STOCKTAKE_FOLDER_ID;
     if (folderId) {
       try {
         const folder = DriveApp.getFolderById(folderId);
-        DriveApp.getFileById(stocktakeId).moveTo(folder);
-      } catch (e) {
-        // Continue if folder move fails
+        // Test access by getting folder name
+        const folderName = folder.getName();
+        const file = DriveApp.getFileById(stocktakeId);
+        file.moveTo(folder);
+        console.log(`[${requestId}] Moved to folder: ${folderName}`);
+      } catch (folderError) {
+        return errorResponse('Folder not found or not accessible: ' + folderError.toString(), 'createStocktake', {
+          folderId: folderId,
+          folderError: folderError.toString(),
+          name: folderError.name
+        }, requestId);
       }
     }
     
     // Setup sheets
-    setupStocktakeSheets(ss, request.name, request.user, dateStr);
+    try {
+      setupStocktakeSheets(ss, request.name, request.user, dateStr);
+    } catch (setupError) {
+      return errorResponse('Failed to setup sheets: ' + setupError.toString(), 'createStocktake', {
+        setupError: setupError.toString()
+      }, requestId);
+    }
     
-    return jsonResponse(true, 'Stocktake created', {
+    return successResponse('Stocktake created', {
       stocktakeId: stocktakeId,
       name: stocktakeName,
       url: ss.getUrl()
-    });
+    }, requestId);
   } catch (error) {
-    return jsonResponse(false, 'Error creating stocktake: ' + error.toString());
+    return errorResponse('Error creating stocktake: ' + error.toString(), 'createStocktake', {
+      name: error.name,
+      stack: error.stack
+    }, requestId);
   }
 }
 
@@ -171,7 +266,6 @@ function setupStocktakeSheets(ss, name, user, dateStr) {
     }
   });
   
-  // Set metadata
   const metadataSheet = ss.getSheetByName('Metadata');
   metadataSheet.getRange('A2:B5').setValues([
     ['stocktake_name', name],
@@ -185,16 +279,22 @@ function formatHeader(range) {
   range.setFontWeight('bold').setBackground('#4A5568').setFontColor('#FFFFFF');
 }
 
-function listStocktakes(request) {
+function listStocktakes(request, requestId) {
   try {
     const folderId = request.folderId || STOCKTAKE_FOLDER_ID;
     let files;
     
+    // Validate folder access if folder ID provided
     if (folderId) {
       try {
-        files = DriveApp.getFolderById(folderId)
-          .searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
-      } catch (e) {
+        const folder = DriveApp.getFolderById(folderId);
+        // Test access
+        const folderName = folder.getName();
+        files = folder.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
+        console.log(`[${requestId}] Searching folder: ${folderName}`);
+      } catch (folderError) {
+        // Fallback to Drive-wide search
+        console.log(`[${requestId}] Folder access failed, searching all Drive`);
         files = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
       }
     } else {
@@ -218,15 +318,19 @@ function listStocktakes(request) {
           url: file.getUrl(),
           lastModified: file.getLastUpdated()
         });
-      } catch (e) {
-        continue; // Skip inaccessible files
+      } catch (fileError) {
+        // Skip inaccessible files
+        continue;
       }
     }
     
     stocktakes.sort((a, b) => b.lastModified - a.lastModified);
-    return jsonResponse(true, 'Stocktakes loaded', { stocktakes });
+    return successResponse('Stocktakes loaded', { stocktakes }, requestId);
   } catch (error) {
-    return jsonResponse(false, 'Error listing stocktakes: ' + error.toString());
+    return errorResponse('Error listing stocktakes: ' + error.toString(), 'listStocktakes', {
+      name: error.name,
+      stack: error.stack
+    }, requestId);
   }
 }
 
@@ -253,15 +357,24 @@ function getMetadata(ss) {
 // SCAN SYNCING
 // ============================================
 
-function syncScans(request) {
+function syncScans(request, requestId) {
   try {
-    if (!request.scans || request.scans.length === 0) {
-      return jsonResponse(true, 'No scans to sync', { syncedCount: 0 });
+    if (!request.stocktakeId) {
+      return errorResponse('Missing stocktakeId', 'syncScans', {}, requestId);
+    }
+    if (!request.scans || !Array.isArray(request.scans) || request.scans.length === 0) {
+      return successResponse('No scans to sync', { syncedCount: 0 }, requestId);
     }
     
     const ss = SpreadsheetApp.openById(request.stocktakeId);
     const rawSheet = ss.getSheetByName('Raw Scans');
     const tallySheet = ss.getSheetByName('Tally');
+    
+    if (!rawSheet || !tallySheet) {
+      return errorResponse('Required sheets not found in stocktake', 'syncScans', {
+        stocktakeId: request.stocktakeId
+      }, requestId);
+    }
     
     // Get existing sync IDs
     const lastRow = rawSheet.getLastRow();
@@ -277,9 +390,11 @@ function syncScans(request) {
     const syncedIds = [];
     
     request.scans.forEach(scan => {
+      if (!scan.syncId) return; // Skip scans without syncId
+      
       const row = [
-        scan.barcode, scan.product, scan.quantity, scan.location,
-        scan.user, scan.timestamp, scan.stockLevel || '', scan.value || '',
+        scan.barcode || '', scan.product || '', scan.quantity || 0, scan.location || '',
+        scan.user || '', scan.timestamp || '', scan.stockLevel || '', scan.value || '',
         'Yes', scan.syncId
       ];
       
@@ -297,65 +412,83 @@ function syncScans(request) {
     
     updateTally(tallySheet, rawSheet);
     
-    return jsonResponse(true, 'Scans synced', {
+    return successResponse('Scans synced', {
       syncedCount: request.scans.length,
       syncedIds: syncedIds,
       newScans: toAdd.length,
       updatedScans: request.scans.length - toAdd.length
-    });
+    }, requestId);
   } catch (error) {
-    return jsonResponse(false, 'Error syncing scans: ' + error.toString());
+    return errorResponse('Error syncing scans: ' + error.toString(), 'syncScans', {
+      name: error.name,
+      stack: error.stack
+    }, requestId);
   }
 }
 
 function updateTally(tallySheet, rawSheet) {
-  const lastRow = rawSheet.getLastRow();
-  if (lastRow < 2) return;
-  
-  const data = rawSheet.getRange('A2:H' + lastRow).getValues();
-  const tally = {};
-  
-  data.forEach(row => {
-    const barcode = String(row[0] || '');
-    if (!tally[barcode]) {
-      tally[barcode] = {
-        product: row[1],
-        totalQty: 0,
-        locations: new Set(),
-        stockLevel: row[6]
-      };
+  try {
+    const lastRow = rawSheet.getLastRow();
+    if (lastRow < 2) return;
+    
+    const data = rawSheet.getRange('A2:H' + lastRow).getValues();
+    const tally = {};
+    
+    data.forEach(row => {
+      const barcode = String(row[0] || '');
+      if (!tally[barcode]) {
+        tally[barcode] = {
+          product: row[1],
+          totalQty: 0,
+          locations: new Set(),
+          stockLevel: row[6]
+        };
+      }
+      tally[barcode].totalQty += parseFloat(row[2]) || 0;
+      tally[barcode].locations.add(row[3]);
+    });
+    
+    // Clear and write tally
+    if (tallySheet.getLastRow() > 1) {
+      tallySheet.getRange('A2:F' + tallySheet.getLastRow()).clearContent();
     }
-    tally[barcode].totalQty += parseFloat(row[2]) || 0;
-    tally[barcode].locations.add(row[3]);
-  });
-  
-  // Clear and write tally
-  if (tallySheet.getLastRow() > 1) {
-    tallySheet.getRange('A2:F' + tallySheet.getLastRow()).clearContent();
-  }
-  
-  const rows = Object.keys(tally).map(barcode => [
-    barcode,
-    tally[barcode].product,
-    tally[barcode].totalQty,
-    Array.from(tally[barcode].locations).join(', '),
-    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'),
-    tally[barcode].stockLevel
-  ]);
-  
-  if (rows.length > 0) {
-    tallySheet.getRange(2, 1, rows.length, 6).setValues(rows);
+    
+    const rows = Object.keys(tally).map(barcode => [
+      barcode,
+      tally[barcode].product,
+      tally[barcode].totalQty,
+      Array.from(tally[barcode].locations).join(', '),
+      Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'),
+      tally[barcode].stockLevel
+    ]);
+    
+    if (rows.length > 0) {
+      tallySheet.getRange(2, 1, rows.length, 6).setValues(rows);
+    }
+  } catch (e) {
+    // Silently fail tally update - not critical
   }
 }
 
-function loadUserScans(request) {
+function loadUserScans(request, requestId) {
   try {
+    if (!request.stocktakeId) {
+      return errorResponse('Missing stocktakeId', 'loadUserScans', {}, requestId);
+    }
+    if (!request.username) {
+      return errorResponse('Missing username', 'loadUserScans', {}, requestId);
+    }
+    
     const ss = SpreadsheetApp.openById(request.stocktakeId);
     const sheet = ss.getSheetByName('Raw Scans');
-    const lastRow = sheet.getLastRow();
     
+    if (!sheet) {
+      return errorResponse('Raw Scans sheet not found', 'loadUserScans', {}, requestId);
+    }
+    
+    const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      return jsonResponse(true, 'No scans found', { scans: [] });
+      return successResponse('No scans found', { scans: [] }, requestId);
     }
     
     const data = sheet.getRange('A2:J' + lastRow).getValues();
@@ -374,27 +507,38 @@ function loadUserScans(request) {
         syncId: row[9]
       }));
     
-    return jsonResponse(true, 'User scans loaded', { scans, count: scans.length });
+    return successResponse('User scans loaded', { scans, count: scans.length }, requestId);
   } catch (error) {
-    return jsonResponse(false, 'Error loading scans: ' + error.toString());
+    return errorResponse('Error loading scans: ' + error.toString(), 'loadUserScans', {
+      name: error.name,
+      stack: error.stack
+    }, requestId);
   }
 }
 
-function deleteScans(request) {
+function deleteScans(request, requestId) {
   try {
-    if (!request.syncIds || request.syncIds.length === 0) {
-      return jsonResponse(true, 'No scans to delete', { deletedCount: 0 });
+    if (!request.stocktakeId) {
+      return errorResponse('Missing stocktakeId', 'deleteScans', {}, requestId);
+    }
+    if (!request.syncIds || !Array.isArray(request.syncIds) || request.syncIds.length === 0) {
+      return successResponse('No scans to delete', { deletedCount: 0 }, requestId);
     }
     
     const ss = SpreadsheetApp.openById(request.stocktakeId);
     const rawSheet = ss.getSheetByName('Raw Scans');
     const deletedSheet = ss.getSheetByName('Deleted Scans');
     
-    if (!deletedSheet || rawSheet.getLastRow() < 2) {
-      return jsonResponse(true, 'No scans found', { deletedCount: 0 });
+    if (!rawSheet || !deletedSheet) {
+      return errorResponse('Required sheets not found', 'deleteScans', {}, requestId);
     }
     
-    const data = rawSheet.getRange('A2:J' + rawSheet.getLastRow()).getValues();
+    const lastRow = rawSheet.getLastRow();
+    if (lastRow < 2) {
+      return successResponse('No scans found', { deletedCount: 0 }, requestId);
+    }
+    
+    const data = rawSheet.getRange('A2:J' + lastRow).getValues();
     const toDelete = [];
     const rowIndices = [];
     
@@ -411,9 +555,12 @@ function deleteScans(request) {
       updateTally(ss.getSheetByName('Tally'), rawSheet);
     }
     
-    return jsonResponse(true, 'Scans deleted', { deletedCount: toDelete.length, deletedIds: request.syncIds });
+    return successResponse('Scans deleted', { deletedCount: toDelete.length, deletedIds: request.syncIds }, requestId);
   } catch (error) {
-    return jsonResponse(false, 'Error deleting scans: ' + error.toString());
+    return errorResponse('Error deleting scans: ' + error.toString(), 'deleteScans', {
+      name: error.name,
+      stack: error.stack
+    }, requestId);
   }
 }
 
@@ -421,16 +568,20 @@ function deleteScans(request) {
 // KEGS & MANUAL ENTRIES
 // ============================================
 
-function syncKegs(request) {
+function syncKegs(request, requestId) {
   try {
-    if (!request.kegs || request.kegs.length === 0) {
-      return jsonResponse(true, 'No kegs to sync', { syncedCount: 0 });
+    if (!request.stocktakeId) {
+      return errorResponse('Missing stocktakeId', 'syncKegs', {}, requestId);
+    }
+    if (!request.kegs || !Array.isArray(request.kegs) || request.kegs.length === 0) {
+      return successResponse('No kegs to sync', { syncedCount: 0 }, requestId);
     }
     
     const ss = SpreadsheetApp.openById(request.stocktakeId);
     const sheet = ss.getSheetByName('Kegs');
+    
     if (!sheet) {
-      return jsonResponse(false, 'Kegs sheet not found');
+      return errorResponse('Kegs sheet not found', 'syncKegs', {}, requestId);
     }
     
     const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
@@ -446,22 +597,29 @@ function syncKegs(request) {
     ]);
     
     sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 7).setValues(rows);
-    return jsonResponse(true, 'Kegs synced', { syncedCount: request.kegs.length, syncId });
+    return successResponse('Kegs synced', { syncedCount: request.kegs.length, syncId }, requestId);
   } catch (error) {
-    return jsonResponse(false, 'Error syncing kegs: ' + error.toString());
+    return errorResponse('Error syncing kegs: ' + error.toString(), 'syncKegs', {
+      name: error.name,
+      stack: error.stack
+    }, requestId);
   }
 }
 
-function syncManualEntries(request) {
+function syncManualEntries(request, requestId) {
   try {
-    if (!request.manualEntries || request.manualEntries.length === 0) {
-      return jsonResponse(true, 'No manual entries to sync', { syncedCount: 0 });
+    if (!request.stocktakeId) {
+      return errorResponse('Missing stocktakeId', 'syncManualEntries', {}, requestId);
+    }
+    if (!request.manualEntries || !Array.isArray(request.manualEntries) || request.manualEntries.length === 0) {
+      return successResponse('No manual entries to sync', { syncedCount: 0 }, requestId);
     }
     
     const ss = SpreadsheetApp.openById(request.stocktakeId);
     const sheet = ss.getSheetByName('Manual');
+    
     if (!sheet) {
-      return jsonResponse(false, 'Manual sheet not found');
+      return errorResponse('Manual sheet not found', 'syncManualEntries', {}, requestId);
     }
     
     // Get existing sync IDs
@@ -503,13 +661,16 @@ function syncManualEntries(request) {
       sheet.getRange(sheet.getLastRow() + 1, 1, toAdd.length, 8).setValues(toAdd);
     }
     
-    return jsonResponse(true, 'Manual entries synced', {
+    return successResponse('Manual entries synced', {
       syncedCount: request.manualEntries.length,
       syncedIds: syncedIds,
       newEntries: toAdd.length,
       updatedEntries: request.manualEntries.length - toAdd.length
-    });
+    }, requestId);
   } catch (error) {
-    return jsonResponse(false, 'Error syncing manual entries: ' + error.toString());
+    return errorResponse('Error syncing manual entries: ' + error.toString(), 'syncManualEntries', {
+      name: error.name,
+      stack: error.stack
+    }, requestId);
   }
 }

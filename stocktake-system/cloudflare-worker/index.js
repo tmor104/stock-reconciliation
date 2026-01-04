@@ -20,59 +20,90 @@ const corsHeaders = {
 // Handle CORS preflight
 router.options('*', () => new Response(null, { headers: corsHeaders }));
 
-// Apps Script Proxy - forwards requests to Apps Script to avoid CORS
+// Apps Script Proxy - defensive proxying, never assumes JSON
 router.post('/apps-script/proxy', async (request, env) => {
-    const correlationId = crypto.randomUUID();
+    const requestId = crypto.randomUUID();
     try {
         const APPS_SCRIPT_URL = env.APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyRxTKP3KGCiGKhkraeaSz9rxEknGR6mF0LnGQBzMuXp_WfjLf7DtLULC0924ZJcmwQ/exec';
         
-        // Get the request body
+        // Get request body
         const body = await request.text();
         
-        // Forward to Apps Script (server-to-server, no CORS issues)
-        const appsScriptResponse = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: body,
-            redirect: 'follow'
-        });
+        // Forward to Apps Script with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
         
-        // Get response as text first (don't assume JSON)
+        let appsScriptResponse;
+        try {
+            appsScriptResponse = await fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: body,
+                redirect: 'follow',
+                signal: controller.signal
+            });
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError.name === 'AbortError') {
+                return new Response(JSON.stringify({
+                    ok: false,
+                    success: false,
+                    error: { message: 'Request timeout', where: 'proxy' },
+                    requestId: requestId
+                }), {
+                    status: 504,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+            throw fetchError;
+        }
+        clearTimeout(timeoutId);
+        
+        // Read response as text (never assume JSON)
         const responseText = await appsScriptResponse.text();
         const contentType = appsScriptResponse.headers.get('content-type') || '';
         const upstreamStatus = appsScriptResponse.status;
         
-        // Check if response is HTML (error page) - Apps Script should never return HTML
+        // Log for debugging
+        console.log(`[${requestId}] Upstream status: ${upstreamStatus}, content-type: ${contentType}`);
+        
+        // Check for HTML (Apps Script error page)
         if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
             const errorMatch = responseText.match(/<title>(.*?)<\/title>/i) || responseText.match(/<h1>(.*?)<\/h1>/i);
-            const errorMsg = errorMatch ? errorMatch[1] : 'Unknown error';
+            const htmlError = errorMatch ? errorMatch[1] : 'Unknown HTML error';
             
-            // Return JSON error wrapper instead of HTML
-            return new Response(JSON.stringify({ 
+            return new Response(JSON.stringify({
                 ok: false,
                 success: false,
                 error: {
-                    message: 'Upstream returned non-JSON',
+                    message: 'Upstream returned non-JSON (HTML error page)',
+                    where: 'proxy',
                     upstreamStatus: upstreamStatus,
                     upstreamContentType: contentType,
                     upstreamBodySnippet: responseText.substring(0, 500),
-                    htmlError: errorMsg
-                }
+                    htmlError: htmlError
+                },
+                requestId: requestId
             }), {
-                status: upstreamStatus >= 400 ? upstreamStatus : 500,
+                status: upstreamStatus >= 400 && upstreamStatus < 600 ? upstreamStatus : 500,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
         
         // Check if content-type indicates JSON
-        if (contentType.includes('application/json') || responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
-            // Try to parse as JSON to validate
+        const isJsonContentType = contentType.includes('application/json');
+        const looksLikeJson = responseText.trim().startsWith('{') || responseText.trim().startsWith('[');
+        
+        if (isJsonContentType || looksLikeJson) {
             try {
                 const jsonData = JSON.parse(responseText);
-                // Preserve upstream status, return JSON
-                return new Response(responseText, {
+                // Preserve upstream status, add requestId if missing
+                if (!jsonData.requestId) {
+                    jsonData.requestId = requestId;
+                }
+                return new Response(JSON.stringify(jsonData), {
                     status: upstreamStatus,
                     headers: {
                         ...corsHeaders,
@@ -80,48 +111,51 @@ router.post('/apps-script/proxy', async (request, env) => {
                     }
                 });
             } catch (parseError) {
-                // Looks like JSON but doesn't parse - return error
                 return new Response(JSON.stringify({
                     ok: false,
                     success: false,
                     error: {
                         message: 'Upstream returned invalid JSON',
+                        where: 'proxy',
                         upstreamStatus: upstreamStatus,
                         upstreamContentType: contentType,
                         upstreamBodySnippet: responseText.substring(0, 500),
                         parseError: parseError.toString()
-                    }
+                    },
+                    requestId: requestId
                 }), {
-                    status: upstreamStatus >= 400 ? upstreamStatus : 500,
+                    status: upstreamStatus >= 400 && upstreamStatus < 600 ? upstreamStatus : 500,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
         }
         
-        // Not JSON and not HTML - return as text with JSON wrapper
+        // Not JSON and not HTML - wrap in JSON error
         return new Response(JSON.stringify({
             ok: false,
             success: false,
             error: {
                 message: 'Upstream returned unexpected content type',
+                where: 'proxy',
                 upstreamStatus: upstreamStatus,
                 upstreamContentType: contentType,
                 upstreamBodySnippet: responseText.substring(0, 500)
-            }
+            },
+            requestId: requestId
         }), {
-            status: upstreamStatus >= 400 ? upstreamStatus : 500,
+            status: upstreamStatus >= 400 && upstreamStatus < 600 ? upstreamStatus : 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
-        // Network or other proxy errors
-        return new Response(JSON.stringify({ 
+        return new Response(JSON.stringify({
             ok: false,
             success: false,
             error: {
                 message: 'Proxy error: ' + error.message,
-                name: error.name,
-                stack: error.stack
-            }
+                where: 'proxy',
+                name: error.name
+            },
+            requestId: requestId
         }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }

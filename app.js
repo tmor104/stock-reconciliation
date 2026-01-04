@@ -2096,16 +2096,56 @@ async function loadIssues() {
         issues.forEach(issue => {
             const issueItem = document.createElement('div');
             issueItem.className = `issue-item ${issue.severity === 'high' ? 'high-severity' : ''} ${issue.acknowledged ? 'acknowledged' : ''}`;
+            // Build detailed description
+            let detailsHTML = `<p><strong>Stocktake:</strong> ${issue.stocktakeId}</p>`;
+            detailsHTML += `<p><strong>Message:</strong> ${issue.message || 'No message'}</p>`;
+            
+            if (issue.description) {
+                detailsHTML += `<p><strong>Description:</strong></p><pre style="white-space: pre-wrap; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin: 8px 0;">${issue.description}</pre>`;
+            }
+            
+            if (issue.details) {
+                detailsHTML += `<p><strong>Details:</strong></p>`;
+                
+                // User breakdown
+                if (issue.details.breakdown) {
+                    detailsHTML += `<div style="margin: 8px 0; padding: 12px; background: rgba(59, 130, 246, 0.1); border-radius: 8px;">`;
+                    detailsHTML += `<strong>User Breakdown:</strong><ul style="margin: 8px 0; padding-left: 20px;">`;
+                    Object.entries(issue.details.breakdown).forEach(([user, stats]) => {
+                        detailsHTML += `<li><strong>${user}:</strong> ${stats.scanCount} scans, ${stats.totalQuantity} total quantity, ${stats.uniqueProducts.length} unique products, ${stats.locations.length} locations${stats.lastScan ? `, last scan: ${new Date(stats.lastScan).toLocaleString()}` : ''}</li>`;
+                    });
+                    detailsHTML += `</ul></div>`;
+                }
+                
+                // Conflict details
+                if (issue.details.conflicts) {
+                    detailsHTML += `<div style="margin: 8px 0; padding: 12px; background: rgba(239, 68, 68, 0.1); border-radius: 8px;">`;
+                    detailsHTML += `<strong>Conflicting Versions:</strong><ul style="margin: 8px 0; padding-left: 20px;">`;
+                    issue.details.conflicts.forEach((conflict, idx) => {
+                        detailsHTML += `<li>Version ${idx + 1} (User: ${conflict.user}): ${conflict.product} (${conflict.barcode}) - Qty: ${conflict.quantity}</li>`;
+                    });
+                    detailsHTML += `</ul></div>`;
+                }
+                
+                // General details
+                if (issue.details.users) {
+                    detailsHTML += `<p><strong>Users involved:</strong> ${issue.details.users.join(', ')}</p>`;
+                }
+                if (issue.details.scanCount !== undefined) {
+                    detailsHTML += `<p><strong>Total scans:</strong> ${issue.details.scanCount}</p>`;
+                }
+            }
+            
+            detailsHTML += `<p><strong>Detected:</strong> ${new Date(issue.timestamp).toLocaleString()}</p>`;
+            
             issueItem.innerHTML = `
                 <div class="issue-item-header">
-                    <h3>${issue.type} - ${issue.severity}</h3>
+                    <h3>${issue.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} - ${issue.severity}</h3>
                     <div class="issue-item-actions">
                         ${!issue.acknowledged ? `<button class="btn-primary btn-small" onclick="handleAcknowledgeIssue('${issue.id}')">Acknowledge</button>` : '<span style="color: var(--slate-500);">Acknowledged</span>'}
                     </div>
                 </div>
-                <p><strong>Stocktake:</strong> ${issue.stocktakeId}</p>
-                <p><strong>Description:</strong> ${issue.description}</p>
-                <p><strong>Detected:</strong> ${new Date(issue.timestamp).toLocaleString()}</p>
+                ${detailsHTML}
             `;
             issuesList.appendChild(issueItem);
         });

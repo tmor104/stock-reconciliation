@@ -658,21 +658,68 @@ router.post('/variance/:stocktakeId/update', async (request, env) => {
         const body = await request.json().catch(() => ({}));
         const { productCode, newCount, reason, user, timestamp } = body;
         
+        // If no body provided, this is just a trigger to recalculate - return success
+        if (!productCode && newCount === undefined) {
+            return new Response(JSON.stringify({ success: true, message: 'Variance recalculation triggered' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
         // stocktakeId IS the spreadsheet ID - no KV lookup needed
         
-        // Save adjustment to Manual sheet in spreadsheet
-        await GoogleSheetsAPI.saveAdjustment(
-            stocktakeId,
-            { productCode, newCount, reason, user, timestamp },
-            env
-        );
+        // Save adjustment to Audit Trail sheet (create if needed)
+        try {
+            await GoogleSheetsAPI.saveAdjustment(
+                stocktakeId,
+                { productCode, newCount, reason, user, timestamp },
+                env
+            );
+        } catch (adjustError) {
+            // If Audit Trail sheet doesn't exist, create it
+            if (adjustError.message.includes('400') || adjustError.message.includes('not found')) {
+                // Create Audit Trail sheet first
+                const accessToken = await GoogleSheetsAPI.getAccessToken(env);
+                const createResponse = await fetch(
+                    `https://sheets.googleapis.com/v4/spreadsheets/${stocktakeId}:batchUpdate`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            requests: [{
+                                addSheet: {
+                                    properties: {
+                                        title: 'Audit Trail'
+                                    }
+                                }
+                            }]
+                        })
+                    }
+                );
+                
+                if (!createResponse.ok) {
+                    throw new Error('Failed to create Audit Trail sheet');
+                }
+                
+                // Retry saving adjustment
+                await GoogleSheetsAPI.saveAdjustment(
+                    stocktakeId,
+                    { productCode, newCount, reason, user, timestamp },
+                    env
+                );
+            } else {
+                throw adjustError;
+            }
+        }
         
         return new Response(JSON.stringify({ success: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
         console.error('Update variance error:', error);
-        return new Response(JSON.stringify({ error: error.message }), {
+        return new Response(JSON.stringify({ error: error.message || 'Failed to update variance' }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

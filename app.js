@@ -2819,6 +2819,8 @@ function switchAdminTab(tabName) {
         loadAdminVariance();
     } else if (tabName === 'issues') {
         loadIssues();
+    } else if (tabName === 'stages') {
+        loadAdminStages();
     } else if (tabName === 'settings') {
         loadAdminSettings();
     }

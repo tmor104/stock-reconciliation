@@ -988,6 +988,7 @@ async function handleProgressStage(direction = 'forward') {
     if (!state.currentStocktake) return;
     
     const currentStageNum = parseInt(state.currentStage || '1');
+    const originalStage = state.currentStage;
     
     let targetStage;
     if (direction === 'backward') {
@@ -1024,11 +1025,12 @@ async function handleProgressStage(direction = 'forward') {
         
         const result = await apiService.updateStocktakeStage(state.currentStocktake.id, targetStage, direction === 'backward' ? false : true);
         if (result.success) {
+            // Only update UI state if backend update succeeded
             state.currentStage = targetStage;
             updateStageDisplay();
             applyStageRestrictions();
             hideLoading();
-            alert(`Stocktake ${direction === 'backward' ? 'rolled back' : 'progressed'} to Stage ${targetStage}: ${targetStageName}`);
+            alert(`✓ Stocktake ${direction === 'backward' ? 'rolled back' : 'progressed'} to Stage ${targetStage}: ${targetStageName}`);
             
             // If rolling back to stage 2, reload counting screen
             if (direction === 'backward' && targetStage === '2') {
@@ -1040,7 +1042,25 @@ async function handleProgressStage(direction = 'forward') {
         }
     } catch (error) {
         hideLoading();
-        alert('Failed to update stage: ' + error.message);
+        
+        // Verify actual stage from backend
+        try {
+            const stageResult = await apiService.getStocktakeStage(state.currentStocktake.id);
+            if (stageResult.success && stageResult.stage) {
+                const actualStage = stageResult.stage;
+                // Sync UI to actual backend stage
+                if (state.currentStage !== actualStage) {
+                    console.warn(`Stage mismatch after error: UI=${state.currentStage}, Backend=${actualStage}. Syncing UI.`);
+                    state.currentStage = actualStage;
+                    updateStageDisplay();
+                    applyStageRestrictions();
+                }
+            }
+        } catch (stageCheckError) {
+            console.error('Failed to verify stage after error:', stageCheckError);
+        }
+        
+        alert(`❌ Failed to update stage: ${error.message}\n\nCurrent stage remains: ${state.currentStage}`);
         console.error('Update stage error:', error);
     }
 }
@@ -2197,37 +2217,83 @@ async function handleCompleteFirstCounts() {
     
     showLoading('Matching counts with variance report...');
     
+    let stageUpdated = false;
+    let originalStage = state.currentStage;
+    
     try {
-        // Sync all unsynced scans first
-        await syncToServer();
+        // Step 1: Sync all unsynced scans first - CRITICAL: must succeed before proceeding
+        try {
+            await syncToServer();
+        } catch (syncError) {
+            hideLoading();
+            alert(`⚠️ Sync failed! Cannot complete first counts until all data is synced.\n\nError: ${syncError.message}\n\nPlease fix the sync issue and try again.`);
+            console.error('Sync error in handleCompleteFirstCounts:', syncError);
+            // DO NOT proceed - return early
+            return;
+        }
         
-        // Update variance data
+        // Step 2: Update variance data
         const result = await apiService.completeFirstCounts(state.currentStocktake.id);
         
-        if (result.success) {
-            // Auto-progress to stage 3 (First Counts Review)
-            try {
-                await apiService.updateStocktakeStage(state.currentStocktake.id, '3', true);
-                state.currentStage = '3';
-                updateStageDisplay();
-                applyStageRestrictions();
-                
-                // Show First Counts Review section with uncounted items
-                await showFirstCountsReview();
-            } catch (error) {
-                console.warn('Failed to auto-progress to stage 3:', error);
-                // Still reload variance data even if stage update fails
-                await reloadVarianceData();
-                hideLoading();
-                showScreen('reconciliation-screen');
-                loadReconciliationScreen();
-            }
-        } else {
+        if (!result.success) {
             throw new Error(result.message || 'Failed to complete first counts');
         }
+        
+        // Step 3: Only update stage if everything succeeded
+        try {
+            await apiService.updateStocktakeStage(state.currentStocktake.id, '3', true);
+            state.currentStage = '3';
+            stageUpdated = true;
+            updateStageDisplay();
+            applyStageRestrictions();
+            
+            // Show First Counts Review section with uncounted items
+            await showFirstCountsReview();
+            hideLoading();
+        } catch (stageError) {
+            // Stage update failed - rollback UI state
+            console.error('Failed to update stage:', stageError);
+            state.currentStage = originalStage;
+            updateStageDisplay();
+            applyStageRestrictions();
+            
+            // Still reload variance data even if stage update fails
+            await reloadVarianceData();
+            hideLoading();
+            showScreen('reconciliation-screen');
+            loadReconciliationScreen();
+            
+            alert(`⚠️ Variance data updated, but stage update failed. Current stage: ${originalStage}\n\nError: ${stageError.message}`);
+        }
     } catch (error) {
+        // Any error - ensure UI state matches backend
         hideLoading();
-        alert('Failed to complete first counts: ' + error.message);
+        
+        // If stage was updated but something else failed, try to rollback
+        if (stageUpdated) {
+            try {
+                await apiService.updateStocktakeStage(state.currentStocktake.id, originalStage, false);
+                state.currentStage = originalStage;
+                updateStageDisplay();
+                applyStageRestrictions();
+            } catch (rollbackError) {
+                console.error('Failed to rollback stage:', rollbackError);
+            }
+        }
+        
+        // Reload actual stage from backend to ensure sync
+        try {
+            const stageResult = await apiService.getStocktakeStage(state.currentStocktake.id);
+            if (stageResult.success) {
+                state.currentStage = stageResult.stage || originalStage;
+                updateStageDisplay();
+                applyStageRestrictions();
+            }
+        } catch (stageCheckError) {
+            console.error('Failed to check stage:', stageCheckError);
+        }
+        
+        alert(`❌ Failed to complete first counts: ${error.message}\n\nPlease try again or contact support if the issue persists.`);
         console.error('Complete first counts error:', error);
     }
 }

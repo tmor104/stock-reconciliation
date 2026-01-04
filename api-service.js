@@ -768,6 +768,24 @@ class UnifiedAPIService {
     // STOCKTAKE STAGES
     // ============================================
 
+    async updateStocktakeStatus(stocktakeId, status) {
+        const response = await fetch(`${this.workerUrl}/stocktake/${stocktakeId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`
+            },
+            body: JSON.stringify({ status })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: 'Failed to update stocktake status' }));
+            throw new Error(error.message || 'Failed to update stocktake status');
+        }
+        
+        return await response.json();
+    }
+    
     async getStocktakeStage(stocktakeId) {
         if (!this.token) {
             throw new Error('Not authenticated');

@@ -2303,10 +2303,13 @@ async function syncToServer() {
         }
         
         // Sync kegs - only sync unsynced kegs with counts > 0
-        const unsyncedKegs = state.kegsList.filter(k => {
-            const count = parseFloat(k.count) || 0;
-            return count > 0 && !k.synced;
-        });
+        let unsyncedKegs = [];
+        if (state.kegsList && state.kegsList.length > 0) {
+            unsyncedKegs = state.kegsList.filter(k => {
+                const count = parseFloat(k.count) || 0;
+                return count > 0 && !k.synced;
+            });
+        }
         
         if (unsyncedKegs.length > 0) {
             try {
@@ -2329,6 +2332,11 @@ async function syncToServer() {
                     
                     // Update unsynced count
                     state.unsyncedKegsCount = Math.max(0, state.unsyncedKegsCount - unsyncedKegs.length);
+                    
+                    // Save kegs to IndexedDB to persist state
+                    if (state.currentStocktake) {
+                        await dbService.saveKegs(state.currentStocktake.id, state.kegsList);
+                    }
                     
                     // Update UI to show synced state
                     updateKegsTable();
@@ -2372,7 +2380,7 @@ async function syncToServer() {
         updateCountingScreen();
         
         // Show sync confirmation
-        const syncedCount = unsyncedScans.length + (kegsWithCounts.length > 0 ? kegsWithCounts.length : 0);
+        const syncedCount = unsyncedScans.length + (unsyncedKegs ? unsyncedKegs.length : 0);
         if (syncedCount > 0) {
             showSyncConfirmation(syncedCount);
         }
@@ -3060,7 +3068,8 @@ async function populateAdminStocktakeSelects() {
         const selects = [
             document.getElementById('counts-stocktake-select'),
             document.getElementById('variance-stocktake-select'),
-            document.getElementById('issues-stocktake-select')
+            document.getElementById('issues-stocktake-select'),
+            document.getElementById('archive-stocktake-select')
         ];
         
         selects.forEach(select => {

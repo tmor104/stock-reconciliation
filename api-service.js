@@ -465,7 +465,12 @@ class UnifiedAPIService {
             throw new Error('Failed to get variance data');
         }
         
-        return await response.json();
+        const result = await response.json();
+        // Ensure success flag is set
+        return {
+            success: true,
+            varianceData: result.varianceData || result
+        };
     }
 
     async updateVarianceData(stocktakeId) {

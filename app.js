@@ -981,6 +981,12 @@ async function loadProductsAndLocations() {
 async function handleUploadVariance(e) {
     e.preventDefault();
     
+    // Check for blocking issues
+    if (await checkBlockingIssues()) {
+        alert('⚠️ Unacknowledged issues detected! Please review and acknowledge them in the Admin panel before uploading variance report.');
+        return;
+    }
+    
     const fileInput = document.getElementById('variance-file-input');
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
         // Skip upload

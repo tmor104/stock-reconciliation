@@ -614,6 +614,108 @@ class UnifiedAPIService {
         
         return await response.json();
     }
+
+    // ============================================
+    // ADMIN (Cloudflare Workers)
+    // ============================================
+
+    async getUsers() {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+        
+        const response = await fetch(`${CONFIG.WORKER_URL}/admin/users`, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to get users' }));
+            throw new Error(error.error || 'Failed to get users');
+        }
+        
+        return await response.json();
+    }
+
+    async addUser(username, password, role = 'user') {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+        
+        const hashedPassword = await sha256(password);
+        
+        const response = await fetch(`${CONFIG.WORKER_URL}/admin/users`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password: hashedPassword, role })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to add user' }));
+            throw new Error(error.error || 'Failed to add user');
+        }
+        
+        return await response.json();
+    }
+
+    async deleteUser(username) {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+        
+        const response = await fetch(`${CONFIG.WORKER_URL}/admin/users/${username}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to delete user' }));
+            throw new Error(error.error || 'Failed to delete user');
+        }
+        
+        return await response.json();
+    }
+
+    async getUserCounts(stocktakeId) {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+        
+        const response = await fetch(`${CONFIG.WORKER_URL}/admin/counts/${stocktakeId}`, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to get user counts' }));
+            throw new Error(error.error || 'Failed to get user counts');
+        }
+        
+        return await response.json();
+    }
+
+    async updateFolderId(folderId) {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+        
+        const response = await fetch(`${CONFIG.WORKER_URL}/admin/folder-id`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ folderId })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to update folder ID' }));
+            throw new Error(error.error || 'Failed to update folder ID');
+        }
+        
+        return await response.json();
+    }
 }
 
 // Export singleton instance

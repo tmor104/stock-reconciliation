@@ -1082,6 +1082,155 @@ body {
 
 .kegs-table input {
     width: 96px;
+}
+
+/* Admin Panel */
+.admin-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.admin-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 8px;
+    border-radius: 16px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    flex-wrap: wrap;
+}
+
+.admin-tab {
+    flex: 1;
+    min-width: 120px;
+    padding: 12px 20px;
+    border: 2px solid var(--slate-300);
+    background: white;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 14px;
+    color: var(--slate-700);
+}
+
+.admin-tab:hover {
+    border-color: var(--blue-400);
+    background: var(--blue-50);
+    transform: translateY(-2px);
+}
+
+.admin-tab.active {
+    background: linear-gradient(to right, var(--blue-600), var(--purple-700));
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 4px 12px -2px rgba(59, 130, 246, 0.3);
+}
+
+.admin-tab-content {
+    display: none;
+}
+
+.admin-tab-content.active {
+    display: block;
+    animation: slideIn 0.3s ease-out;
+}
+
+.users-list,
+.issues-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.user-item,
+.issue-item {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid var(--slate-200);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.user-item:hover,
+.issue-item:hover {
+    border-color: var(--blue-400);
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px -2px rgba(59, 130, 246, 0.2);
+}
+
+.user-item-header,
+.issue-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.user-item h3,
+.issue-item h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--slate-800);
+    margin: 0;
+}
+
+.user-item-actions,
+.issue-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.issue-item.high-severity {
+    border-color: var(--red-500);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.issue-item.acknowledged {
+    opacity: 0.6;
+    border-color: var(--slate-300);
+}
+
+.user-counts-table {
+    margin-top: 20px;
+    overflow-x: auto;
+}
+
+.user-counts-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.user-counts-table th,
+.user-counts-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--slate-200);
+}
+
+.user-counts-table th {
+    background: var(--slate-100);
+    font-weight: 600;
+    color: var(--slate-700);
+    position: sticky;
+    top: 0;
+}
+
+.user-counts-table tbody tr:hover {
+    background: var(--slate-50);
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
     padding: 8px;
     text-align: center;
     border: 2px solid var(--orange-300);

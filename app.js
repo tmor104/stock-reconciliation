@@ -292,6 +292,9 @@ function setupEventListeners() {
     
     // Reconciliation screen
     setupReconciliationScreenListeners();
+    
+    // Admin panel
+    setupAdminPanelListeners();
 }
 
 function setupCountingScreenListeners() {
@@ -574,7 +577,7 @@ function extractFolderId(input) {
     return null;
 }
 
-async function saveFolderId(e) {
+async function saveFolderId(e, isAdmin = false) {
     // Prevent form submission if button is in a form
     if (e) {
         e.preventDefault();
@@ -583,8 +586,8 @@ async function saveFolderId(e) {
     
     console.log('saveFolderId called');
     
-    const input = document.getElementById('folder-id-input');
-    const status = document.getElementById('folder-id-status');
+    const input = isAdmin ? document.getElementById('admin-folder-id-input') : document.getElementById('folder-id-input');
+    const status = isAdmin ? document.getElementById('admin-folder-id-status') : document.getElementById('folder-id-status');
     
     if (!input) {
         console.error('folder-id-input not found');
@@ -639,9 +642,9 @@ async function saveFolderId(e) {
     }
 }
 
-async function clearFolderId() {
-    const input = document.getElementById('folder-id-input');
-    const status = document.getElementById('folder-id-status');
+async function clearFolderId(isAdmin = false) {
+    const input = isAdmin ? document.getElementById('admin-folder-id-input') : document.getElementById('folder-id-input');
+    const status = isAdmin ? document.getElementById('admin-folder-id-status') : document.getElementById('folder-id-status');
     
     if (input) input.value = '';
     if (status) {
@@ -656,8 +659,8 @@ async function clearFolderId() {
 }
 
 function updateFolderIdDisplay() {
-    const input = document.getElementById('folder-id-input');
-    const status = document.getElementById('folder-id-status');
+    const input = isAdmin ? document.getElementById('admin-folder-id-input') : document.getElementById('folder-id-input');
+    const status = isAdmin ? document.getElementById('admin-folder-id-status') : document.getElementById('folder-id-status');
     
     if (!input || !status) return;
     
@@ -698,8 +701,14 @@ async function loadHomeScreen() {
         userInfo.textContent = `Hello, ${state.user.username}`;
     }
     
-    // Update folder ID display
-    updateFolderIdDisplay();
+    // Show/hide admin button
+    const adminBtn = document.getElementById('admin-panel-btn');
+    if (adminBtn) {
+        adminBtn.style.display = state.user && state.user.role === 'admin' ? 'block' : 'none';
+    }
+    
+    // Update folder ID display (removed from main page, now in admin)
+    // updateFolderIdDisplay();
     
     // Load stocktakes
     await loadStocktakes();
@@ -1523,6 +1532,11 @@ async function deleteManualEntry(syncId) {
 // ============================================
 
 async function syncToServer() {
+    // Check for blocking issues
+    if (await checkBlockingIssues()) {
+        alert('⚠️ Unacknowledged issues detected! Please review and acknowledge them in the Admin panel before syncing.');
+        return;
+    }
     if (!state.currentStocktake || !state.isOnline || state.isSyncing) return;
     
     state.isSyncing = true;
@@ -1779,8 +1793,345 @@ async function loadScansForStocktake(stocktakeId, currentUsername) {
             await dbService.saveScan(scan);
         }
         
-        return Array.from(scanMap.values());
+    return Array.from(scanMap.values());
+}
+
+// ============================================
+// ADMIN PANEL
+// ============================================
+
+function setupAdminPanelListeners() {
+    // Admin back button
+    const adminBackBtn = document.getElementById('admin-back-btn');
+    if (adminBackBtn) {
+        adminBackBtn.addEventListener('click', () => {
+            showScreen('home-screen');
+            loadHomeScreen();
+        });
+    }
+    
+    // Admin logout
+    const adminLogoutBtn = document.getElementById('admin-logout-btn');
+    if (adminLogoutBtn) {
+        adminLogoutBtn.addEventListener('click', handleLogout);
+    }
+    
+    // Admin tabs
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            switchAdminTab(tabName);
+        });
+    });
+    
+    // Add user form
+    const addUserForm = document.getElementById('add-user-form');
+    if (addUserForm) {
+        addUserForm.addEventListener('submit', handleAddUser);
+    }
+    
+    // Admin folder settings
+    const adminSaveFolderBtn = document.getElementById('admin-save-folder-id-btn');
+    if (adminSaveFolderBtn) {
+        adminSaveFolderBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            saveFolderId(e, true); // true = admin panel
+        });
+    }
+    
+    const adminClearFolderBtn = document.getElementById('admin-clear-folder-id-btn');
+    if (adminClearFolderBtn) {
+        adminClearFolderBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            clearFolderId(true); // true = admin panel
+        });
+    }
+    
+    // Stocktake selects
+    const countsStocktakeSelect = document.getElementById('counts-stocktake-select');
+    if (countsStocktakeSelect) {
+        countsStocktakeSelect.addEventListener('change', loadUserCounts);
+    }
+    
+    const varianceStocktakeSelect = document.getElementById('variance-stocktake-select');
+    if (varianceStocktakeSelect) {
+        varianceStocktakeSelect.addEventListener('change', loadAdminVariance);
+    }
+    
+    const issuesStocktakeSelect = document.getElementById('issues-stocktake-select');
+    if (issuesStocktakeSelect) {
+        issuesStocktakeSelect.addEventListener('change', loadIssues);
+    }
+}
+
+function switchAdminTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+    
+    // Update tab content
+    document.querySelectorAll('.admin-tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === `admin-${tabName}-tab`);
+    });
+    
+    // Load tab data
+    if (tabName === 'users') {
+        loadUsers();
+    } else if (tabName === 'counts') {
+        loadUserCounts();
+    } else if (tabName === 'variance') {
+        loadAdminVariance();
+    } else if (tabName === 'issues') {
+        loadIssues();
+    } else if (tabName === 'settings') {
+        loadAdminSettings();
+    }
+}
+
+async function loadAdminPanel() {
+    if (!state.user || state.user.role !== 'admin') {
+        alert('Access denied. Admin privileges required.');
+        showScreen('home-screen');
+        return;
+    }
+    
+    // Update user info
+    const adminUserInfo = document.getElementById('admin-user-info');
+    if (adminUserInfo) {
+        adminUserInfo.textContent = `Admin: ${state.user.username}`;
+    }
+    
+    // Load initial tab
+    switchAdminTab('users');
+    
+    // Populate stocktake selects
+    await populateAdminStocktakeSelects();
+}
+
+async function populateAdminStocktakeSelects() {
+    try {
+        const result = await apiService.listStocktakes(state.folderId);
+        const stocktakes = result.success && result.stocktakes ? result.stocktakes : [];
+        
+        const selects = [
+            document.getElementById('counts-stocktake-select'),
+            document.getElementById('variance-stocktake-select'),
+            document.getElementById('issues-stocktake-select')
+        ];
+        
+        selects.forEach(select => {
+            if (!select) return;
+            select.innerHTML = '<option value="">Select a stocktake...</option>';
+            stocktakes.forEach(st => {
+                const option = document.createElement('option');
+                option.value = st.id;
+                option.textContent = st.name;
+                select.appendChild(option);
+            });
+        });
     } catch (error) {
+        console.error('Error loading stocktakes for admin:', error);
+    }
+}
+
+async function loadUsers() {
+    const usersList = document.getElementById('users-list');
+    if (!usersList) return;
+    
+    usersList.innerHTML = '<p class="loading-text">Loading users...</p>';
+    
+    try {
+        const users = await apiService.getUsers();
+        if (users.length === 0) {
+            usersList.innerHTML = '<p class="info-text">No users found.</p>';
+            return;
+        }
+        
+        usersList.innerHTML = '';
+        users.forEach(user => {
+            const userItem = document.createElement('div');
+            userItem.className = 'user-item';
+            userItem.innerHTML = `
+                <div class="user-item-header">
+                    <h3>${user.username} <span style="color: var(--slate-500); font-size: 0.875rem;">(${user.role})</span></h3>
+                    <div class="user-item-actions">
+                        ${user.username !== 'admin' ? `<button class="btn-secondary btn-small" onclick="handleDeleteUser('${user.username}')">Delete</button>` : ''}
+                    </div>
+                </div>
+            `;
+            usersList.appendChild(userItem);
+        });
+    } catch (error) {
+        usersList.innerHTML = `<p class="error-text">Error loading users: ${error.message}</p>`;
+    }
+}
+
+async function handleAddUser(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('new-username').value.trim();
+    const password = document.getElementById('new-password').value;
+    const role = document.getElementById('new-role').value;
+    
+    if (!username || !password) {
+        alert('Please enter both username and password');
+        return;
+    }
+    
+    showLoading('Adding user...');
+    
+    try {
+        await apiService.addUser(username, password, role);
+        document.getElementById('add-user-form').reset();
+        await loadUsers();
+        hideLoading();
+        alert('User added successfully');
+    } catch (error) {
+        hideLoading();
+        alert('Error adding user: ' + error.message);
+    }
+}
+
+async function handleDeleteUser(username) {
+    if (!confirm(`Are you sure you want to delete user "${username}"?`)) return;
+    
+    showLoading('Deleting user...');
+    
+    try {
+        await apiService.deleteUser(username);
+        await loadUsers();
+        hideLoading();
+        alert('User deleted successfully');
+    } catch (error) {
+        hideLoading();
+        alert('Error deleting user: ' + error.message);
+    }
+}
+
+async function loadUserCounts() {
+    const stocktakeId = document.getElementById('counts-stocktake-select')?.value;
+    const display = document.getElementById('user-counts-display');
+    
+    if (!display) return;
+    
+    if (!stocktakeId) {
+        display.innerHTML = '<p class="info-text">Select a stocktake to view user counts</p>';
+        return;
+    }
+    
+    display.innerHTML = '<p class="loading-text">Loading user counts...</p>';
+    
+    try {
+        const counts = await apiService.getUserCounts(stocktakeId);
+        
+        if (!counts || counts.length === 0) {
+            display.innerHTML = '<p class="info-text">No counts found for this stocktake</p>';
+            return;
+        }
+        
+        let html = '<table class="user-counts-table"><thead><tr><th>User</th><th>Scans</th><th>Manual Entries</th><th>Kegs</th><th>Last Sync</th></tr></thead><tbody>';
+        counts.forEach(count => {
+            html += `<tr>
+                <td>${count.username}</td>
+                <td>${count.scanCount || 0}</td>
+                <td>${count.manualCount || 0}</td>
+                <td>${count.kegCount || 0}</td>
+                <td>${count.lastSync || 'Never'}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        display.innerHTML = html;
+    } catch (error) {
+        display.innerHTML = `<p class="error-text">Error loading counts: ${error.message}</p>`;
+    }
+}
+
+async function loadAdminVariance() {
+    const stocktakeId = document.getElementById('variance-stocktake-select')?.value;
+    const display = document.getElementById('admin-variance-display');
+    
+    if (!display) return;
+    
+    if (!stocktakeId) {
+        display.innerHTML = '<p class="info-text">Select a stocktake to view variance report</p>';
+        return;
+    }
+    
+    display.innerHTML = '<p class="loading-text">Loading variance report...</p>';
+    
+    try {
+        const result = await apiService.getVarianceData(stocktakeId);
+        if (result.success && result.varianceData) {
+            // Reuse reconciliation screen rendering logic
+            display.innerHTML = '<p class="info-text">Variance data loaded. Use the Reconciliation screen for detailed view.</p>';
+        } else {
+            display.innerHTML = '<p class="info-text">No variance data available for this stocktake</p>';
+        }
+    } catch (error) {
+        display.innerHTML = `<p class="error-text">Error loading variance: ${error.message}</p>`;
+    }
+}
+
+async function loadIssues() {
+    const stocktakeId = document.getElementById('issues-stocktake-select')?.value || null;
+    const issuesList = document.getElementById('issues-list');
+    
+    if (!issuesList) return;
+    
+    issuesList.innerHTML = '<p class="loading-text">Loading issues...</p>';
+    
+    try {
+        const issues = await dbService.getIssues(stocktakeId);
+        
+        if (!issues || issues.length === 0) {
+            issuesList.innerHTML = '<p class="info-text">No issues found. ✅</p>';
+            return;
+        }
+        
+        issuesList.innerHTML = '';
+        issues.forEach(issue => {
+            const issueItem = document.createElement('div');
+            issueItem.className = `issue-item ${issue.severity === 'high' ? 'high-severity' : ''} ${issue.acknowledged ? 'acknowledged' : ''}`;
+            issueItem.innerHTML = `
+                <div class="issue-item-header">
+                    <h3>${issue.type} - ${issue.severity}</h3>
+                    <div class="issue-item-actions">
+                        ${!issue.acknowledged ? `<button class="btn-primary btn-small" onclick="handleAcknowledgeIssue('${issue.id}')">Acknowledge</button>` : '<span style="color: var(--slate-500);">Acknowledged</span>'}
+                    </div>
+                </div>
+                <p><strong>Stocktake:</strong> ${issue.stocktakeId}</p>
+                <p><strong>Description:</strong> ${issue.description}</p>
+                <p><strong>Detected:</strong> ${new Date(issue.timestamp).toLocaleString()}</p>
+            `;
+            issuesList.appendChild(issueItem);
+        });
+    } catch (error) {
+        issuesList.innerHTML = `<p class="error-text">Error loading issues: ${error.message}</p>`;
+    }
+}
+
+async function handleAcknowledgeIssue(issueId) {
+    try {
+        await dbService.acknowledgeIssue(issueId);
+        await loadIssues();
+    } catch (error) {
+        alert('Error acknowledging issue: ' + error.message);
+    }
+}
+
+function loadAdminSettings() {
+    const folderInput = document.getElementById('admin-folder-id-input');
+    if (folderInput && state.folderId) {
+        folderInput.value = state.folderId;
+    }
+}
+
+// Make functions available globally for onclick handlers
+window.handleDeleteUser = handleDeleteUser;
+window.handleAcknowledgeIssue = handleAcknowledgeIssue; catch (error) {
         console.error('Error loading scans:', error);
         // Return local scans as fallback
         return await dbService.getAllScans(stocktakeId);

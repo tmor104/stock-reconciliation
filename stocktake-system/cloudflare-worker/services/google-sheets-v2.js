@@ -292,38 +292,73 @@ export class GoogleSheetsAPI {
         }));
     }
     
-    static async getCountData(countSheetId, env) {
+    static async getCountData(spreadsheetId, env) {
         const accessToken = await this.getAccessToken(env);
         
-        // Stock app writes to "Raw Scans" sheet with 10 columns (A-J)
-        // Format: Barcode, Product, Quantity, Location, User, Timestamp, Stock Level, $ Value, Synced, Sync ID
+        // Apps Script creates "Tally" sheet with aggregated counts
+        // Format: Barcode, Product, Total Quantity, Locations, Last Updated, Stock Level
         const response = await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${countSheetId}/values/'Raw Scans'!A:J`,
+            `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Tally'!A:F`,
             {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             }
         );
         
         if (!response.ok) {
-            throw new Error('Failed to get count data');
+            // Fallback to Raw Scans if Tally doesn't exist
+            const rawResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Raw Scans'!A:J`,
+                {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                }
+            );
+            
+            if (!rawResponse.ok) {
+                throw new Error('Failed to get count data');
+            }
+            
+            const rawData = await rawResponse.json();
+            const rows = rawData.values || [];
+            
+            // Aggregate Raw Scans by barcode
+            const tally = {};
+            rows.slice(1).forEach(row => {
+                const barcode = row[0] || '';
+                if (!barcode) return;
+                
+                if (!tally[barcode]) {
+                    tally[barcode] = {
+                        barcode: barcode,
+                        product: row[1] || '',
+                        quantity: 0,
+                        locations: new Set(),
+                        stockLevel: row[6] || ''
+                    };
+                }
+                tally[barcode].quantity += parseFloat(row[2]) || 0;
+                if (row[3]) tally[barcode].locations.add(row[3]);
+            });
+            
+            return Object.values(tally).map(item => ({
+                barcode: item.barcode,
+                product: item.product,
+                quantity: item.quantity,
+                location: Array.from(item.locations).join(', '),
+                stockLevel: item.stockLevel
+            }));
         }
         
         const data = await response.json();
         const rows = data.values || [];
         
         // Skip header row
-        // Stock app format: A=Barcode, B=Product, C=Quantity, D=Location, E=User, F=Timestamp, G=Stock Level, H=$ Value, I=Synced, J=Sync ID
+        // Tally format: A=Barcode, B=Product, C=Total Quantity, D=Locations, E=Last Updated, F=Stock Level
         return rows.slice(1).map(row => ({
             barcode: row[0] || '',
             product: row[1] || '',
             quantity: parseFloat(row[2]) || 0,
             location: row[3] || '',
-            user: row[4] || '',
-            timestamp: row[5] || '',
-            stockLevel: row[6] || '',
-            value: parseFloat(row[7]) || 0,
-            synced: row[8] || '',
-            syncId: row[9] || ''  // Fixed: Stock app writes syncId in column J (index 9), not K
+            stockLevel: row[5] || ''
         }));
     }
     

@@ -589,37 +589,40 @@ router.post('/stocktake/create', async (request, env) => {
 });
 
 // Variance - Get Data
+// stocktakeId is the Apps Script spreadsheet ID
 router.get('/variance/:stocktakeId', async (request, env) => {
     const authError = await requireAuth(request, env);
     if (authError) return authError;
     
     try {
         const { stocktakeId } = request.params;
+        // stocktakeId IS the spreadsheet ID in Apps Script system
         
-        // Get stocktake info
-        const currentStocktake = await env.STOCKTAKE_KV.get('current_stocktake', { type: 'json' });
-        
-        if (!currentStocktake || currentStocktake.id !== stocktakeId) {
-            return new Response('Stocktake not found', { status: 404, headers: corsHeaders });
+        // Get theoretical data (from Theoretical sheet in spreadsheet)
+        let theoretical = [];
+        try {
+            theoretical = await GoogleSheetsAPI.getTheoreticalData(stocktakeId, env);
+        } catch (e) {
+            console.warn('No theoretical data found:', e.message);
+            // Continue with empty theoretical data
         }
         
-        // Get theoretical data
-        const theoretical = await GoogleSheetsAPI.getTheoreticalData(
-            currentStocktake.spreadsheetId,
-            env
-        );
+        // Get count data (from Tally sheet in same spreadsheet)
+        let counts = [];
+        try {
+            counts = await GoogleSheetsAPI.getCountData(stocktakeId, env);
+        } catch (e) {
+            console.warn('No count data found:', e.message);
+            // Continue with empty counts
+        }
         
-        // Get count data
-        const counts = await GoogleSheetsAPI.getCountData(
-            currentStocktake.countSheetId,
-            env
-        );
-        
-        // Get manual adjustments
-        const adjustments = await GoogleSheetsAPI.getAdjustments(
-            currentStocktake.spreadsheetId,
-            env
-        );
+        // Get manual adjustments (from Manual sheet)
+        let adjustments = [];
+        try {
+            adjustments = await GoogleSheetsAPI.getAdjustments(stocktakeId, env);
+        } catch (e) {
+            console.warn('No adjustments found:', e.message);
+        }
         
         // Get barcode mapping
         const barcodeMapping = await GoogleSheetsAPI.getBarcodeMapping(env);
@@ -645,27 +648,21 @@ router.get('/variance/:stocktakeId', async (request, env) => {
 });
 
 // Variance - Update Count
+// stocktakeId is the Apps Script spreadsheet ID
 router.post('/variance/:stocktakeId/update', async (request, env) => {
     const authError = await requireAuth(request, env);
     if (authError) return authError;
     
     try {
         const { stocktakeId } = request.params;
-        const { productCode, newCount, reason, user, timestamp } = await request.json();
+        const body = await request.json().catch(() => ({}));
+        const { productCode, newCount, reason, user, timestamp } = body;
         
-        const currentStocktake = await env.STOCKTAKE_KV.get('current_stocktake', { type: 'json' });
+        // stocktakeId IS the spreadsheet ID - no KV lookup needed
         
-        if (!currentStocktake || currentStocktake.id !== stocktakeId) {
-            return new Response('Stocktake not found', { status: 404, headers: corsHeaders });
-        }
-        
-        if (currentStocktake.status !== 'active') {
-            return new Response('Stocktake is not active', { status: 400, headers: corsHeaders });
-        }
-        
-        // Save adjustment to audit trail
+        // Save adjustment to Manual sheet in spreadsheet
         await GoogleSheetsAPI.saveAdjustment(
-            currentStocktake.spreadsheetId,
+            stocktakeId,
             { productCode, newCount, reason, user, timestamp },
             env
         );
@@ -674,6 +671,7 @@ router.post('/variance/:stocktakeId/update', async (request, env) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
+        console.error('Update variance error:', error);
         return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -682,21 +680,14 @@ router.post('/variance/:stocktakeId/update', async (request, env) => {
 });
 
 // Stocktake - Upload Variance Report (HnL file)
+// stocktakeId is the Apps Script spreadsheet ID
 router.post('/stocktake/:stocktakeId/upload', async (request, env) => {
     const authError = await requireAuth(request, env);
     if (authError) return authError;
     
     try {
         const { stocktakeId } = request.params;
-        
-        // Verify stocktake exists
-        const currentStocktake = await env.STOCKTAKE_KV.get('current_stocktake', { type: 'json' });
-        if (!currentStocktake || currentStocktake.id !== stocktakeId) {
-            return new Response(JSON.stringify({ error: 'Stocktake not found' }), {
-                status: 404,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-        }
+        // stocktakeId IS the spreadsheet ID - no KV lookup needed
         
         // Get uploaded file
         const formData = await request.formData();
@@ -713,18 +704,12 @@ router.post('/stocktake/:stocktakeId/upload', async (request, env) => {
         const arrayBuffer = await hnlFile.arrayBuffer();
         const theoreticalData = await parseHnLExcel(arrayBuffer);
         
-        // Save to spreadsheet
+        // Save to Theoretical sheet in spreadsheet
         await GoogleSheetsAPI.saveTheoreticalData(
-            currentStocktake.spreadsheetId,
+            stocktakeId,
             theoreticalData,
             env
         );
-        
-        // Update stocktake with HnL data
-        currentStocktake.hnlUploaded = true;
-        currentStocktake.hnlUploadedAt = new Date().toISOString();
-        currentStocktake.hnlUploadedBy = request.user.username;
-        await env.STOCKTAKE_KV.put('current_stocktake', JSON.stringify(currentStocktake));
         
         return new Response(JSON.stringify({
             success: true,

@@ -224,27 +224,8 @@ function setupEventListeners() {
         showModal('create-stocktake-modal');
     });
     
-    // Folder ID settings
-    const saveFolderIdBtn = document.getElementById('save-folder-id-btn');
-    if (saveFolderIdBtn) {
-        console.log('Setting up save folder ID button listener');
-        saveFolderIdBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            saveFolderId(e);
-        });
-    } else {
-        console.error('save-folder-id-btn not found!');
-    }
-    
-    const clearFolderIdBtn = document.getElementById('clear-folder-id-btn');
-    if (clearFolderIdBtn) {
-        clearFolderIdBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            clearFolderId();
-        });
-    }
+    // Folder ID settings (removed from main page, now in admin panel)
+    // These buttons are only in the admin panel now
     
     const refreshStocktakesBtn = document.getElementById('refresh-stocktakes-btn');
     if (refreshStocktakesBtn) refreshStocktakesBtn.addEventListener('click', loadStocktakes);
@@ -1759,8 +1740,8 @@ function filterVarianceTable(searchQuery = '', filterType = 'all') {
 
 async function loadScansForStocktake(stocktakeId, currentUsername) {
     try {
-        // Load scans from Google Sheets (all users) - pass undefined instead of null
-        const result = await apiService.loadUserScans(stocktakeId, undefined);
+        // Load scans from Google Sheets (all users) - pass null to load all scans
+        const result = await apiService.loadUserScans(stocktakeId, null);
         const serverScans = result.success && result.scans ? result.scans : [];
         
         // Load local scans

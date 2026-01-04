@@ -2,7 +2,7 @@
 // All data is stored locally to prevent data loss on refresh or network issues
 
 const DB_NAME = 'UnifiedStockSystemDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class IndexedDBService {
     constructor() {

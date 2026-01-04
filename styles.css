@@ -2,34 +2,43 @@
 /* Modern gradients, professional, mobile-friendly */
 
 :root {
-    --blue-50: #eff6ff;
-    --blue-100: #dbeafe;
-    --blue-200: #bfdbfe;
-    --blue-300: #93c5fd;
-    --blue-400: #60a5fa;
-    --blue-500: #3b82f6;
-    --blue-600: #2563eb;
-    --blue-700: #1d4ed8;
-    --blue-800: #1e40af;
-    --blue-900: #1e3a8a;
-    
-    --purple-50: #faf5ff;
-    --purple-100: #f3e8ff;
-    --purple-200: #e9d5ff;
-    --purple-300: #d8b4fe;
-    --purple-400: #c084fc;
-    --purple-500: #a855f7;
-    --purple-600: #9333ea;
-    --purple-700: #7e22ce;
-    --purple-800: #6b21a8;
-    
-    --pink-50: #fdf2f8;
-    --pink-100: #fce7f3;
-    --pink-200: #fbcfe8;
-    --pink-300: #f9a8d4;
-    --pink-400: #f472b6;
-    --pink-500: #ec4899;
-    --pink-600: #db2777;
+    /* Wizard Logo Color Palette */
+    --wizard-dark: #1a3a52;      /* Primary dark blue (wizard/hat) */
+    --wizard-medium: #4a7c9e;    /* Medium blue (accents) */
+    --wizard-light: #7fa9c8;     /* Light blue (highlights) */
+    --wizard-pale: #a8c5d6;      /* Very light blue */
+    --wizard-bg: #f0f4f5;        /* Off-white cream background */
+
+    /* Blue shades based on wizard palette */
+    --blue-50: #f0f4f5;
+    --blue-100: #e1eaef;
+    --blue-200: #c3d5df;
+    --blue-300: #a8c5d6;
+    --blue-400: #7fa9c8;
+    --blue-500: #4a7c9e;
+    --blue-600: #3a6481;
+    --blue-700: #2a4d64;
+    --blue-800: #1a3a52;
+    --blue-900: #0f2235;
+
+    /* Purple/Pink - toned down to match wizard theme */
+    --purple-50: #f5f7fa;
+    --purple-100: #ebeef3;
+    --purple-200: #d7dee7;
+    --purple-300: #b8c4d3;
+    --purple-400: #8fa3b8;
+    --purple-500: #6b839c;
+    --purple-600: #556a80;
+    --purple-700: #3f5164;
+    --purple-800: #2a3948;
+
+    --pink-50: #f8f9fa;
+    --pink-100: #f0f2f4;
+    --pink-200: #e1e5e9;
+    --pink-300: #c9d1d9;
+    --pink-400: #a8b5c3;
+    --pink-500: #8899ad;
+    --pink-600: #6c7d91;
     
     --slate-50: #f8fafc;
     --slate-100: #f1f5f9;
@@ -70,7 +79,7 @@ body {
         'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
+    background: linear-gradient(135deg, var(--wizard-dark) 0%, var(--wizard-medium) 40%, var(--wizard-light) 70%, var(--wizard-pale) 100%);
     background-size: 400% 400%;
     animation: gradientShift 15s ease infinite;
     background-attachment: fixed;

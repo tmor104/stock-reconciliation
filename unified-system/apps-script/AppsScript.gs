@@ -445,12 +445,29 @@ function syncScans(request, requestId) {
       syncedIds.push(scan.syncId);
     });
     
-    // Batch update existing rows
+    // Batch update existing rows efficiently
     if (toUpdate.length > 0) {
-      // Group updates by consecutive rows for efficiency
       toUpdate.sort((a, b) => a.rowIndex - b.rowIndex);
-      toUpdate.forEach(update => {
-        rawSheet.getRange(update.rowIndex, 1, 1, 10).setValues([update.row]);
+
+      // Group consecutive rows into batches
+      const batches = [];
+      let currentBatch = [toUpdate[0]];
+
+      for (let i = 1; i < toUpdate.length; i++) {
+        if (toUpdate[i].rowIndex === currentBatch[currentBatch.length - 1].rowIndex + 1) {
+          currentBatch.push(toUpdate[i]);
+        } else {
+          batches.push(currentBatch);
+          currentBatch = [toUpdate[i]];
+        }
+      }
+      batches.push(currentBatch);
+
+      // Apply batches with single setValues() call per batch
+      batches.forEach(batch => {
+        const startRow = batch[0].rowIndex;
+        const rows = batch.map(u => u.row);
+        rawSheet.getRange(startRow, 1, rows.length, 10).setValues(rows);
       });
     }
     
@@ -693,14 +710,32 @@ function syncKegs(request, requestId) {
       }
     });
     
-    // Batch update all rows at once (much faster than individual setValue calls)
+    // Batch update rows efficiently - group consecutive rows
     if (updates.length > 0) {
       // Sort by row index for efficiency
       updates.sort((a, b) => a.rowIndex - b.rowIndex);
-      
-      // Update rows in batches (can update multiple rows with one setValues call)
-      updates.forEach(update => {
-        sheet.getRange(update.rowIndex, 1, 1, 7).setValues([update.row]);
+
+      // Group consecutive rows into batches
+      const batches = [];
+      let currentBatch = [updates[0]];
+
+      for (let i = 1; i < updates.length; i++) {
+        if (updates[i].rowIndex === currentBatch[currentBatch.length - 1].rowIndex + 1) {
+          // Consecutive row - add to current batch
+          currentBatch.push(updates[i]);
+        } else {
+          // Non-consecutive - start new batch
+          batches.push(currentBatch);
+          currentBatch = [updates[i]];
+        }
+      }
+      batches.push(currentBatch); // Don't forget the last batch
+
+      // Apply batches with single setValues() call per batch
+      batches.forEach(batch => {
+        const startRow = batch[0].rowIndex;
+        const rows = batch.map(u => u.row);
+        sheet.getRange(startRow, 1, rows.length, 7).setValues(rows);
       });
     }
     
@@ -771,10 +806,29 @@ function syncManualEntries(request, requestId) {
       syncedIds.push(syncId);
     });
     
-    // Batch update existing rows
+    // Batch update existing rows efficiently
     if (toUpdate.length > 0) {
-      toUpdate.forEach(update => {
-        sheet.getRange(update.rowIndex, 1, 1, 8).setValues([update.row]);
+      toUpdate.sort((a, b) => a.rowIndex - b.rowIndex);
+
+      // Group consecutive rows into batches
+      const batches = [];
+      let currentBatch = [toUpdate[0]];
+
+      for (let i = 1; i < toUpdate.length; i++) {
+        if (toUpdate[i].rowIndex === currentBatch[currentBatch.length - 1].rowIndex + 1) {
+          currentBatch.push(toUpdate[i]);
+        } else {
+          batches.push(currentBatch);
+          currentBatch = [toUpdate[i]];
+        }
+      }
+      batches.push(currentBatch);
+
+      // Apply batches with single setValues() call per batch
+      batches.forEach(batch => {
+        const startRow = batch[0].rowIndex;
+        const rows = batch.map(u => u.row);
+        sheet.getRange(startRow, 1, rows.length, 8).setValues(rows);
       });
     }
     

@@ -711,16 +711,12 @@ router.get('/variance/:stocktakeId', async (request, env) => {
         } catch (e) {
             console.warn('No adjustments found:', e.message);
         }
-        
-        // Get barcode mapping
-        const barcodeMapping = await GoogleSheetsAPI.getBarcodeMapping(env);
-        
-        // Calculate variance
+
+        // Calculate variance (uses theoretical sheet data for barcode/description matching)
         const varianceData = VarianceCalculator.calculate(
             theoretical,
             counts,
-            adjustments,
-            barcodeMapping
+            adjustments
         );
         
         // Return items array directly for easier frontend consumption

@@ -284,9 +284,8 @@ export class GoogleSheetsAPI {
     
     static async populateKegsSheet(spreadsheetId, kegItems, env) {
         const accessToken = await this.getAccessToken(env);
-        
+
         // Kegs sheet format: Keg Product, Count, Location, User, Timestamp, Synced, Sync ID
-        // For initial import, we just populate the product names (Count will be 0, others empty)
         const headers = [
             'Keg Product',
             'Count',
@@ -296,13 +295,60 @@ export class GoogleSheetsAPI {
             'Synced',
             'Sync ID'
         ];
-        
-        // Extract unique product descriptions from keg items
-        const uniqueKegs = new Map();
+
+        // Extract unique product descriptions from new HnL keg items
+        const newKegsMap = new Map();
         kegItems.forEach(item => {
             const productName = item.description || item.productCode || '';
-            if (productName && !uniqueKegs.has(productName)) {
-                uniqueKegs.set(productName, {
+            if (productName) {
+                newKegsMap.set(productName.toLowerCase().trim(), productName);
+            }
+        });
+
+        // Try to read existing Kegs sheet to preserve counts
+        const existingKegsMap = new Map();
+        try {
+            const existingResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Kegs'!A:G`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+
+            if (existingResponse.ok) {
+                const existingData = await existingResponse.json();
+                const existingRows = existingData.values || [];
+
+                // Skip header, preserve existing keg data
+                for (let i = 1; i < existingRows.length; i++) {
+                    const row = existingRows[i];
+                    const productName = (row[0] || '').toString().trim();
+                    if (productName) {
+                        existingKegsMap.set(productName.toLowerCase(), {
+                            product: productName,
+                            count: row[1] || 0,
+                            location: row[2] || '',
+                            user: row[3] || '',
+                            timestamp: row[4] || '',
+                            synced: row[5] || '',
+                            syncId: row[6] || ''
+                        });
+                    }
+                }
+            }
+        } catch (e) {
+            console.log('No existing Kegs sheet found, will create new one');
+        }
+
+        // Merge: new products from HnL + existing kegs with counts preserved
+        const mergedKegs = new Map();
+
+        // Add all new keg products from HnL
+        for (const [key, productName] of newKegsMap) {
+            if (existingKegsMap.has(key)) {
+                // Product exists - preserve count
+                mergedKegs.set(key, existingKegsMap.get(key));
+            } else {
+                // New product - set count to 0
+                mergedKegs.set(key, {
                     product: productName,
                     count: 0,
                     location: '',
@@ -312,9 +358,16 @@ export class GoogleSheetsAPI {
                     syncId: ''
                 });
             }
-        });
-        
-        const rows = Array.from(uniqueKegs.values()).map(keg => [
+        }
+
+        // Also keep existing kegs that are no longer in HnL (they were counted but removed from theoretical)
+        for (const [key, kegData] of existingKegsMap) {
+            if (!mergedKegs.has(key)) {
+                mergedKegs.set(key, kegData);
+            }
+        }
+
+        const rows = Array.from(mergedKegs.values()).map(keg => [
             keg.product,
             keg.count,
             keg.location,
@@ -323,7 +376,7 @@ export class GoogleSheetsAPI {
             keg.synced,
             keg.syncId
         ]);
-        
+
         const allData = [headers, ...rows];
         
         // Check if Kegs sheet exists, create if needed

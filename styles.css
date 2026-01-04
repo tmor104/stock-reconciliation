@@ -1047,9 +1047,19 @@ body {
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     z-index: 2000;
+}
+
+.loading-video {
+    max-width: 200px;
+    max-height: 200px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    margin-bottom: 20px;
 }
 
 .spinner {
@@ -1059,6 +1069,7 @@ body {
     border-top-color: var(--blue-600);
     border-radius: 50%;
     animation: spin 1s linear infinite;
+    margin-bottom: 20px;
 }
 
 @keyframes spin {
@@ -1069,6 +1080,18 @@ body {
     color: white;
     margin-top: 16px;
     font-weight: 600;
+    text-align: center;
+}
+
+/* Login screen video animation */
+.login-video {
+    max-width: 150px;
+    max-height: 150px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    margin: 0 auto 20px;
+    display: block;
 }
 
 .progress-overlay {

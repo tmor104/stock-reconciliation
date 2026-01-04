@@ -681,6 +681,67 @@ router.post('/variance/:stocktakeId/update', async (request, env) => {
     }
 });
 
+// Stocktake - Upload Variance Report (HnL file)
+router.post('/stocktake/:stocktakeId/upload', async (request, env) => {
+    const authError = await requireAuth(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId } = request.params;
+        
+        // Verify stocktake exists
+        const currentStocktake = await env.STOCKTAKE_KV.get('current_stocktake', { type: 'json' });
+        if (!currentStocktake || currentStocktake.id !== stocktakeId) {
+            return new Response(JSON.stringify({ error: 'Stocktake not found' }), {
+                status: 404,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
+        // Get uploaded file
+        const formData = await request.formData();
+        const hnlFile = formData.get('hnlFile');
+        
+        if (!hnlFile) {
+            return new Response(JSON.stringify({ error: 'No file uploaded' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+        
+        // Parse HnL Excel file
+        const arrayBuffer = await hnlFile.arrayBuffer();
+        const theoreticalData = await parseHnLExcel(arrayBuffer);
+        
+        // Save to spreadsheet
+        await GoogleSheetsAPI.saveTheoreticalData(
+            currentStocktake.spreadsheetId,
+            theoreticalData,
+            env
+        );
+        
+        // Update stocktake with HnL data
+        currentStocktake.hnlUploaded = true;
+        currentStocktake.hnlUploadedAt = new Date().toISOString();
+        currentStocktake.hnlUploadedBy = request.user.username;
+        await env.STOCKTAKE_KV.put('current_stocktake', JSON.stringify(currentStocktake));
+        
+        return new Response(JSON.stringify({
+            success: true,
+            message: 'Variance report uploaded successfully',
+            recordCount: theoreticalData.length
+        }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        console.error('Upload variance report error:', error);
+        return new Response(JSON.stringify({ error: error.message || 'Failed to upload variance report' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
 // Stocktake - Finish
 router.post('/stocktake/:stocktakeId/finish', async (request, env) => {
     const authError = await requireAdmin(request, env);

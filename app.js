@@ -858,12 +858,7 @@ async function selectStocktake(stocktake) {
             const result = await apiService.loadUserScans(stocktake.id, null); // null = load all scans
             if (result.success && result.scans) {
                 // Clear existing scans for this stocktake first
-                const existingScans = await dbService.getAllScans(stocktake.id);
-                for (const scan of existingScans) {
-                    if (scan.syncId) {
-                        await dbService.deleteScan(scan.syncId);
-                    }
-                }
+                await dbService.clearScans(stocktake.id);
                 
                 // Save all scans from server
                 for (const scan of result.scans) {
@@ -1565,12 +1560,7 @@ async function syncToServer() {
             const result = await apiService.loadUserScans(state.currentStocktake.id, null); // null = load all scans
             if (result.success && result.scans) {
                 // Clear existing scans for this stocktake and reload from server
-                const existingScans = await dbService.getAllScans(state.currentStocktake.id);
-                for (const scan of existingScans) {
-                    if (scan.syncId) {
-                        await dbService.deleteScan(scan.syncId);
-                    }
-                }
+                await dbService.clearScans(state.currentStocktake.id);
                 
                 // Save all scans from server
                 for (const scan of result.scans) {

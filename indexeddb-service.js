@@ -168,19 +168,25 @@ class IndexedDBService {
         const tx = this.db.transaction(['scans'], 'readwrite');
         const store = tx.objectStore('scans');
         
-        if (stocktakeId) {
-            const request = store.getAll();
-            request.onsuccess = () => {
-                const scans = request.result.filter(scan => scan.stocktakeId === stocktakeId);
-                scans.forEach(scan => store.delete(scan.syncId));
-            };
-        } else {
-            await store.clear();
-        }
-        
         return new Promise((resolve, reject) => {
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => reject(tx.error);
+            if (stocktakeId) {
+                const request = store.getAll();
+                request.onsuccess = () => {
+                    const scans = request.result.filter(scan => scan.stocktakeId === stocktakeId);
+                    scans.forEach(scan => {
+                        if (scan.syncId) {
+                            store.delete(scan.syncId);
+                        }
+                    });
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                };
+                request.onerror = () => reject(request.error);
+            } else {
+                store.clear();
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            }
         });
     }
 

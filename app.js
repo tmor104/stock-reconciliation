@@ -935,11 +935,14 @@ async function loadProductsAndLocations() {
             }
         }
         
-        // Load kegs
+        // Load kegs from master sheet (for initial list)
         const kegsResult = await apiService.getKegs();
         if (kegsResult.success) {
             state.kegs = kegsResult.kegs;
-            state.kegsList = kegsResult.kegs.map(keg => ({ ...keg, count: 0 }));
+            // Only set kegsList if we don't have a stocktake selected (will load from stocktake if available)
+            if (!state.currentStocktake) {
+                state.kegsList = kegsResult.kegs.map(keg => ({ ...keg, count: 0 }));
+            }
         }
     } catch (error) {
         console.error('Error loading data:', error);

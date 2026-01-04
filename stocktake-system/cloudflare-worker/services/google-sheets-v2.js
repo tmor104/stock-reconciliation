@@ -442,9 +442,9 @@ export class GoogleSheetsAPI {
         }
         
         // Skip header row (index 0) and map data rows
-        const theoreticalData = rows.slice(1).map(row => {
+        const theoreticalData = rows.slice(1).map((row, index) => {
             // Handle rows that might be shorter than expected
-            return {
+            const item = {
                 category: (row[0] || '').toString().trim(),
                 productCode: (row[1] || '').toString().trim(),
                 barcode: (row[2] || '').toString().trim(),
@@ -454,8 +454,20 @@ export class GoogleSheetsAPI {
                 theoreticalQty: parseFloat(row[6]) || 0,
                 theoreticalValue: parseFloat(row[7]) || 0
             };
-        }).filter(item => item.description || item.productCode); // Filter out completely empty rows
+            
+            // If theoreticalValue is 0 but we have qty and cost, calculate it
+            if (item.theoreticalValue === 0 && item.theoreticalQty > 0 && item.unitCost > 0) {
+                item.theoreticalValue = item.theoreticalQty * item.unitCost;
+            }
+            
+            return item;
+        }).filter(item => {
+            // Filter out completely empty rows, but keep rows with at least productCode or description
+            return (item.description && item.description.length > 0) || 
+                   (item.productCode && item.productCode.length > 0);
+        });
         
+        console.log(`Loaded ${theoreticalData.length} theoretical items from spreadsheet ${spreadsheetId}`);
         return theoreticalData;
     }
     

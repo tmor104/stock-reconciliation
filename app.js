@@ -658,7 +658,7 @@ async function clearFolderId(isAdmin = false) {
     updateCreateButtonState();
 }
 
-function updateFolderIdDisplay() {
+function updateFolderIdDisplay(isAdmin = false) {
     const input = isAdmin ? document.getElementById('admin-folder-id-input') : document.getElementById('folder-id-input');
     const status = isAdmin ? document.getElementById('admin-folder-id-status') : document.getElementById('folder-id-status');
     
@@ -2142,12 +2142,7 @@ function loadAdminSettings() {
 
 // Make functions available globally for onclick handlers
 window.handleDeleteUser = handleDeleteUser;
-window.handleAcknowledgeIssue = handleAcknowledgeIssue; catch (error) {
-        console.error('Error loading scans:', error);
-        // Return local scans as fallback
-        return await dbService.getAllScans(stocktakeId);
-    }
-}
+window.handleAcknowledgeIssue = handleAcknowledgeIssue;
 
 // ============================================
 // ISSUE DETECTION AND TRACKING

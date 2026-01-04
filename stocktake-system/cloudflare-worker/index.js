@@ -1401,50 +1401,151 @@ router.get('/admin/counts/:stocktakeId', async (request, env) => {
     
     try {
         const { stocktakeId } = request.params;
-        const { GoogleSheetsAPI } = await import('./services/google-sheets-v2.js');
-        
-        // Get all scans from the stocktake (getCountData requires env parameter)
-        const countData = await GoogleSheetsAPI.getCountData(stocktakeId, env);
+        const accessToken = await GoogleSheetsAPI.getAccessToken(env);
         
         // Group by user
         const userCounts = {};
         
-        // Process scans
-        if (countData && countData.scans) {
-            countData.scans.forEach(scan => {
-                const username = scan.user || 'unknown';
-                if (!userCounts[username]) {
-                    userCounts[username] = {
-                        username,
-                        scanCount: 0,
-                        manualCount: 0,
-                        kegCount: 0,
-                        lastSync: null
-                    };
-                }
-                userCounts[username].scanCount += scan.quantity || 0;
-                if (scan.timestamp) {
-                    const scanTime = new Date(scan.timestamp);
-                    if (!userCounts[username].lastSync || scanTime > new Date(userCounts[username].lastSync)) {
-                        userCounts[username].lastSync = scan.timestamp;
+        // Read Raw Scans sheet (format: Barcode, Product, Quantity, Location, User, Timestamp, Stock Level, $ Value, Synced, Sync ID)
+        try {
+            const rawScansResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${stocktakeId}/values/'Raw Scans'!A:J`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (rawScansResponse.ok) {
+                const rawData = await rawScansResponse.json();
+                const rows = rawData.values || [];
+                
+                rows.slice(1).forEach(row => {
+                    const username = (row[4] || '').trim() || 'unknown';
+                    const quantity = parseFloat(row[2]) || 0;
+                    const timestamp = row[5] || '';
+                    
+                    if (!userCounts[username]) {
+                        userCounts[username] = {
+                            username,
+                            scanCount: 0,
+                            manualCount: 0,
+                            kegCount: 0,
+                            lastSync: null
+                        };
                     }
-                }
-            });
+                    
+                    userCounts[username].scanCount += quantity;
+                    
+                    if (timestamp) {
+                        const scanTime = new Date(timestamp);
+                        if (!userCounts[username].lastSync || scanTime > new Date(userCounts[username].lastSync)) {
+                            userCounts[username].lastSync = timestamp;
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn('Error reading Raw Scans:', e.message);
         }
         
-        // Process manual entries
-        if (countData && countData.manualEntries) {
-            countData.manualEntries.forEach(entry => {
-                const username = entry.user || 'unknown';
-                if (!userCounts[username]) {
-                    userCounts[username] = {
-                        username,
-                        scanCount: 0,
-                        manualCount: 0,
-                        kegCount: 0,
-                        lastSync: null
-                    };
-                }
+        // Read Manual sheet (format: Product, Quantity, Location, User, Timestamp, Stock Level, $ Value, Sync ID)
+        try {
+            const manualResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${stocktakeId}/values/'Manual'!A:H`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (manualResponse.ok) {
+                const manualData = await manualResponse.json();
+                const rows = manualData.values || [];
+                
+                rows.slice(1).forEach(row => {
+                    const username = (row[3] || '').trim() || 'unknown';
+                    const quantity = parseFloat(row[1]) || 0;
+                    const timestamp = row[4] || '';
+                    
+                    if (!userCounts[username]) {
+                        userCounts[username] = {
+                            username,
+                            scanCount: 0,
+                            manualCount: 0,
+                            kegCount: 0,
+                            lastSync: null
+                        };
+                    }
+                    
+                    userCounts[username].manualCount += quantity;
+                    
+                    if (timestamp) {
+                        const scanTime = new Date(timestamp);
+                        if (!userCounts[username].lastSync || scanTime > new Date(userCounts[username].lastSync)) {
+                            userCounts[username].lastSync = timestamp;
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn('Error reading Manual sheet:', e.message);
+        }
+        
+        // Read Kegs sheet (format: Keg Product, Count, Location, User, Timestamp, Synced, Sync ID)
+        try {
+            const kegsResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${stocktakeId}/values/'Kegs'!A:G`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (kegsResponse.ok) {
+                const kegsData = await kegsResponse.json();
+                const rows = kegsData.values || [];
+                
+                rows.slice(1).forEach(row => {
+                    const username = (row[3] || '').trim() || 'unknown';
+                    const count = parseFloat(row[1]) || 0;
+                    const timestamp = row[4] || '';
+                    
+                    if (!userCounts[username]) {
+                        userCounts[username] = {
+                            username,
+                            scanCount: 0,
+                            manualCount: 0,
+                            kegCount: 0,
+                            lastSync: null
+                        };
+                    }
+                    
+                    userCounts[username].kegCount += count;
+                    
+                    if (timestamp) {
+                        const scanTime = new Date(timestamp);
+                        if (!userCounts[username].lastSync || scanTime > new Date(userCounts[username].lastSync)) {
+                            userCounts[username].lastSync = timestamp;
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn('Error reading Kegs sheet:', e.message);
+        }
+        
+        // Convert to array and format lastSync
+        const counts = Object.values(userCounts).map(user => ({
+            username: user.username,
+            scanCount: user.scanCount,
+            manualCount: user.manualCount,
+            kegCount: user.kegCount,
+            lastSync: user.lastSync || 'Never'
+        }));
+        
+        return new Response(JSON.stringify(counts), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        console.error('Error getting user counts:', error);
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
                 userCounts[username].manualCount += entry.quantity || 0;
             });
         }

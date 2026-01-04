@@ -954,6 +954,19 @@ body {
     font-weight: 600;
 }
 
+.variance-positive-row {
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.variance-negative-row {
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+.no-barcode-row {
+    background-color: rgba(251, 191, 36, 0.1);
+    border-left: 3px solid var(--orange-500);
+}
+
 .complete-section {
     text-align: center;
     margin-top: 32px;

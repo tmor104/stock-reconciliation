@@ -1760,34 +1760,39 @@ function renderVarianceTable() {
     const tbody = document.getElementById('variance-table-body');
     if (!tbody) return;
     
-    if (state.varianceData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No variance data available. Upload a variance report first.</td></tr>';
-        return;
-    }
-    
     // Ensure varianceData is an array
     if (!Array.isArray(state.varianceData)) {
         state.varianceData = [];
     }
     
-    tbody.innerHTML = state.varianceData.map(item => {
+    // Get filtered data (from state.filteredVarianceData if set, otherwise all data)
+    const dataToRender = state.filteredVarianceData || state.varianceData;
+    
+    if (dataToRender.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No variance data available. Upload a variance report first.</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = dataToRender.map(item => {
         // VarianceCalculator uses qtyVariance and dollarVariance
         const varianceQty = item.qtyVariance !== undefined ? item.qtyVariance : (item.varianceQty || 0);
         const varianceValue = item.dollarVariance !== undefined ? item.dollarVariance : (item.varianceValue || 0);
         const varianceQtyClass = varianceQty > 0 ? 'variance-positive' : varianceQty < 0 ? 'variance-negative' : '';
         const productName = item.description || item.product || 'N/A';
         const productCode = item.productCode || item.barcode || 'N/A';
+        const hasBarcode = item.hasBarcode !== false && (item.productCode || item.barcode);
+        const rowClass = !hasBarcode ? 'no-barcode-row' : (varianceQty > 0 ? 'variance-positive-row' : varianceQty < 0 ? 'variance-negative-row' : '');
+        const canEdit = !hasBarcode || true; // Items without barcodes should always be editable
         
         return `
-            <tr>
+            <tr class="${rowClass}">
                 <td>${productName}</td>
-                <td>${productCode}</td>
                 <td>${item.theoreticalQty || 0}</td>
                 <td>${item.countedQty || 0}</td>
                 <td class="${varianceQtyClass}">${varianceQty}</td>
                 <td class="${varianceQtyClass}">${formatCurrency(varianceValue)}</td>
                 <td>
-                    <button class="btn-secondary" onclick="editVarianceItem('${productCode}')">Edit</button>
+                    ${canEdit ? `<button class="btn-secondary" onclick="editVarianceItem('${productCode.replace(/'/g, "\\'")}')">Edit</button>` : '-'}
                 </td>
             </tr>
         `;
@@ -1795,7 +1800,55 @@ function renderVarianceTable() {
 }
 
 function filterVarianceTable(searchQuery = '', filterType = 'all') {
-    // This would filter the variance table - implementation depends on requirements
+    // Ensure varianceData is an array
+    if (!Array.isArray(state.varianceData)) {
+        state.varianceData = [];
+    }
+    
+    let filtered = [...state.varianceData];
+    
+    // Apply search filter
+    if (searchQuery && searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        filtered = filtered.filter(item => {
+            const productName = (item.description || item.product || '').toLowerCase();
+            const productCode = (item.productCode || item.barcode || '').toLowerCase();
+            return productName.includes(query) || productCode.includes(query);
+        });
+    }
+    
+    // Apply type filter
+    if (filterType !== 'all') {
+        filtered = filtered.filter(item => {
+            const varianceQty = item.qtyVariance !== undefined ? item.qtyVariance : (item.varianceQty || 0);
+            const hasBarcode = item.hasBarcode !== false && (item.productCode || item.barcode);
+            const countedQty = item.countedQty || 0;
+            
+            switch (filterType) {
+                case 'variance':
+                    return Math.abs(varianceQty) > 0;
+                case 'positive':
+                    return varianceQty > 0;
+                case 'negative':
+                    return varianceQty < 0;
+                case 'uncounted':
+                    return countedQty === 0 && !item.manuallyEntered;
+                case 'no-barcode':
+                    return !hasBarcode;
+                case 'quantity-over':
+                    return varianceQty > 0;
+                case 'quantity-under':
+                    return varianceQty < 0;
+                default:
+                    return true;
+            }
+        });
+    }
+    
+    // Store filtered data
+    state.filteredVarianceData = filtered;
+    
+    // Re-render table
     renderVarianceTable();
 }
 

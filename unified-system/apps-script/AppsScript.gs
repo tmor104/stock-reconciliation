@@ -642,7 +642,10 @@ function syncKegs(request, requestId) {
     
     // For each keg being synced, find and update the matching row
     request.kegs.forEach(keg => {
+      // Accept both field name formats for backward compatibility
       const productName = (keg.product || keg.name || '').toString().trim();
+      const quantity = keg.quantity !== undefined ? keg.quantity : (keg.count !== undefined ? keg.count : 0);
+      
       if (!productName) return; // Skip empty names
       
       // Find the row with matching product name (case-insensitive)
@@ -652,7 +655,7 @@ function syncKegs(request, requestId) {
         if (rowProduct.toLowerCase() === productName.toLowerCase()) {
           // Found matching row - update it (row index i + 2 because we start from row 2)
           const rowIndex = i + 2;
-          sheet.getRange(rowIndex, 2, 1, 1).setValue(keg.count || 0); // Update Count column (column B)
+          sheet.getRange(rowIndex, 2, 1, 1).setValue(quantity); // Update Count column (column B)
           sheet.getRange(rowIndex, 3, 1, 1).setValue(request.location || ''); // Update Location
           sheet.getRange(rowIndex, 4, 1, 1).setValue(request.user || ''); // Update User
           sheet.getRange(rowIndex, 5, 1, 1).setValue(timestamp); // Update Timestamp

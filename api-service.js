@@ -335,10 +335,12 @@ class UnifiedAPIService {
             throw new Error('Apps Script URL not configured. Please set APPS_SCRIPT_URL in api-service.js');
         }
         
-        // Format kegs for Apps Script (same format as syncScans)
+        // Format kegs for Apps Script
+        // Send both 'quantity' and 'count' for backward compatibility with Apps Script
         const formattedKegs = kegs.map(keg => ({
             product: keg.name,
-            quantity: keg.count,
+            quantity: keg.count,  // Primary field name
+            count: keg.count,     // Also send as 'count' for Apps Script compatibility
             location: location || '',
             user: user || '',
             timestamp: new Date().toISOString()

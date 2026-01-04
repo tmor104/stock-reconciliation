@@ -1400,10 +1400,10 @@ router.get('/admin/counts/:stocktakeId', async (request, env) => {
     
     try {
         const { stocktakeId } = request.params;
-        const GoogleSheetsAPI = await import('./services/google-sheets-v2.js');
+        const { GoogleSheetsAPI } = await import('./services/google-sheets-v2.js');
         
-        // Get all scans from the stocktake
-        const countData = await GoogleSheetsAPI.getCountData(stocktakeId);
+        // Get all scans from the stocktake (getCountData requires env parameter)
+        const countData = await GoogleSheetsAPI.getCountData(stocktakeId, env);
         
         // Group by user
         const userCounts = {};

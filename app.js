@@ -2217,8 +2217,13 @@ async function checkForIssues(stocktakeId, currentUsername) {
 }
 
 async function hasUnacknowledgedIssues(stocktakeId) {
-    const issues = await dbService.getIssues(stocktakeId, false);
-    return issues.length > 0;
+    const issues = await dbService.getIssues(stocktakeId);
+    return issues.some(issue => !issue.acknowledged);
+}
+
+async function checkBlockingIssues() {
+    if (!state.currentStocktake) return false;
+    return await hasUnacknowledgedIssues(state.currentStocktake.id);
 }
 
 function editVarianceItem(barcode) {

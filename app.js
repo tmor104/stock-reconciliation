@@ -1588,6 +1588,12 @@ function updateCountingScreen() {
         }
     });
     
+    // Show/hide location selector based on scan type (hide for kegs)
+    const locationSelector = document.querySelector('.location-selector');
+    if (locationSelector) {
+        locationSelector.style.display = state.scanType === 'kegs' ? 'none' : 'block';
+    }
+    
     // Show/hide sections based on scan type
     const regularSection = document.getElementById('scanned-items-section');
     const manualSection = document.getElementById('manual-entries-section');

@@ -485,14 +485,18 @@ class UnifiedAPIService {
         };
     }
 
-    async updateVarianceData(stocktakeId) {
+    async updateVarianceData(stocktakeId, adjustment = null) {
         if (!this.token) {
             throw new Error('Not authenticated');
         }
         
         const response = await fetch(`${CONFIG.WORKER_URL}/variance/${stocktakeId}/update`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${this.token}` }
+            headers: { 
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: adjustment ? JSON.stringify(adjustment) : undefined
         });
         
         if (!response.ok) {

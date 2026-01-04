@@ -861,7 +861,7 @@ async function selectStocktake(stocktake) {
         
         // Load ALL scans for this stocktake (not just current user) - non-blocking
         try {
-            const result = await apiService.loadUserScans(stocktake.id, null); // null = load all scans
+            const result = await apiService.loadUserScans(stocktake.id, undefined); // undefined = load all scans
             if (result.success && result.scans) {
                 // Clear existing scans for this stocktake first
                 await dbService.clearScans(stocktake.id);

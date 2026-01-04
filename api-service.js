@@ -299,8 +299,8 @@ class UnifiedAPIService {
             stocktakeId
         };
         
-        // Only include username if provided (null means load all scans)
-        if (username !== null) {
+        // Only include username if provided (null/undefined means load all scans)
+        if (username !== null && username !== undefined) {
             requestBody.username = username;
         }
         

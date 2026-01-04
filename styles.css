@@ -109,10 +109,12 @@ body {
 .logo-container {
     text-align: center;
     margin-bottom: 24px;
+    position: relative;
 }
 
 .main-logo {
     max-width: 120px;
+    width: 120px;
     height: auto;
     margin-bottom: 16px;
     display: block;
@@ -120,7 +122,8 @@ body {
     margin-right: auto;
     border-radius: 16px;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
-    transition: transform 0.3s ease;
+    transition: opacity 0.3s ease;
+    object-fit: contain;
 }
 
 .main-logo:hover {
@@ -1083,15 +1086,23 @@ body {
     text-align: center;
 }
 
-/* Login screen video animation */
+/* Login screen video animation - matches logo size exactly */
 .login-video {
-    max-width: 150px;
-    max-height: 150px;
-    width: auto;
+    max-width: 120px;
+    width: 120px;
     height: auto;
-    object-fit: contain;
-    margin: 0 auto 20px;
+    margin-bottom: 16px;
     display: block;
+    margin-left: auto;
+    margin-right: auto;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+    object-fit: contain;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: opacity 0.3s ease;
 }
 
 .progress-overlay {

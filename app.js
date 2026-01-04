@@ -646,20 +646,24 @@ async function handleLogin(e) {
     
     hideError('login-error');
     
-    // Hide logo and show video
-    const logoImg = document.querySelector('.logo-container .main-logo');
+    // Hide logo and show video - seamless swap
+    const logoImg = document.querySelector('.logo-container .main-logo[src]');
     const logoEmoji = document.querySelector('.logo-container .main-logo[style*="font-size"]');
     const loginVideo = document.getElementById('login-video');
-    const logoText = document.querySelector('.logo-text');
-    const logoTagline = document.querySelector('.logo-tagline');
     
-    if (logoImg && logoImg.tagName === 'IMG') logoImg.style.display = 'none';
-    if (logoEmoji) logoEmoji.style.display = 'none';
-    if (logoText) logoText.style.display = 'none';
-    if (logoTagline) logoTagline.style.display = 'none';
+    // Only hide/show logo and video - don't touch text elements
+    if (logoImg && logoImg.tagName === 'IMG') {
+        logoImg.style.opacity = '0';
+        logoImg.style.pointerEvents = 'none';
+    }
+    if (logoEmoji) {
+        logoEmoji.style.opacity = '0';
+        logoEmoji.style.pointerEvents = 'none';
+    }
     
     if (loginVideo) {
         loginVideo.style.display = 'block';
+        loginVideo.style.opacity = '1';
         loginVideo.currentTime = 0; // Reset to start
         loginVideo.play().catch(err => console.warn('Video play failed:', err));
     }
@@ -705,13 +709,18 @@ async function handleLogin(e) {
                 throw new Error(result.message || 'Login failed');
             }
         } catch (error) {
-            // Restore logo on error
-            if (logoImg && logoImg.tagName === 'IMG') logoImg.style.display = 'block';
-            if (logoEmoji) logoEmoji.style.display = 'block';
-            if (logoText) logoText.style.display = 'block';
-            if (logoTagline) logoTagline.style.display = 'block';
+            // Restore logo on error - seamless swap back
+            if (logoImg && logoImg.tagName === 'IMG') {
+                logoImg.style.opacity = '1';
+                logoImg.style.pointerEvents = 'auto';
+            }
+            if (logoEmoji) {
+                logoEmoji.style.opacity = '1';
+                logoEmoji.style.pointerEvents = 'auto';
+            }
             if (loginVideo) {
                 loginVideo.pause();
+                loginVideo.style.opacity = '0';
                 loginVideo.style.display = 'none';
             }
             

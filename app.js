@@ -1002,7 +1002,14 @@ async function handleUploadVariance(e) {
             // Load variance data
             const varianceResult = await apiService.getVarianceData(state.currentStocktake.id);
             if (varianceResult.success && varianceResult.varianceData) {
-                state.varianceData = varianceResult.varianceData;
+                // Extract items array if varianceData is an object with items property
+                if (varianceResult.varianceData.items && Array.isArray(varianceResult.varianceData.items)) {
+                    state.varianceData = varianceResult.varianceData.items;
+                } else if (Array.isArray(varianceResult.varianceData)) {
+                    state.varianceData = varianceResult.varianceData;
+                } else {
+                    state.varianceData = [];
+                }
                 await dbService.saveVarianceData(state.currentStocktake.id, state.varianceData);
             }
             
@@ -1645,7 +1652,14 @@ async function handleCompleteFirstCounts() {
             // Reload variance data
             const varianceResult = await apiService.getVarianceData(state.currentStocktake.id);
             if (varianceResult.success && varianceResult.varianceData) {
-                state.varianceData = varianceResult.varianceData;
+                // Extract items array if varianceData is an object with items property
+                if (varianceResult.varianceData.items && Array.isArray(varianceResult.varianceData.items)) {
+                    state.varianceData = varianceResult.varianceData.items;
+                } else if (Array.isArray(varianceResult.varianceData)) {
+                    state.varianceData = varianceResult.varianceData;
+                } else {
+                    state.varianceData = [];
+                }
                 await dbService.saveVarianceData(state.currentStocktake.id, state.varianceData);
             }
             
@@ -1676,16 +1690,30 @@ async function loadReconciliationScreen() {
     }
     
     // Load variance data if not loaded
-    if (state.varianceData.length === 0) {
+    if (!Array.isArray(state.varianceData) || state.varianceData.length === 0) {
         try {
             const result = await apiService.getVarianceData(state.currentStocktake.id);
             if (result.success && result.varianceData) {
-                state.varianceData = result.varianceData;
+                // VarianceCalculator returns { items: [...], totals: {...} }
+                // Extract items array if needed
+                if (result.varianceData.items && Array.isArray(result.varianceData.items)) {
+                    state.varianceData = result.varianceData.items;
+                } else if (Array.isArray(result.varianceData)) {
+                    state.varianceData = result.varianceData;
+                } else {
+                    state.varianceData = [];
+                }
                 await dbService.saveVarianceData(state.currentStocktake.id, state.varianceData);
             }
         } catch (error) {
             console.error('Error loading variance data:', error);
+            state.varianceData = []; // Ensure it's always an array
         }
+    }
+    
+    // Ensure varianceData is always an array
+    if (!Array.isArray(state.varianceData)) {
+        state.varianceData = [];
     }
     
     // Update variance status
@@ -1699,11 +1727,16 @@ function updateVarianceStatus() {
     const statusInfo = document.getElementById('variance-status-info');
     if (!statusInfo) return;
     
+    // Ensure varianceData is an array
+    if (!Array.isArray(state.varianceData)) {
+        state.varianceData = [];
+    }
+    
     if (state.varianceData.length === 0) {
         statusInfo.innerHTML = '<p style="color: var(--slate-600);">No variance report uploaded yet.</p>';
     } else {
         const totalItems = state.varianceData.length;
-        const withVariance = state.varianceData.filter(v => Math.abs(v.varianceQty) > 0).length;
+        const withVariance = state.varianceData.filter(v => Math.abs(v.qtyVariance || v.varianceQty || 0) > 0).length;
         statusInfo.innerHTML = `
             <p><strong>Total Items:</strong> ${totalItems}</p>
             <p><strong>Items with Variance:</strong> ${withVariance}</p>
@@ -1720,18 +1753,29 @@ function renderVarianceTable() {
         return;
     }
     
+    // Ensure varianceData is an array
+    if (!Array.isArray(state.varianceData)) {
+        state.varianceData = [];
+    }
+    
     tbody.innerHTML = state.varianceData.map(item => {
-        const varianceQtyClass = item.varianceQty > 0 ? 'variance-positive' : item.varianceQty < 0 ? 'variance-negative' : '';
+        // VarianceCalculator uses qtyVariance and dollarVariance
+        const varianceQty = item.qtyVariance !== undefined ? item.qtyVariance : (item.varianceQty || 0);
+        const varianceValue = item.dollarVariance !== undefined ? item.dollarVariance : (item.varianceValue || 0);
+        const varianceQtyClass = varianceQty > 0 ? 'variance-positive' : varianceQty < 0 ? 'variance-negative' : '';
+        const productName = item.description || item.product || 'N/A';
+        const productCode = item.productCode || item.barcode || 'N/A';
+        
         return `
             <tr>
-                <td>${item.product || 'N/A'}</td>
-                <td>${item.barcode || 'N/A'}</td>
+                <td>${productName}</td>
+                <td>${productCode}</td>
                 <td>${item.theoreticalQty || 0}</td>
                 <td>${item.countedQty || 0}</td>
-                <td class="${varianceQtyClass}">${item.varianceQty || 0}</td>
-                <td class="${varianceQtyClass}">${formatCurrency(item.varianceValue || 0)}</td>
+                <td class="${varianceQtyClass}">${varianceQty}</td>
+                <td class="${varianceQtyClass}">${formatCurrency(varianceValue)}</td>
                 <td>
-                    <button class="btn-secondary" onclick="editVarianceItem('${item.barcode || ''}')">Edit</button>
+                    <button class="btn-secondary" onclick="editVarianceItem('${productCode}')">Edit</button>
                 </td>
             </tr>
         `;
@@ -2066,8 +2110,74 @@ async function loadAdminVariance() {
     try {
         const result = await apiService.getVarianceData(stocktakeId);
         if (result.success && result.varianceData) {
-            // Reuse reconciliation screen rendering logic
-            display.innerHTML = '<p class="info-text">Variance data loaded. Use the Reconciliation screen for detailed view.</p>';
+            // Extract items array
+            const varianceItems = Array.isArray(result.varianceData) 
+                ? result.varianceData 
+                : (result.varianceData.items || []);
+            
+            if (varianceItems.length === 0) {
+                display.innerHTML = '<p class="info-text">No variance data available for this stocktake</p>';
+                return;
+            }
+            
+            // Show summary and table
+            const totalItems = varianceItems.length;
+            const withVariance = varianceItems.filter(v => Math.abs(v.qtyVariance || v.varianceQty || 0) > 0).length;
+            const totalDollarVariance = varianceItems.reduce((sum, item) => 
+                sum + (item.dollarVariance || item.varianceValue || 0), 0);
+            
+            let html = `
+                <div class="section-card">
+                    <h3>Variance Summary</h3>
+                    <p><strong>Total Items:</strong> ${totalItems}</p>
+                    <p><strong>Items with Variance:</strong> ${withVariance}</p>
+                    <p><strong>Total Dollar Variance:</strong> ${formatCurrency(totalDollarVariance)}</p>
+                </div>
+                <div class="section-card">
+                    <h3>Variance Details</h3>
+                    <div style="overflow-x: auto;">
+                        <table class="user-counts-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Code</th>
+                                    <th>Theoretical</th>
+                                    <th>Counted</th>
+                                    <th>Variance Qty</th>
+                                    <th>Variance $</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+            
+            varianceItems.slice(0, 50).forEach(item => {
+                const varianceQty = item.qtyVariance !== undefined ? item.qtyVariance : (item.varianceQty || 0);
+                const varianceValue = item.dollarVariance !== undefined ? item.dollarVariance : (item.varianceValue || 0);
+                const varianceQtyClass = varianceQty > 0 ? 'variance-positive' : varianceQty < 0 ? 'variance-negative' : '';
+                html += `
+                    <tr>
+                        <td>${item.description || item.product || 'N/A'}</td>
+                        <td>${item.productCode || item.barcode || 'N/A'}</td>
+                        <td>${item.theoreticalQty || 0}</td>
+                        <td>${item.countedQty || 0}</td>
+                        <td class="${varianceQtyClass}">${varianceQty}</td>
+                        <td class="${varianceQtyClass}">${formatCurrency(varianceValue)}</td>
+                    </tr>
+                `;
+            });
+            
+            if (varianceItems.length > 50) {
+                html += `<tr><td colspan="6" style="text-align: center; padding: 12px;">... and ${varianceItems.length - 50} more items</td></tr>`;
+            }
+            
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            display.innerHTML = html;
         } else {
             display.innerHTML = '<p class="info-text">No variance data available for this stocktake</p>';
         }

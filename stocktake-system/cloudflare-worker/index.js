@@ -703,9 +703,10 @@ router.get('/variance/:stocktakeId', async (request, env) => {
             barcodeMapping
         );
         
+        // Return items array directly for easier frontend consumption
         return new Response(JSON.stringify({
             success: true,
-            varianceData: varianceData
+            varianceData: varianceData.items || varianceData
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

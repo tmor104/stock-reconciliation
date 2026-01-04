@@ -125,7 +125,18 @@ class UnifiedAPIService {
             let errorDetails = 'Failed to create stocktake';
             try {
                 const errorData = await response.json();
-                errorDetails = errorData.error || errorData.message || JSON.stringify(errorData);
+                // Handle error object structure
+                if (errorData.error) {
+                    if (typeof errorData.error === 'string') {
+                        errorDetails = errorData.error;
+                    } else if (errorData.error.message) {
+                        errorDetails = errorData.error.message;
+                    } else {
+                        errorDetails = JSON.stringify(errorData.error);
+                    }
+                } else {
+                    errorDetails = errorData.message || JSON.stringify(errorData);
+                }
             } catch (e) {
                 const text = await response.text();
                 errorDetails = text || 'Failed to create stocktake';
@@ -135,7 +146,15 @@ class UnifiedAPIService {
         
         const result = await response.json();
         if (!result.success) {
-            throw new Error(result.message || result.error || 'Failed to create stocktake');
+            let errorMsg = result.message || 'Failed to create stocktake';
+            if (result.error) {
+                if (typeof result.error === 'string') {
+                    errorMsg = result.error;
+                } else if (result.error.message) {
+                    errorMsg = result.error.message;
+                }
+            }
+            throw new Error(errorMsg);
         }
         
         return {
@@ -165,10 +184,17 @@ class UnifiedAPIService {
             let errorDetails = 'Failed to list stocktakes';
             try {
                 const errorData = await response.json();
-                errorDetails = errorData.error || errorData.message || errorData.htmlError || JSON.stringify(errorData);
-                // Include response preview if available
-                if (errorData.responsePreview) {
-                    errorDetails += '\n\nResponse preview: ' + errorData.responsePreview;
+                // Handle error object structure
+                if (errorData.error) {
+                    if (typeof errorData.error === 'string') {
+                        errorDetails = errorData.error;
+                    } else if (errorData.error.message) {
+                        errorDetails = errorData.error.message;
+                    } else {
+                        errorDetails = JSON.stringify(errorData.error);
+                    }
+                } else {
+                    errorDetails = errorData.message || JSON.stringify(errorData);
                 }
             } catch (e) {
                 const text = await response.text();
@@ -179,7 +205,15 @@ class UnifiedAPIService {
         
         const result = await response.json();
         if (!result.success) {
-            throw new Error(result.message || result.error || 'Failed to list stocktakes');
+            let errorMsg = result.message || 'Failed to list stocktakes';
+            if (result.error) {
+                if (typeof result.error === 'string') {
+                    errorMsg = result.error;
+                } else if (result.error.message) {
+                    errorMsg = result.error.message;
+                }
+            }
+            throw new Error(errorMsg);
         }
         
         return {

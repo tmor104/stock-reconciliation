@@ -689,19 +689,33 @@ async function handleLogin(e) {
                 if (savedFolderId) {
                     state.folderId = savedFolderId;
                 }
+                
+                // Load products and locations
+                await loadProductsAndLocations();
+                
+                // Hide video and show home screen
+                if (loginVideo) {
+                    loginVideo.pause();
+                    loginVideo.style.display = 'none';
+                }
+                
+                showScreen('home-screen');
+                await loadHomeScreen();
+            } else {
+                throw new Error(result.message || 'Login failed');
+            }
+        } catch (error) {
+            // Restore logo on error
+            if (logoImg && logoImg.tagName === 'IMG') logoImg.style.display = 'block';
+            if (logoEmoji) logoEmoji.style.display = 'block';
+            if (logoText) logoText.style.display = 'block';
+            if (logoTagline) logoTagline.style.display = 'block';
+            if (loginVideo) {
+                loginVideo.pause();
+                loginVideo.style.display = 'none';
+            }
             
-            // Load products and locations
-            await loadProductsAndLocations();
-            
-            hideLoading();
-            showScreen('home-screen');
-            await loadHomeScreen();
-        } else {
-            throw new Error('Login failed');
-        }
-    } catch (error) {
-        hideLoading();
-        showError('login-error', error.message || 'Invalid credentials');
+            showError('login-error', error.message || 'Invalid credentials');
         console.error('Login error:', error);
     }
 }

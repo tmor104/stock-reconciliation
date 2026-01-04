@@ -282,6 +282,114 @@ export class GoogleSheetsAPI {
         }
     }
     
+    static async populateKegsSheet(spreadsheetId, kegItems, env) {
+        const accessToken = await this.getAccessToken(env);
+        
+        // Kegs sheet format: Keg Product, Count, Location, User, Timestamp, Synced, Sync ID
+        // For initial import, we just populate the product names (Count will be 0, others empty)
+        const headers = [
+            'Keg Product',
+            'Count',
+            'Location',
+            'User',
+            'Timestamp',
+            'Synced',
+            'Sync ID'
+        ];
+        
+        // Extract unique product descriptions from keg items
+        const uniqueKegs = new Map();
+        kegItems.forEach(item => {
+            const productName = item.description || item.productCode || '';
+            if (productName && !uniqueKegs.has(productName)) {
+                uniqueKegs.set(productName, {
+                    product: productName,
+                    count: 0,
+                    location: '',
+                    user: '',
+                    timestamp: '',
+                    synced: '',
+                    syncId: ''
+                });
+            }
+        });
+        
+        const rows = Array.from(uniqueKegs.values()).map(keg => [
+            keg.product,
+            keg.count,
+            keg.location,
+            keg.user,
+            keg.timestamp,
+            keg.synced,
+            keg.syncId
+        ]);
+        
+        const allData = [headers, ...rows];
+        
+        // Check if Kegs sheet exists, create if needed
+        let response = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Kegs'!A1?valueInputOption=RAW`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    values: allData
+                })
+            }
+        );
+        
+        // If sheet doesn't exist (400 error), create it first
+        if (!response.ok && response.status === 400) {
+            // Create Kegs sheet
+            const createResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        requests: [{
+                            addSheet: {
+                                properties: {
+                                    title: 'Kegs'
+                                }
+                            }
+                        }]
+                    })
+                }
+            );
+            
+            if (!createResponse.ok) {
+                throw new Error('Failed to create Kegs sheet');
+            }
+            
+            // Retry writing data
+            response = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Kegs'!A1?valueInputOption=RAW`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        values: allData
+                    })
+                }
+            );
+        }
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to populate kegs sheet: ${errorText}`);
+        }
+    }
+    
     static async linkCountSheet(spreadsheetId, countSheetId, env) {
         const accessToken = await this.getAccessToken(env);
         
@@ -330,19 +438,25 @@ export class GoogleSheetsAPI {
         const rows = data.values || [];
         
         if (rows.length < 2) {
-            return []; // No data rows
+            return []; // No data rows (only header or empty)
         }
         
-        return rows.slice(1).map(row => ({
-            category: row[0] || '',
-            productCode: row[1] || '',
-            barcode: row[2] || '',
-            description: row[3] || '',
-            unit: row[4] || '',
-            unitCost: parseFloat(row[5]) || 0,
-            theoreticalQty: parseFloat(row[6]) || 0,
-            theoreticalValue: parseFloat(row[7]) || 0
-        }));
+        // Skip header row (index 0) and map data rows
+        const theoreticalData = rows.slice(1).map(row => {
+            // Handle rows that might be shorter than expected
+            return {
+                category: (row[0] || '').toString().trim(),
+                productCode: (row[1] || '').toString().trim(),
+                barcode: (row[2] || '').toString().trim(),
+                description: (row[3] || '').toString().trim(),
+                unit: (row[4] || '').toString().trim(),
+                unitCost: parseFloat(row[5]) || 0,
+                theoreticalQty: parseFloat(row[6]) || 0,
+                theoreticalValue: parseFloat(row[7]) || 0
+            };
+        }).filter(item => item.description || item.productCode); // Filter out completely empty rows
+        
+        return theoreticalData;
     }
     
     static async getCountData(spreadsheetId, env) {

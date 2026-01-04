@@ -207,77 +207,103 @@ function handleCreateStocktake(request, correlationId) {
       }
     }
 
-  // Set up Tally sheet
-  const tallySheet = newSheet.getActiveSheet();
-  tallySheet.setName('Tally');
-  tallySheet.getRange('A1:F1').setValues([[
-    'Barcode', 'Product', 'Total Quantity', 'Locations', 'Last Updated', 'Stock Level'
-  ]]);
-  tallySheet.getRange('A1:F1').setFontWeight('bold').setBackground('#4A5568').setFontColor('#FFFFFF');
+    // Set up Tally sheet
+    const tallySheet = newSheet.getActiveSheet();
+    tallySheet.setName('Tally');
+    tallySheet.getRange('A1:F1').setValues([[
+      'Barcode', 'Product', 'Total Quantity', 'Locations', 'Last Updated', 'Stock Level'
+    ]]);
+    tallySheet.getRange('A1:F1').setFontWeight('bold').setBackground('#4A5568').setFontColor('#FFFFFF');
 
-  // Create Raw Scans sheet
-  const rawScansSheet = newSheet.insertSheet('Raw Scans');
-  rawScansSheet.getRange('A1:J1').setValues([[
-    'Barcode', 'Product', 'Quantity', 'Location', 'User', 'Timestamp', 'Stock Level', '$ Value', 'Synced', 'Sync ID'
-  ]]);
-  rawScansSheet.getRange('A1:J1').setFontWeight('bold').setBackground('#2D3748').setFontColor('#FFFFFF');
+    // Create Raw Scans sheet
+    const rawScansSheet = newSheet.insertSheet('Raw Scans');
+    rawScansSheet.getRange('A1:J1').setValues([[
+      'Barcode', 'Product', 'Quantity', 'Location', 'User', 'Timestamp', 'Stock Level', '$ Value', 'Synced', 'Sync ID'
+    ]]);
+    rawScansSheet.getRange('A1:J1').setFontWeight('bold').setBackground('#2D3748').setFontColor('#FFFFFF');
 
-  // Create Manual sheet
-  const manualSheet = newSheet.insertSheet('Manual');
-  manualSheet.getRange('A1:H1').setValues([[
-    'Product', 'Quantity', 'Location', 'User', 'Timestamp', 'Stock Level', '$ Value', 'Sync ID'
-  ]]);
-  manualSheet.getRange('A1:H1').setFontWeight('bold').setBackground('#6B46C1').setFontColor('#FFFFFF');
+    // Create Manual sheet
+    const manualSheet = newSheet.insertSheet('Manual');
+    manualSheet.getRange('A1:H1').setValues([[
+      'Product', 'Quantity', 'Location', 'User', 'Timestamp', 'Stock Level', '$ Value', 'Sync ID'
+    ]]);
+    manualSheet.getRange('A1:H1').setFontWeight('bold').setBackground('#6B46C1').setFontColor('#FFFFFF');
 
-  // Create Kegs sheet
-  const kegsSheet = newSheet.insertSheet('Kegs');
-  kegsSheet.getRange('A1:G1').setValues([[
-    'Keg Product', 'Count', 'Location', 'User', 'Timestamp', 'Synced', 'Sync ID'
-  ]]);
-  kegsSheet.getRange('A1:G1').setFontWeight('bold').setBackground('#D97706').setFontColor('#FFFFFF');
+    // Create Kegs sheet
+    const kegsSheet = newSheet.insertSheet('Kegs');
+    kegsSheet.getRange('A1:G1').setValues([[
+      'Keg Product', 'Count', 'Location', 'User', 'Timestamp', 'Synced', 'Sync ID'
+    ]]);
+    kegsSheet.getRange('A1:G1').setFontWeight('bold').setBackground('#D97706').setFontColor('#FFFFFF');
 
-  // Create Deleted Scans sheet (audit trail)
-  const deletedScansSheet = newSheet.insertSheet('Deleted Scans');
-  deletedScansSheet.getRange('A1:K1').setValues([[
-    'Barcode', 'Product', 'Quantity', 'Location', 'User', 'Timestamp', 'Stock Level', '$ Value', 'Synced', 'Sync ID', 'Deleted At'
-  ]]);
-  deletedScansSheet.getRange('A1:K1').setFontWeight('bold').setBackground('#DC2626').setFontColor('#FFFFFF');
-  deletedScansSheet.hideSheet();  // Hide from normal users
+    // Create Deleted Scans sheet (audit trail)
+    const deletedScansSheet = newSheet.insertSheet('Deleted Scans');
+    deletedScansSheet.getRange('A1:K1').setValues([[
+      'Barcode', 'Product', 'Quantity', 'Location', 'User', 'Timestamp', 'Stock Level', '$ Value', 'Synced', 'Sync ID', 'Deleted At'
+    ]]);
+    deletedScansSheet.getRange('A1:K1').setFontWeight('bold').setBackground('#DC2626').setFontColor('#FFFFFF');
+    deletedScansSheet.hideSheet();  // Hide from normal users
 
-  // Create Metadata sheet to store stocktake info
-  const metadataSheet = newSheet.insertSheet('Metadata');
-  metadataSheet.getRange('A1:B1').setValues([['Property', 'Value']]);
-  metadataSheet.getRange('A1:B1').setFontWeight('bold').setBackground('#1F2937').setFontColor('#FFFFFF');
-  metadataSheet.getRange('A2:B5').setValues([
-    ['stocktake_name', name],
-    ['created_by', user],
-    ['created_date', dateStr],
-    ['status', 'Active']
-  ]);
-  metadataSheet.hideSheet();  // Hide metadata sheet from users
+    // Create Metadata sheet to store stocktake info
+    const metadataSheet = newSheet.insertSheet('Metadata');
+    metadataSheet.getRange('A1:B1').setValues([['Property', 'Value']]);
+    metadataSheet.getRange('A1:B1').setFontWeight('bold').setBackground('#1F2937').setFontColor('#FFFFFF');
+    metadataSheet.getRange('A2:B5').setValues([
+      ['stocktake_name', name],
+      ['created_by', user],
+      ['created_date', dateStr],
+      ['status', 'Active']
+    ]);
+    metadataSheet.hideSheet();  // Hide metadata sheet from users
 
-  return createResponse(true, 'Stocktake created', {
-    stocktakeId,
-    name: stocktakeName,
-    url: newSheet.getUrl()
-  });
+    console.log(`[${correlationId}] Stocktake created: ${stocktakeName} (${stocktakeId})`);
+    return createResponse(true, 'Stocktake created', {
+      stocktakeId,
+      name: stocktakeName,
+      url: newSheet.getUrl()
+    });
+  } catch (error) {
+    console.error(`[${correlationId}] Error in handleCreateStocktake:`, error);
+    return createErrorResponse(
+      'Error creating stocktake: ' + error.toString(),
+      'handleCreateStocktake',
+      { stack: error.stack, name: error.name },
+      correlationId
+    );
+  }
 }
 
-function handleListStocktakes(request) {
+function handleListStocktakes(request, correlationId) {
   try {
+    // Validate folder access if folder ID is configured
+    let folderId = STOCKTAKE_FOLDER_ID;
+    if (request.folderId) {
+      folderId = request.folderId;
+    }
+
     let files;
     
-    // If folder ID is provided, search within that folder
-    if (STOCKTAKE_FOLDER_ID && STOCKTAKE_FOLDER_ID.trim() !== '') {
+    // If folder ID is provided, validate and search within that folder
+    if (folderId && folderId.trim() !== '') {
       try {
-        const folder = DriveApp.getFolderById(STOCKTAKE_FOLDER_ID);
+        // Validate folder exists and is accessible
+        const folder = DriveApp.getFolderById(folderId);
+        // Test access by getting folder name
+        const folderName = folder.getName();
+        console.log(`[${correlationId}] Accessing folder: ${folderName} (${folderId})`);
         files = folder.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
-      } catch (e) {
-        // Fallback to Drive-wide search
-        files = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
+      } catch (folderError) {
+        console.error(`[${correlationId}] Folder access error:`, folderError);
+        return createErrorResponse(
+          'Folder not found or not accessible: ' + folderError.toString(),
+          'handleListStocktakes',
+          { folderId: folderId, folderError: folderError.toString() },
+          correlationId
+        );
       }
     } else {
       // Search all of Drive
+      console.log(`[${correlationId}] Searching all Drive (no folder specified)`);
       files = DriveApp.searchFiles('name contains "Stocktake -" and mimeType = "application/vnd.google-apps.spreadsheet"');
     }
 
@@ -306,6 +332,7 @@ function handleListStocktakes(request) {
           }
         } catch (e) {
           // If metadata sheet doesn't exist, use defaults
+          console.log(`[${correlationId}] No metadata sheet for ${file.getName()}`);
         }
 
         stocktakes.push({
@@ -318,8 +345,9 @@ function handleListStocktakes(request) {
           url: file.getUrl(),
           lastModified: file.getLastUpdated()
         });
-      } catch (e) {
-        // Skip files that can't be accessed
+      } catch (fileError) {
+        // Skip files that can't be accessed, but log it
+        console.error(`[${correlationId}] Skipping file due to error:`, fileError);
         continue;
       }
     }
@@ -327,9 +355,16 @@ function handleListStocktakes(request) {
     // Sort by last modified (newest first)
     stocktakes.sort((a, b) => b.lastModified - a.lastModified);
 
+    console.log(`[${correlationId}] Found ${stocktakes.length} stocktakes`);
     return createResponse(true, 'Stocktakes loaded', { stocktakes });
   } catch (error) {
-    return createResponse(false, 'Error listing stocktakes: ' + error.toString());
+    console.error(`[${correlationId}] Error in handleListStocktakes:`, error);
+    return createErrorResponse(
+      'Error listing stocktakes: ' + error.toString(),
+      'handleListStocktakes',
+      { stack: error.stack, name: error.name },
+      correlationId
+    );
   }
 }
 

@@ -438,6 +438,61 @@ class IndexedDBService {
             request.onerror = () => reject(request.error);
         });
     }
+
+    // ============================================
+    // ISSUES
+    // ============================================
+
+    async saveIssue(issue) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['issues'], 'readwrite');
+        const store = tx.objectStore('issues');
+        await store.add({
+            ...issue,
+            timestamp: issue.timestamp || new Date().toISOString(),
+            acknowledged: issue.acknowledged || false
+        });
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async getIssues(stocktakeId = null) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['issues'], 'readonly');
+        const store = tx.objectStore('issues');
+        const request = stocktakeId 
+            ? store.index('stocktakeId').getAll(stocktakeId)
+            : store.getAll();
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => {
+                const issues = request.result || [];
+                resolve(issues);
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async acknowledgeIssue(issueId) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['issues'], 'readwrite');
+        const store = tx.objectStore('issues');
+        const request = store.get(issueId);
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => {
+                const issue = request.result;
+                if (issue) {
+                    issue.acknowledged = true;
+                    store.put(issue);
+                }
+                tx.oncomplete = () => resolve();
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
 }
 
 // Export singleton instance

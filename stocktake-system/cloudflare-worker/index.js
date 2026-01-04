@@ -1357,6 +1357,89 @@ router.get('/debug/test-auth', async (request, env) => {
     }
 });
 
+// Admin - Get User Counts for Stocktake
+router.get('/admin/counts/:stocktakeId', async (request, env) => {
+    const authError = await requireAdmin(request, env);
+    if (authError) return authError;
+    
+    try {
+        const { stocktakeId } = request.params;
+        const GoogleSheetsAPI = await import('./services/google-sheets-v2.js');
+        
+        // Get all scans from the stocktake
+        const countData = await GoogleSheetsAPI.getCountData(stocktakeId);
+        
+        // Group by user
+        const userCounts = {};
+        
+        // Process scans
+        if (countData && countData.scans) {
+            countData.scans.forEach(scan => {
+                const username = scan.user || 'unknown';
+                if (!userCounts[username]) {
+                    userCounts[username] = {
+                        username,
+                        scanCount: 0,
+                        manualCount: 0,
+                        kegCount: 0,
+                        lastSync: null
+                    };
+                }
+                userCounts[username].scanCount += scan.quantity || 0;
+                if (scan.timestamp) {
+                    const scanTime = new Date(scan.timestamp);
+                    if (!userCounts[username].lastSync || scanTime > new Date(userCounts[username].lastSync)) {
+                        userCounts[username].lastSync = scan.timestamp;
+                    }
+                }
+            });
+        }
+        
+        // Process manual entries
+        if (countData && countData.manualEntries) {
+            countData.manualEntries.forEach(entry => {
+                const username = entry.user || 'unknown';
+                if (!userCounts[username]) {
+                    userCounts[username] = {
+                        username,
+                        scanCount: 0,
+                        manualCount: 0,
+                        kegCount: 0,
+                        lastSync: null
+                    };
+                }
+                userCounts[username].manualCount += entry.quantity || 0;
+            });
+        }
+        
+        // Process kegs
+        if (countData && countData.kegs) {
+            countData.kegs.forEach(keg => {
+                const username = keg.user || 'unknown';
+                if (!userCounts[username]) {
+                    userCounts[username] = {
+                        username,
+                        scanCount: 0,
+                        manualCount: 0,
+                        kegCount: 0,
+                        lastSync: null
+                    };
+                }
+                userCounts[username].kegCount += keg.quantity || 0;
+            });
+        }
+        
+        return new Response(JSON.stringify(Object.values(userCounts)), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+});
+
 // 404 handler
 router.all('*', () => new Response('Not Found', { status: 404, headers: corsHeaders }));
 

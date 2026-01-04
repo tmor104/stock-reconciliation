@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - claude/analyze-appscript-performance-70iMM
   workflow_dispatch:
 
 permissions:

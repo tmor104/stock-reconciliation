@@ -618,20 +618,57 @@ function syncKegs(request, requestId) {
       return errorResponse('Kegs sheet not found', 'syncKegs', requestId);
     }
     
+    // Read all existing rows (skip header row)
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return errorResponse('Kegs sheet has no data rows', 'syncKegs', requestId);
+    }
+    
+    const allData = sheet.getRange(2, 1, lastRow - 1, 7).getValues(); // Row 2 onwards, 7 columns
     const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
     const syncId = Utilities.getUuid();
-    const rows = request.kegs.map(keg => [
-      keg.product || keg.name || '',
-      keg.count || 0,
-      request.location || '',
-      request.user || '',
-      timestamp,
-      'Yes',
-      syncId
-    ]);
     
-    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 7).setValues(rows);
-    return successResponse('Kegs synced', { syncedCount: request.kegs.length, syncId }, requestId);
+    let updatedCount = 0;
+    const notFound = [];
+    
+    // For each keg being synced, find and update the matching row
+    request.kegs.forEach(keg => {
+      const productName = (keg.product || keg.name || '').toString().trim();
+      if (!productName) return; // Skip empty names
+      
+      // Find the row with matching product name (case-insensitive)
+      let found = false;
+      for (let i = 0; i < allData.length; i++) {
+        const rowProduct = (allData[i][0] || '').toString().trim();
+        if (rowProduct.toLowerCase() === productName.toLowerCase()) {
+          // Found matching row - update it (row index i + 2 because we start from row 2)
+          const rowIndex = i + 2;
+          sheet.getRange(rowIndex, 2, 1, 1).setValue(keg.count || 0); // Update Count column (column B)
+          sheet.getRange(rowIndex, 3, 1, 1).setValue(request.location || ''); // Update Location
+          sheet.getRange(rowIndex, 4, 1, 1).setValue(request.user || ''); // Update User
+          sheet.getRange(rowIndex, 5, 1, 1).setValue(timestamp); // Update Timestamp
+          sheet.getRange(rowIndex, 6, 1, 1).setValue('Yes'); // Update Synced
+          sheet.getRange(rowIndex, 7, 1, 1).setValue(syncId); // Update Sync ID
+          updatedCount++;
+          found = true;
+          break;
+        }
+      }
+      
+      if (!found) {
+        notFound.push(productName);
+      }
+    });
+    
+    if (notFound.length > 0) {
+      console.warn(`[${requestId}] Products not found in Kegs sheet: ${notFound.join(', ')}`);
+    }
+    
+    return successResponse('Kegs synced', { 
+      syncedCount: updatedCount, 
+      syncId,
+      notFound: notFound.length > 0 ? notFound : undefined
+    }, requestId);
   } catch (error) {
     return errorResponse('Error syncing kegs: ' + error.toString(), 'syncKegs', requestId);
   }

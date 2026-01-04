@@ -1588,16 +1588,17 @@ router.get('/stocktake/:stocktakeId/stage', async (request, env) => {
     }
 });
 
-// Stocktake - Update Stage (Admin only)
+// Stocktake - Update Stage
 // stocktakeId is the Apps Script spreadsheet ID
+// Allows automatic progression for certain transitions (1→2, 2→3), admin required for others
 router.post('/stocktake/:stocktakeId/stage', async (request, env) => {
-    const authError = await requireAdmin(request, env);
+    const authError = await requireAuth(request, env);
     if (authError) return authError;
     
     try {
         const { stocktakeId } = request.params;
         const body = await request.json().catch(() => ({}));
-        const { stage } = body;
+        const { stage, autoProgress } = body;
         
         if (!stage || !['1', '2', '3', '4', '5', '6', '7'].includes(stage.toString())) {
             return new Response(JSON.stringify({ error: 'Invalid stage. Must be 1-7' }), {
@@ -1610,6 +1611,17 @@ router.post('/stocktake/:stocktakeId/stage', async (request, env) => {
         const currentStage = await GoogleSheetsAPI.getStocktakeStage(stocktakeId, env);
         const newStageNum = parseInt(stage);
         const currentStageNum = parseInt(currentStage);
+        
+        // Allow automatic progression for: 1→2 (entering counting), 2→3 (completing first counts)
+        // Require admin for all other transitions
+        const isAutoProgressAllowed = (currentStageNum === 1 && newStageNum === 2) || 
+                                      (currentStageNum === 2 && newStageNum === 3);
+        
+        if (!isAutoProgressAllowed || !autoProgress) {
+            // Check if user is admin for manual progression
+            const adminError = await requireAdmin(request, env);
+            if (adminError) return adminError;
+        }
         
         // Stage 2 -> 3: Require at least one count
         if (currentStageNum === 2 && newStageNum === 3) {

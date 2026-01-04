@@ -783,49 +783,92 @@ export class GoogleSheetsAPI {
                 }
             }
             
+            // Use batchUpdate for more reliable updates
+            const requests = [];
+            
             if (stageRowIndex === -1) {
-                // Stage row doesn't exist, append it
-                const appendResponse = await fetch(
-                    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!A:append?valueInputOption=RAW`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
+                // Stage row doesn't exist, append it using batchUpdate
+                // First, find the last row
+                const lastRow = rows.length + 1;
+                requests.push({
+                    updateCells: {
+                        range: {
+                            sheetId: await this.getSheetId(spreadsheetId, 'Metadata', env),
+                            startRowIndex: lastRow,
+                            endRowIndex: lastRow + 1,
+                            startColumnIndex: 0,
+                            endColumnIndex: 2
                         },
-                        body: JSON.stringify({
-                            values: [['stage', stage.toString()]]
-                        })
+                        rows: [{
+                            values: [
+                                { userEnteredValue: { stringValue: 'stage' } },
+                                { userEnteredValue: { stringValue: stage.toString() } }
+                            ]
+                        }],
+                        fields: 'userEnteredValue'
                     }
-                );
-                
-                if (!appendResponse.ok) {
-                    throw new Error('Failed to add stage');
-                }
+                });
             } else {
                 // Update existing stage row
-                const updateResponse = await fetch(
-                    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!B${stageRowIndex}?valueInputOption=RAW`,
-                    {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
+                requests.push({
+                    updateCells: {
+                        range: {
+                            sheetId: await this.getSheetId(spreadsheetId, 'Metadata', env),
+                            startRowIndex: stageRowIndex - 1,
+                            endRowIndex: stageRowIndex,
+                            startColumnIndex: 1,
+                            endColumnIndex: 2
                         },
-                        body: JSON.stringify({
-                            values: [[stage.toString()]]
-                        })
+                        rows: [{
+                            values: [
+                                { userEnteredValue: { stringValue: stage.toString() } }
+                            ]
+                        }],
+                        fields: 'userEnteredValue'
                     }
-                );
-                
-                if (!updateResponse.ok) {
-                    throw new Error('Failed to update stage');
+                });
+            }
+            
+            const batchResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requests })
                 }
+            );
+            
+            if (!batchResponse.ok) {
+                const errorData = await batchResponse.json().catch(() => ({}));
+                throw new Error(`Failed to update stage: ${errorData.error?.message || batchResponse.statusText}`);
             }
         } catch (error) {
             console.error('Error updating stage:', error);
             throw error;
         }
+    }
+    
+    static async getSheetId(spreadsheetId, sheetName, env) {
+        const accessToken = await this.getAccessToken(env);
+        const response = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`,
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        
+        if (!response.ok) {
+            throw new Error('Failed to get spreadsheet info');
+        }
+        
+        const data = await response.json();
+        const sheet = data.sheets?.find(s => s.properties.title === sheetName);
+        if (!sheet) {
+            throw new Error(`Sheet "${sheetName}" not found`);
+        }
+        
+        return sheet.properties.sheetId;
     }
     
     static async updateStocktakeMetadata(spreadsheetId, property, value, env) {
@@ -855,44 +898,67 @@ export class GoogleSheetsAPI {
                 }
             }
             
+            // Use batchUpdate for more reliable updates
+            const sheetId = await this.getSheetId(spreadsheetId, 'Metadata', env);
+            const requests = [];
+            
             if (propertyRowIndex === -1) {
                 // Property row doesn't exist, append it
-                const appendResponse = await fetch(
-                    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!A:append?valueInputOption=RAW`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
+                const lastRow = rows.length + 1;
+                requests.push({
+                    updateCells: {
+                        range: {
+                            sheetId: sheetId,
+                            startRowIndex: lastRow,
+                            endRowIndex: lastRow + 1,
+                            startColumnIndex: 0,
+                            endColumnIndex: 2
                         },
-                        body: JSON.stringify({
-                            values: [[property, value.toString()]]
-                        })
+                        rows: [{
+                            values: [
+                                { userEnteredValue: { stringValue: property } },
+                                { userEnteredValue: { stringValue: value.toString() } }
+                            ]
+                        }],
+                        fields: 'userEnteredValue'
                     }
-                );
-                
-                if (!appendResponse.ok) {
-                    throw new Error(`Failed to add ${property}`);
-                }
+                });
             } else {
                 // Update existing property row
-                const updateResponse = await fetch(
-                    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Metadata'!B${propertyRowIndex}?valueInputOption=RAW`,
-                    {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
+                requests.push({
+                    updateCells: {
+                        range: {
+                            sheetId: sheetId,
+                            startRowIndex: propertyRowIndex - 1,
+                            endRowIndex: propertyRowIndex,
+                            startColumnIndex: 1,
+                            endColumnIndex: 2
                         },
-                        body: JSON.stringify({
-                            values: [[value.toString()]]
-                        })
+                        rows: [{
+                            values: [
+                                { userEnteredValue: { stringValue: value.toString() } }
+                            ]
+                        }],
+                        fields: 'userEnteredValue'
                     }
-                );
-                
-                if (!updateResponse.ok) {
-                    throw new Error(`Failed to update ${property}`);
+                });
+            }
+            
+            const batchResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requests })
                 }
+            );
+            
+            if (!batchResponse.ok) {
+                const errorData = await batchResponse.json().catch(() => ({}));
+                throw new Error(`Failed to update ${property}: ${errorData.error?.message || batchResponse.statusText}`);
             }
         } catch (error) {
             console.error(`Error updating metadata ${property}:`, error);

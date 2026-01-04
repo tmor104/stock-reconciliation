@@ -772,7 +772,7 @@ class UnifiedAPIService {
         return await response.json();
     }
 
-    async updateStocktakeStage(stocktakeId, stage) {
+    async updateStocktakeStage(stocktakeId, stage, autoProgress = false) {
         if (!this.token) {
             throw new Error('Not authenticated');
         }
@@ -783,7 +783,7 @@ class UnifiedAPIService {
                 'Authorization': `Bearer ${this.token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ stage })
+            body: JSON.stringify({ stage, autoProgress })
         });
         
         if (!response.ok) {

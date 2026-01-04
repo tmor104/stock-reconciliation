@@ -1214,6 +1214,18 @@ async function handleUploadVariance(e) {
 async function loadCountingScreen() {
     if (!state.currentStocktake) return;
     
+    // Auto-progress to stage 2 (First Counts) if currently at stage 1
+    // This happens automatically when entering counting screen
+    if (state.currentStage === '1') {
+        try {
+            await apiService.updateStocktakeStage(state.currentStocktake.id, '2', true);
+            state.currentStage = '2';
+            updateStageDisplay();
+        } catch (error) {
+            console.warn('Failed to auto-progress to stage 2:', error);
+        }
+    }
+    
     // Update stocktake info
     const stocktakeInfo = document.getElementById('counting-stocktake-info');
     if (stocktakeInfo) {
@@ -1475,6 +1487,7 @@ function updateSyncButton() {
     const syncStatusText = document.getElementById('sync-status-text');
     const unsyncedBadge = document.getElementById('unsynced-count-badge');
     const manualSyncBtn = document.getElementById('manual-sync-btn');
+    const syncKegsBtn = document.getElementById('sync-kegs-btn');
     
     if (syncBtn) {
         syncBtn.disabled = !state.isOnline || state.isSyncing || state.unsyncedCount === 0;
@@ -1495,6 +1508,12 @@ function updateSyncButton() {
     
     if (manualSyncBtn) {
         manualSyncBtn.disabled = !state.isOnline || state.isSyncing || state.unsyncedCount === 0;
+    }
+    
+    // Enable keg sync button if there are kegs with counts > 0
+    if (syncKegsBtn) {
+        const hasKegCounts = state.kegsList && state.kegsList.some(k => k.count > 0);
+        syncKegsBtn.disabled = !state.isOnline || state.isSyncing || !hasKegCounts;
     }
 }
 
@@ -1828,14 +1847,14 @@ async function handleCompleteFirstCounts() {
         const result = await apiService.completeFirstCounts(state.currentStocktake.id);
         
         if (result.success) {
-            // Progress to stage 3 (First Counts Review)
+            // Auto-progress to stage 3 (First Counts Review)
             try {
-                await apiService.updateStocktakeStage(state.currentStocktake.id, '3');
+                await apiService.updateStocktakeStage(state.currentStocktake.id, '3', true);
                 state.currentStage = '3';
                 updateStageDisplay();
                 applyStageRestrictions();
             } catch (error) {
-                console.warn('Failed to progress stage:', error);
+                console.warn('Failed to auto-progress to stage 3:', error);
             }
             
             // Reload variance data

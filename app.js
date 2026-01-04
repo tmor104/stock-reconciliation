@@ -1799,7 +1799,12 @@ async function loadScansForStocktake(stocktakeId, currentUsername) {
             await dbService.saveScan(scan);
         }
         
-    return Array.from(scanMap.values());
+        return Array.from(scanMap.values());
+    } catch (error) {
+        console.error('Error loading scans:', error);
+        // Return local scans as fallback
+        return await dbService.getAllScans(stocktakeId);
+    }
 }
 
 // ============================================

@@ -25,9 +25,21 @@ router.post('/apps-script/proxy', async (request, env) => {
     const requestId = crypto.randomUUID();
     try {
         const APPS_SCRIPT_URL = env.APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyRxTKP3KGCiGKhkraeaSz9rxEknGR6mF0LnGQBzMuXp_WfjLf7DtLULC0924ZJcmwQ/exec';
+        const API_SECRET = env.APPS_SCRIPT_SECRET || '';
         
-        // Get request body
-        const body = await request.text();
+        // Get request body and add API secret
+        const bodyText = await request.text();
+        let body;
+        try {
+            body = JSON.parse(bodyText);
+            // Add API secret if configured
+            if (API_SECRET) {
+                body.secret = API_SECRET;
+            }
+        } catch (e) {
+            // If not JSON, pass through as-is
+            body = bodyText;
+        }
         
         // Forward to Apps Script with timeout
         const controller = new AbortController();
@@ -40,7 +52,7 @@ router.post('/apps-script/proxy', async (request, env) => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: body,
+                body: typeof body === 'string' ? body : JSON.stringify(body),
                 redirect: 'follow',
                 signal: controller.signal
             });

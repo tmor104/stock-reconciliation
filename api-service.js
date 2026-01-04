@@ -145,7 +145,7 @@ class UnifiedAPIService {
         }
         
         const result = await response.json();
-        if (!result.success) {
+        if (!result.ok) {
             let errorMsg = result.message || 'Failed to create stocktake';
             if (result.error) {
                 if (typeof result.error === 'string') {
@@ -157,11 +157,13 @@ class UnifiedAPIService {
             throw new Error(errorMsg);
         }
         
+        // New format: data is wrapped in data object
+        const data = result.data || result;
         return {
             success: true,
-            stocktakeId: result.stocktakeId,
-            name: result.name,
-            url: result.url
+            stocktakeId: data.stocktakeId,
+            name: data.name,
+            url: data.url
         };
     }
 
@@ -204,21 +206,16 @@ class UnifiedAPIService {
         }
         
         const result = await response.json();
-        if (!result.success) {
-            let errorMsg = result.message || 'Failed to list stocktakes';
-            if (result.error) {
-                if (typeof result.error === 'string') {
-                    errorMsg = result.error;
-                } else if (result.error.message) {
-                    errorMsg = result.error.message;
-                }
-            }
+        if (!result.ok) {
+            const errorMsg = result.error?.message || result.message || 'Failed to list stocktakes';
             throw new Error(errorMsg);
         }
         
+        // New format: data is wrapped in data object
+        const data = result.data || result;
         return {
             success: true,
-            stocktakes: result.stocktakes || []
+            stocktakes: data.stocktakes || []
         };
     }
 
@@ -247,11 +244,13 @@ class UnifiedAPIService {
         }
         
         const result = await response.json();
-        if (!result.success) {
-            throw new Error(result.message || 'Failed to sync scans');
+        if (!result.ok) {
+            const errorMsg = result.error?.message || result.message || 'Failed to sync scans';
+            throw new Error(errorMsg);
         }
         
-        return result;
+        // New format: data is wrapped in data object
+        return result.data || result;
     }
 
     async deleteScans(stocktakeId, syncIds) {
@@ -275,11 +274,13 @@ class UnifiedAPIService {
         }
         
         const result = await response.json();
-        if (!result.success) {
-            throw new Error(result.message || 'Failed to delete scans');
+        if (!result.ok) {
+            const errorMsg = result.error?.message || result.message || 'Failed to delete scans';
+            throw new Error(errorMsg);
         }
         
-        return result;
+        // New format: data is wrapped in data object
+        return result.data || result;
     }
 
     async loadUserScans(stocktakeId, username) {
@@ -303,11 +304,13 @@ class UnifiedAPIService {
         }
         
         const result = await response.json();
-        if (!result.success) {
-            throw new Error(result.message || 'Failed to load user scans');
+        if (!result.ok) {
+            const errorMsg = result.error?.message || result.message || 'Failed to load user scans';
+            throw new Error(errorMsg);
         }
         
-        return result;
+        // New format: data is wrapped in data object
+        return result.data || result;
     }
 
     async syncKegs(stocktakeId, kegs, location, user) {
@@ -333,11 +336,13 @@ class UnifiedAPIService {
         }
         
         const result = await response.json();
-        if (!result.success) {
-            throw new Error(result.message || 'Failed to sync kegs');
+        if (!result.ok) {
+            const errorMsg = result.error?.message || result.message || 'Failed to sync kegs';
+            throw new Error(errorMsg);
         }
         
-        return result;
+        // New format: data is wrapped in data object
+        return result.data || result;
     }
 
     async syncManualEntries(stocktakeId, manualEntries) {
@@ -361,11 +366,13 @@ class UnifiedAPIService {
         }
         
         const result = await response.json();
-        if (!result.success) {
-            throw new Error(result.message || 'Failed to sync manual entries');
+        if (!result.ok) {
+            const errorMsg = result.error?.message || result.message || 'Failed to sync manual entries';
+            throw new Error(errorMsg);
         }
         
-        return result;
+        // New format: data is wrapped in data object
+        return result.data || result;
     }
 
     // ============================================

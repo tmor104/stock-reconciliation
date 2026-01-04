@@ -291,36 +291,71 @@ router.post('/auth/login', async (request, env) => {
     try {
         const { username, password } = await request.json();
         
-        // Auto-initialize if no users exist and password matches INITIAL_ADMIN_PASSWORD
+        if (!username || !password) {
+            return new Response(JSON.stringify({ error: 'Username and password are required' }), { 
+                status: 400, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
+        }
+        
+        // Auto-initialize if no users exist
         const usersJson = await env.STOCKTAKE_KV.get('users', { type: 'json' });
         const users = usersJson || [];
         
-        if (users.length === 0 && username === 'admin' && env.INITIAL_ADMIN_PASSWORD) {
-            // Hash the INITIAL_ADMIN_PASSWORD to match what frontend sends
-            const encoder = new TextEncoder();
-            const initialPasswordData = encoder.encode(env.INITIAL_ADMIN_PASSWORD);
-            const initialPasswordHash = await crypto.subtle.digest('SHA-256', initialPasswordData);
-            const initialPasswordHashArray = Array.from(new Uint8Array(initialPasswordHash));
-            const initialPasswordHashHex = initialPasswordHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        if (users.length === 0) {
+            // No users exist - auto-create admin user
+            let adminPasswordHash = password; // Use the password provided (already hashed by frontend)
             
-            // Compare with the hashed password from frontend
-            if (password === initialPasswordHashHex) {
-                // Create admin user with hashed password (as frontend sends hashed passwords)
-                const adminUser = {
-                    username: 'admin',
-                    password: initialPasswordHashHex, // Store hashed password
-                    role: 'admin'
-                };
-                await env.STOCKTAKE_KV.put('users', JSON.stringify([adminUser]));
+            // If INITIAL_ADMIN_PASSWORD is set, validate against it
+            if (env.INITIAL_ADMIN_PASSWORD && username === 'admin') {
+                // Hash the INITIAL_ADMIN_PASSWORD to match what frontend sends
+                const encoder = new TextEncoder();
+                const initialPasswordData = encoder.encode(env.INITIAL_ADMIN_PASSWORD);
+                const initialPasswordHash = await crypto.subtle.digest('SHA-256', initialPasswordData);
+                const initialPasswordHashArray = Array.from(new Uint8Array(initialPasswordHash));
+                const initialPasswordHashHex = initialPasswordHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
                 
-                // Now login
-                const result = await AuthService.login(username, password, env);
+                // Only create if password matches INITIAL_ADMIN_PASSWORD
+                if (password !== initialPasswordHashHex) {
+                    return new Response(JSON.stringify({ 
+                        error: 'Invalid credentials. If this is the first login, use the password set in INITIAL_ADMIN_PASSWORD secret.' 
+                    }), { 
+                        status: 401, 
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+                    });
+                }
+                adminPasswordHash = initialPasswordHashHex;
+            } else if (!env.INITIAL_ADMIN_PASSWORD && username === 'admin') {
+                // No INITIAL_ADMIN_PASSWORD set - allow any password for first-time setup
+                // This is less secure but allows initial setup
+                adminPasswordHash = password;
+            } else {
+                return new Response(JSON.stringify({ 
+                    error: 'No users exist. Please login as "admin" to create the first user.' 
+                }), { 
+                    status: 401, 
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+                });
+            }
+            
+            // Create admin user with hashed password
+            const adminUser = {
+                username: 'admin',
+                password: adminPasswordHash,
+                role: 'admin'
+            };
+            await env.STOCKTAKE_KV.put('users', JSON.stringify([adminUser]));
+            
+            // Now login
+            const result = await AuthService.login(username, password, env);
+            if (result) {
                 return new Response(JSON.stringify(result), {
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
         }
         
+        // Normal login flow
         const result = await AuthService.login(username, password, env);
         
         if (!result) {
@@ -334,7 +369,8 @@ router.post('/auth/login', async (request, env) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
+        console.error('Login error:', error);
+        return new Response(JSON.stringify({ error: error.message || 'Login failed' }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

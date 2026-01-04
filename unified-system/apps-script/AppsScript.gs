@@ -293,45 +293,44 @@ function listStocktakes(request, requestId) {
       try {
         const folder = DriveApp.getFolderById(folderId);
         const folderName = folder.getName();
-        // folder.searchFiles() doesn't support mimeType in query - get all files and filter
+        // Get all files - no query syntax to avoid errors
         allFiles = folder.getFiles();
         console.log(`[${requestId}] Searching folder: ${folderName}`);
       } catch (folderError) {
-        // Don't fallback to Drive-wide search - it's too slow and risky
         return errorResponse('Folder not accessible: ' + folderError.toString(), 'listStocktakes', requestId);
       }
     } else {
-      // DriveApp.searchFiles() also doesn't reliably support mimeType - use name only and filter
-      allFiles = DriveApp.searchFiles('name contains "Stocktake -"');
+      // Get all files from Drive - filter in JavaScript instead of query
+      allFiles = DriveApp.getRootFolder().getFiles();
     }
     
     const stocktakes = [];
     let count = 0;
     
-    // Filter files by mimeType and extract metadata
+    // Filter files by name pattern and mimeType in JavaScript (no Drive query syntax)
     while (allFiles.hasNext() && count < MAX_RESULTS) {
       try {
         const file = allFiles.next();
-        
-        // Filter by mimeType (must be spreadsheet) and name pattern
-        const mimeType = file.getMimeType();
         const fileName = file.getName();
+        const mimeType = file.getMimeType();
         
-        if (mimeType !== 'application/vnd.google-apps.spreadsheet' || !fileName.includes('Stocktake -')) {
-          continue; // Skip non-spreadsheets or files not matching pattern
+        // Filter: must be spreadsheet AND name must start with "Stocktake"
+        if (mimeType !== 'application/vnd.google-apps.spreadsheet' || !fileName.startsWith('Stocktake')) {
+          continue; // Skip non-matching files
         }
         
         count++;
         
         // Extract metadata from filename pattern: "Stocktake - {name} - {date}"
-        const nameMatch = fileName.match(/Stocktake - (.+?) - (\d{4}-\d{2}-\d{2})/);
-        const displayName = nameMatch ? nameMatch[1] : fileName;
+        // Full name is the entire fileName
+        const nameMatch = fileName.match(/^Stocktake - (.+?) - (\d{4}-\d{2}-\d{2})/);
+        const displayName = nameMatch ? nameMatch[1] : fileName.replace(/^Stocktake - /, '');
         
         stocktakes.push({
           id: file.getId(),
-          name: fileName,
-          displayName: displayName,
-          createdBy: 'Unknown', // Can't get without opening spreadsheet
+          name: fileName, // Full name
+          displayName: displayName, // Extracted name without prefix/date
+          createdBy: 'Unknown',
           createdDate: nameMatch ? nameMatch[2] : 'Unknown',
           status: 'Active',
           url: file.getUrl(),

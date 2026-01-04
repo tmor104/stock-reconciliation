@@ -900,8 +900,20 @@ async function selectStocktake(stocktake) {
         
         // Check if variance report exists
         const varianceData = await dbService.getVarianceData(stocktake.id);
-        if (varianceData && varianceData.length > 0) {
-            state.varianceData = varianceData;
+        if (varianceData) {
+            // Ensure it's an array
+            if (Array.isArray(varianceData)) {
+                state.varianceData = varianceData;
+            } else if (varianceData.items && Array.isArray(varianceData.items)) {
+                state.varianceData = varianceData.items;
+            } else {
+                state.varianceData = [];
+            }
+        } else {
+            state.varianceData = [];
+        }
+        
+        if (state.varianceData.length > 0) {
             // Go to reconciliation screen
             console.log('Variance data found, going to reconciliation screen');
             showScreen('reconciliation-screen');

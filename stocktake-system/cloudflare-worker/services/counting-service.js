@@ -16,8 +16,9 @@ export class CountingService {
             throw new Error('MASTER_SHEET_ID not configured');
         }
         
+        // Read more columns to check for stock group (A-D is standard, but may have more)
         const response = await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${masterSheetId}/values/'Product Database'!A2:D`,
+            `https://sheets.googleapis.com/v4/spreadsheets/${masterSheetId}/values/'Product Database'!A2:Z`,
             {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             }
@@ -34,7 +35,8 @@ export class CountingService {
             barcode: row[0]?.toString() || '',
             product: row[1] || '',
             currentStock: parseFloat(row[2]) || 0,
-            value: parseFloat(row[3]) || 0
+            value: parseFloat(row[3]) || 0,
+            stockGroup: row[4] || '' // Column E - Stock Group (if exists)
         }));
     }
     
@@ -81,25 +83,29 @@ export class CountingService {
             throw new Error('MASTER_SHEET_ID not configured');
         }
         
-        // Try to get kegs from a "Kegs" sheet, or return empty array
-        const response = await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${masterSheetId}/values/'Kegs'!A2:A`,
-            {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            }
-        );
+        // Get all products from Product Database
+        const products = await this.getProductDatabase(env);
         
-        if (!response.ok) {
-            // If sheet doesn't exist, return empty array
-            return [];
-        }
+        // Filter by stock groups: "1 Beer Keg" and "300 Cider/Seltzer Keg"
+        const kegStockGroups = ['1', '300', '1 Beer Keg', '300 Cider/Seltzer Keg', 'Beer Keg', 'Cider/Seltzer Keg'];
+        const kegs = products
+            .filter(product => {
+                const stockGroup = (product.stockGroup || '').toString().trim();
+                return kegStockGroups.some(group => 
+                    stockGroup === group || 
+                    stockGroup.includes('Beer Keg') || 
+                    stockGroup.includes('Cider/Seltzer Keg') ||
+                    stockGroup === '1' ||
+                    stockGroup === '300'
+                );
+            })
+            .map(product => ({
+                name: product.product,
+                barcode: product.barcode,
+                count: 0
+            }));
         
-        const data = await response.json();
-        const rows = data.values || [];
-        
-        return rows
-            .map(row => ({ name: row[0] || '', count: 0 }))
-            .filter(keg => keg.name && keg.name.trim() !== '');
+        return kegs;
     }
     
     // ============================================

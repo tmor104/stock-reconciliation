@@ -25,6 +25,26 @@ export async function parseHnLExcel(arrayBuffer) {
     const items = [];
     let currentCategory = '';
     
+    // Find column indices by header name (case-insensitive)
+    const findColumnIndex = (searchTerms) => {
+        for (let i = 0; i < headers.length; i++) {
+            const header = (headers[i] || '').toString().toLowerCase();
+            if (searchTerms.some(term => header.includes(term.toLowerCase()))) {
+                return i;
+            }
+        }
+        return -1;
+    };
+    
+    const invCodeCol = findColumnIndex(['invcode', 'inv code', 'product code']) || 1; // Default to B
+    const descriptionCol = findColumnIndex(['stock description', 'description', 'product']) || 2; // Default to C
+    const unitCol = findColumnIndex(['unit', 'uom']) || 3; // Default to D
+    const unitCostCol = findColumnIndex(['unit cost', 'cost', 'price']) || 4; // Default to E
+    const qtyAtStocktakeCol = findColumnIndex(['quantity at stocktake', 'qty at stocktake', 'stocktake qty']);
+    const qtyEnteredCol = findColumnIndex(['quantity entered', 'qty entered', 'entered qty']);
+    // Use "Quantity at Stocktake" if found, otherwise fall back to "Quantity Entered", then column F
+    const theoreticalQtyCol = qtyAtStocktakeCol >= 0 ? qtyAtStocktakeCol : (qtyEnteredCol >= 0 ? qtyEnteredCol : 5);
+    
     // Process data rows
     for (let i = headerRowIndex + 1; i < rawData.length; i++) {
         const row = rawData[i];
@@ -41,12 +61,12 @@ export async function parseHnLExcel(arrayBuffer) {
             continue;
         }
         
-        // Extract product data
-        const invCode = row[1] || ''; // Column B
-        const description = row[2] || ''; // Column C
-        const unit = row[3] || ''; // Column D
-        const unitCost = parseFloat(row[4]) || 0; // Column E
-        const theoreticalQty = parseFloat(row[5]) || 0; // Column F
+        // Extract product data using dynamic column indices
+        const invCode = row[invCodeCol] || ''; 
+        const description = row[descriptionCol] || '';
+        const unit = row[unitCol] || '';
+        const unitCost = parseFloat(row[unitCostCol]) || 0;
+        const theoreticalQty = parseFloat(row[theoreticalQtyCol]) || 0;
         
         // Only include rows with a description
         if (description && typeof description === 'string') {

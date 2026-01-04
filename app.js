@@ -1485,8 +1485,16 @@ async function syncToServer() {
         if (unsyncedScans.length > 0) {
             const result = await apiService.syncScans(state.currentStocktake.id, unsyncedScans);
             if (result.success) {
-                await dbService.markScansSynced(result.syncedIds);
-                state.unsyncedCount -= result.syncedIds.length;
+                // Extract syncedIds from result (handle both old and new format)
+                const syncedIds = result.syncedIds || result.data?.syncedIds || [];
+                if (syncedIds.length > 0) {
+                    await dbService.markScansSynced(syncedIds);
+                    state.unsyncedCount -= syncedIds.length;
+                }
+                // Reload scans to update UI with synced status
+                const scans = await dbService.getAllScans(state.currentStocktake.id);
+                state.scannedItems = scans;
+                updateCountingScreen();
             }
         }
         

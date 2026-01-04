@@ -648,7 +648,10 @@ router.get('/variance/:stocktakeId', async (request, env) => {
             barcodeMapping
         );
         
-        return new Response(JSON.stringify(varianceData), {
+        return new Response(JSON.stringify({
+            success: true,
+            varianceData: varianceData
+        }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {

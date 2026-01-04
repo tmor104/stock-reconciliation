@@ -24,7 +24,7 @@ router.options('*', () => new Response(null, { headers: corsHeaders }));
 router.post('/apps-script/proxy', async (request, env) => {
     const requestId = crypto.randomUUID();
     try {
-        const APPS_SCRIPT_URL = env.APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyRxTKP3KGCiGKhkraeaSz9rxEknGR6mF0LnGQBzMuXp_WfjLf7DtLULC0924ZJcmwQ/exec';
+        const APPS_SCRIPT_URL = env.APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyqSkkSFpvTZVCxPVkFuO8Pd6Z37hx6yS1FiOhUG-0ggJlhiKfYnFT7OQKthAEbEsoI/exec';
         const API_SECRET = env.APPS_SCRIPT_SECRET || '';
         
         // Get request body and add API secret

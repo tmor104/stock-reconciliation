@@ -14,6 +14,7 @@ head_sampling_rate = 1
 BARCODE_SHEET_ID = "YOUR_GOOGLE_SHEETS_BARCODE_MAPPING_ID"  # Leave as-is to use Option 2
 MASTER_SHEET_ID = "1e3rsYW4RoEpxpH8ZMckLP7VdtnpbbfQpd8N_NB9fRgM"  # Master Sheet - auto-uses Product Database
 COUNT_SHEETS_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # Optional - can leave empty
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyqSkkSFpvTZVCxPVkFuO8Pd6Z37hx6yS1FiOhUG-0ggJlhiKfYnFT7OQKthAEbEsoI/exec"
 
 [[kv_namespaces]]
 binding = "STOCKTAKE_KV"

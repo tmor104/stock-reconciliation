@@ -1575,34 +1575,18 @@ async function syncToServer() {
             }
         }
         
-        // Reload scans from Google Sheets to get latest data
-        try {
-            const result = await apiService.loadUserScans(state.currentStocktake.id, null); // null = load all scans
-            if (result.success && result.scans) {
-                // Clear existing scans for this stocktake and reload from server
-                await dbService.clearScans(state.currentStocktake.id);
-                
-                // Save all scans from server
-                for (const scan of result.scans) {
-                    const scanWithMeta = {
-                        ...scan,
-                        stocktakeId: state.currentStocktake.id,
-                        stocktakeName: state.currentStocktake.name,
-                        synced: true
-                    };
-                    await dbService.saveScan(scanWithMeta);
-                }
-            }
-        } catch (error) {
-            console.warn('Error reloading scans from server:', error);
-        }
-        
         // Reload and merge scans from Google Sheets and local storage
-        await loadScansForStocktake(state.currentStocktake.id, state.user.username);
+        if (state.user) {
+            try {
+                await loadScansForStocktake(state.currentStocktake.id, state.user.username);
+            } catch (error) {
+                console.warn('Error reloading scans from server:', error);
+            }
+        }
         
         // Load scans from IndexedDB (filtered by current user only)
         const allScans = await dbService.getAllScans(state.currentStocktake.id);
-        state.scannedItems = allScans.filter(scan => scan.user === state.user.username);
+        state.scannedItems = state.user ? allScans.filter(scan => scan.user === state.user.username) : allScans;
         
         // Reload kegs from stocktake
         try {

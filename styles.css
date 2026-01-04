@@ -1105,13 +1105,19 @@ body {
     border-color: var(--orange-400);
 }
 
-/* First Counts Review Section */
+/* First Counts Review Section - Now at top */
 .first-counts-review-section {
-    margin-top: 32px;
+    margin-top: 0;
+    margin-bottom: 24px;
     padding: 24px;
     background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
     border-radius: 12px;
     border: 2px solid var(--orange-300);
+    order: -1; /* Move to top using flexbox order */
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .first-counts-review-section h2 {
@@ -1137,6 +1143,103 @@ body {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
+}
+
+/* Stock Groups Summary Modal */
+#stock-groups-summary-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.stock-groups-summary-modal {
+    background: white;
+    border-radius: 12px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.stock-groups-summary-modal .modal-header {
+    padding: 20px 24px;
+    border-bottom: 2px solid var(--slate-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--slate-50);
+}
+
+.stock-groups-summary-modal .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--slate-800);
+}
+
+.stock-groups-summary-modal .modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: var(--slate-600);
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.stock-groups-summary-modal .modal-close:hover {
+    background: var(--slate-200);
+    color: var(--slate-800);
+}
+
+.stock-groups-summary-modal .modal-body {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.stock-groups-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.stock-groups-table thead {
+    position: sticky;
+    top: 0;
+    background: var(--slate-100);
+    z-index: 10;
+}
+
+.stock-groups-table th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--slate-700);
+    border-bottom: 2px solid var(--slate-300);
+    background: var(--slate-100);
+}
+
+.stock-groups-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--slate-200);
+}
+
+.stock-groups-table tbody tr:hover {
+    background: var(--slate-50);
 }
 
 /* Kegs Table */

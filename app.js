@@ -1880,9 +1880,28 @@ function handleSearch() {
     
     // Use theoretical products (from HnL import) for search, not master sheet
     // Master sheet is only used for barcode lookups when scanning
+    // Exclude kegs (stock groups 1 and 300) from search since they're on keg counting sheet
     const searchSource = state.theoreticalProducts.length > 0 
-        ? state.theoreticalProducts 
-        : state.productDatabase; // Fallback to master sheet if no theoretical data
+        ? state.theoreticalProducts.filter(p => {
+            const category = (p.category || '').toString().trim();
+            // Exclude stock groups 1, 300, and any containing "Beer Keg" or "Cider/Seltzer Keg"
+            return category !== '1' && 
+                   category !== '300' && 
+                   category !== '1 Beer Keg' && 
+                   category !== '300 Cider/Seltzer Keg' &&
+                   !category.includes('Beer Keg') &&
+                   !category.includes('Cider/Seltzer Keg');
+        })
+        : state.productDatabase.filter(p => {
+            // Also filter master sheet if used as fallback
+            const stockGroup = (p.stockGroup || '').toString().trim();
+            return stockGroup !== '1' && 
+                   stockGroup !== '300' && 
+                   stockGroup !== '1 Beer Keg' && 
+                   stockGroup !== '300 Cider/Seltzer Keg' &&
+                   !stockGroup.includes('Beer Keg') &&
+                   !stockGroup.includes('Cider/Seltzer Keg');
+        });
     
     state.searchResults = searchSource.filter(p => {
         const description = (p.description || p.product || '').toLowerCase();
@@ -2058,15 +2077,36 @@ async function syncToServer() {
         // Sync kegs
         const kegsWithCounts = state.kegsList.filter(k => k.count > 0);
         if (kegsWithCounts.length > 0) {
-            const result = await apiService.syncKegs(
-                state.currentStocktake.id,
-                kegsWithCounts,
-                state.currentLocation,
-                state.user.username
-            );
-            if (result.success) {
-                // Reset keg counts
-                state.kegsList = state.kegsList.map(k => ({ ...k, count: 0 }));
+            showLoading(`Syncing ${kegsWithCounts.length} keg count(s)...`);
+            try {
+                const result = await apiService.syncKegs(
+                    state.currentStocktake.id,
+                    kegsWithCounts,
+                    state.currentLocation,
+                    state.user.username
+                );
+                if (result.success) {
+                    // Reset keg counts
+                    state.kegsList = state.kegsList.map(k => ({ ...k, count: 0 }));
+                    hideLoading();
+                    // Show success message
+                    const syncKegsBtn = document.getElementById('sync-kegs-btn');
+                    if (syncKegsBtn) {
+                        const originalText = syncKegsBtn.textContent;
+                        syncKegsBtn.textContent = `✓ Synced ${kegsWithCounts.length} keg(s)`;
+                        syncKegsBtn.style.backgroundColor = 'var(--emerald-500)';
+                        setTimeout(() => {
+                            syncKegsBtn.textContent = originalText;
+                            syncKegsBtn.style.backgroundColor = '';
+                        }, 3000);
+                    }
+                } else {
+                    throw new Error(result.message || 'Failed to sync kegs');
+                }
+            } catch (error) {
+                hideLoading();
+                alert('Failed to sync kegs: ' + error.message);
+                throw error;
             }
         }
         
@@ -2261,6 +2301,93 @@ function populateStockGroupFilter() {
         stockGroupFilter.appendChild(option);
     });
 }
+
+function showStockGroupsSummary() {
+    if (!Array.isArray(state.varianceData) || state.varianceData.length === 0) {
+        alert('No variance data available');
+        return;
+    }
+    
+    // Calculate stock group totals
+    const stockGroupTotals = {};
+    state.varianceData.forEach(item => {
+        const category = item.category || 'Unknown';
+        if (!stockGroupTotals[category]) {
+            stockGroupTotals[category] = {
+                count: 0,
+                totalTheoretical: 0,
+                totalCounted: 0,
+                totalDollarVariance: 0,
+                totalQtyVariance: 0,
+                items: []
+            };
+        }
+        stockGroupTotals[category].count++;
+        stockGroupTotals[category].totalTheoretical += (item.theoreticalQty || 0);
+        stockGroupTotals[category].totalCounted += (item.countedQty || 0);
+        stockGroupTotals[category].totalDollarVariance += (item.dollarVariance || 0);
+        stockGroupTotals[category].totalQtyVariance += (item.qtyVariance || 0);
+        stockGroupTotals[category].items.push(item);
+    });
+    
+    // Create modal content
+    const modalContent = `
+        <div class="stock-groups-summary-modal">
+            <div class="modal-header">
+                <h2>📊 Stock Groups Variance Summary</h2>
+                <button class="modal-close" onclick="closeStockGroupsSummary()">×</button>
+            </div>
+            <div class="modal-body">
+                <table class="stock-groups-table">
+                    <thead>
+                        <tr>
+                            <th>Stock Group</th>
+                            <th>Items</th>
+                            <th>Theoretical</th>
+                            <th>Counted</th>
+                            <th>Qty Variance</th>
+                            <th>Dollar Variance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(stockGroupTotals)
+                            .sort((a, b) => Math.abs(b[1].totalDollarVariance) - Math.abs(a[1].totalDollarVariance))
+                            .map(([group, totals]) => `
+                                <tr class="${totals.totalDollarVariance >= 0 ? 'variance-positive-row' : 'variance-negative-row'}">
+                                    <td><strong>${group}</strong></td>
+                                    <td>${totals.count}</td>
+                                    <td>${formatNumber(totals.totalTheoretical)}</td>
+                                    <td>${formatNumber(totals.totalCounted)}</td>
+                                    <td class="${totals.totalQtyVariance >= 0 ? 'variance-positive' : 'variance-negative'}">
+                                        ${formatNumber(totals.totalQtyVariance)}
+                                    </td>
+                                    <td class="${totals.totalDollarVariance >= 0 ? 'variance-positive' : 'variance-negative'}">
+                                        ${formatCurrency(totals.totalDollarVariance)}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    // Create and show modal
+    let modal = document.getElementById('stock-groups-summary-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'stock-groups-summary-modal';
+        modal.className = 'modal';
+        document.body.appendChild(modal);
+    }
+    modal.innerHTML = modalContent;
+    modal.style.display = 'flex';
+}
+
+window.closeStockGroupsSummary = function() {
+    const modal = document.getElementById('stock-groups-summary-modal');
+    if (modal) modal.style.display = 'none';
+};
 
 function updateVarianceStatus() {
     const statusInfo = document.getElementById('variance-status-info');

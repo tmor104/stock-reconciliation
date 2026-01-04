@@ -684,6 +684,26 @@ router.get('/variance/:stocktakeId', async (request, env) => {
             // Continue with empty counts
         }
         
+        // Get kegs data (from Kegs sheet) and convert to count format
+        let kegCounts = [];
+        try {
+            const kegs = await GoogleSheetsAPI.getKegsFromStocktake(stocktakeId, env);
+            // Convert kegs to count format (kegs have product name, not barcode)
+            kegCounts = kegs
+                .filter(keg => keg.count > 0)
+                .map(keg => ({
+                    barcode: '', // Kegs don't have barcodes
+                    product: keg.name,
+                    quantity: keg.count,
+                    location: keg.location || '',
+                    stockLevel: ''
+                }));
+            // Add keg counts to main counts array
+            counts = [...counts, ...kegCounts];
+        } catch (e) {
+            console.warn('No kegs data found:', e.message);
+        }
+        
         // Get manual adjustments (from Manual sheet)
         let adjustments = [];
         try {

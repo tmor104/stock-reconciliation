@@ -37,19 +37,29 @@ export class VarianceCalculator {
         // Map barcode counts to product codes
         for (const [barcode, qty] of countMap) {
             let productCode = null;
+            const countEntry = counts.find(c => c.barcode === barcode);
+            const productName = countEntry?.product || '';
             
-            // First try: barcode mapping
+            // First try: barcode mapping (most reliable)
             if (barcode && barcode.trim()) {
                 productCode = reverseBarcodeMap.get(barcode);
             }
             
-            // Fallback: match by product description from count data
-            if (!productCode && counts.length > 0) {
-                // Find the count entry with this barcode to get its product description
-                const countEntry = counts.find(c => c.barcode === barcode);
-                if (countEntry && countEntry.product) {
-                    const productDesc = (countEntry.product || '').toLowerCase().trim();
-                    productCode = productDescriptionMap.get(productDesc);
+            // Fallback 1: match by exact product description from count data
+            if (!productCode && productName) {
+                const productDesc = productName.toLowerCase().trim();
+                productCode = productDescriptionMap.get(productDesc);
+            }
+            
+            // Fallback 2: fuzzy match by product description (contains match)
+            if (!productCode && productName) {
+                const productDesc = productName.toLowerCase().trim();
+                // Try to find a theoretical item where description contains or is contained by the count product name
+                for (const [desc, code] of productDescriptionMap) {
+                    if (desc.includes(productDesc) || productDesc.includes(desc)) {
+                        productCode = code;
+                        break;
+                    }
                 }
             }
             
@@ -61,8 +71,21 @@ export class VarianceCalculator {
                     productCountMap.set(productCode, qty);
                 }
             } else if (barcode && barcode.trim()) {
-                // Log unmatched barcodes for debugging (but don't fail)
-                console.warn(`Unmatched barcode in counts: ${barcode}, product: ${counts.find(c => c.barcode === barcode)?.product || 'unknown'}`);
+                // Log unmatched barcodes for debugging
+                console.warn(`Unmatched barcode in counts: ${barcode}, product: ${productName || 'unknown'}`);
+            } else if (!barcode && productName) {
+                // Item without barcode - try to match by name only
+                const productDesc = productName.toLowerCase().trim();
+                productCode = productDescriptionMap.get(productDesc);
+                if (productCode) {
+                    if (productCountMap.has(productCode)) {
+                        productCountMap.set(productCode, productCountMap.get(productCode) + qty);
+                    } else {
+                        productCountMap.set(productCode, qty);
+                    }
+                } else {
+                    console.warn(`Unmatched item (no barcode): ${productName}`);
+                }
             }
         }
         

@@ -831,16 +831,304 @@ class UnifiedAPIService {
         if (!this.token) {
             throw new Error('Not authenticated');
         }
-        
+
         const response = await fetch(`${CONFIG.WORKER_URL}/stocktake/${stocktakeId}/theoretical`, {
             headers: { 'Authorization': `Bearer ${this.token}` }
         });
-        
+
         if (!response.ok) {
             const error = await response.json().catch(() => ({ error: 'Failed to get theoretical products' }));
             throw new Error(error.error || 'Failed to get theoretical products');
         }
-        
+
+        return await response.json();
+    }
+
+    // ============================================
+    // TEMPLATES (Apps Script - Sheet Operations)
+    // ============================================
+
+    async getTemplates(location = null) {
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured');
+        }
+
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'getTemplates',
+                location
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load templates');
+        }
+
+        const result = await response.json();
+        if (!result.ok) {
+            throw new Error(result.error?.message || result.message || 'Failed to load templates');
+        }
+
+        return result.data || result;
+    }
+
+    async saveTemplate(template) {
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured');
+        }
+
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'saveTemplate',
+                template
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save template');
+        }
+
+        const result = await response.json();
+        if (!result.ok) {
+            throw new Error(result.error?.message || result.message || 'Failed to save template');
+        }
+
+        return result.data || result;
+    }
+
+    async deleteTemplate(templateID) {
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured');
+        }
+
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'deleteTemplate',
+                templateID
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete template');
+        }
+
+        const result = await response.json();
+        if (!result.ok) {
+            throw new Error(result.error?.message || result.message || 'Failed to delete template');
+        }
+
+        return result.data || result;
+    }
+
+    // ============================================
+    // RECIPES (Apps Script - Sheet Operations)
+    // ============================================
+
+    async getRecipes(location = null) {
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured');
+        }
+
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'getRecipes',
+                location
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load recipes');
+        }
+
+        const result = await response.json();
+        if (!result.ok) {
+            throw new Error(result.error?.message || result.message || 'Failed to load recipes');
+        }
+
+        return result.data || result;
+    }
+
+    async saveRecipe(recipe) {
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured');
+        }
+
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'saveRecipe',
+                recipe
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save recipe');
+        }
+
+        const result = await response.json();
+        if (!result.ok) {
+            throw new Error(result.error?.message || result.message || 'Failed to save recipe');
+        }
+
+        return result.data || result;
+    }
+
+    async deleteRecipe(recipeID) {
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured');
+        }
+
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'deleteRecipe',
+                recipeID
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete recipe');
+        }
+
+        const result = await response.json();
+        if (!result.ok) {
+            throw new Error(result.error?.message || result.message || 'Failed to delete recipe');
+        }
+
+        return result.data || result;
+    }
+
+    // ============================================
+    // BATCHES (Apps Script - Sheet Operations)
+    // ============================================
+
+    async syncBatches(stocktakeId, batches) {
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured');
+        }
+
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'syncBatches',
+                stocktakeId,
+                batches
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to sync batches');
+        }
+
+        const result = await response.json();
+        if (!result.ok) {
+            throw new Error(result.error?.message || result.message || 'Failed to sync batches');
+        }
+
+        return result.data || result;
+    }
+
+    async loadBatches(stocktakeId) {
+        if (!CONFIG.APPS_SCRIPT_URL) {
+            throw new Error('Apps Script URL not configured');
+        }
+
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'loadBatches',
+                stocktakeId
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load batches');
+        }
+
+        const result = await response.json();
+        if (!result.ok) {
+            throw new Error(result.error?.message || result.message || 'Failed to load batches');
+        }
+
+        return result.data || result;
+    }
+
+    // ============================================
+    // ALL PRODUCTS (Cloudflare Workers)
+    // ============================================
+
+    async getAllProducts() {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`${CONFIG.WORKER_URL}/counting/all-products`, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load all products');
+        }
+
+        return await response.json();
+    }
+
+    // ============================================
+    // PERMISSIONS (Cloudflare Workers)
+    // ============================================
+
+    async getUserPermissions(username = null) {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+
+        const url = username
+            ? `${CONFIG.WORKER_URL}/admin/permissions/${username}`
+            : `${CONFIG.WORKER_URL}/admin/permissions`;
+
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to get permissions' }));
+            throw new Error(error.error || 'Failed to get permissions');
+        }
+
+        return await response.json();
+    }
+
+    async updateUserPermissions(username, permissions) {
+        if (!this.token) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`${CONFIG.WORKER_URL}/admin/permissions/${username}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(permissions)
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Failed to update permissions' }));
+            throw new Error(error.error || 'Failed to update permissions');
+        }
+
         return await response.json();
     }
 }

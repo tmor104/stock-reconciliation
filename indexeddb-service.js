@@ -2,7 +2,7 @@
 // All data is stored locally to prevent data loss on refresh or network issues
 
 const DB_NAME = 'UnifiedStockSystemDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3; // Incremented for template/batch features
 
 class IndexedDBService {
     constructor() {
@@ -76,6 +76,34 @@ class IndexedDBService {
                     issuesStore.createIndex('stocktakeId', 'stocktakeId', { unique: false });
                     issuesStore.createIndex('acknowledged', 'acknowledged', { unique: false });
                     issuesStore.createIndex('type', 'type', { unique: false });
+                }
+
+                // Store for batches (new for batch counting feature)
+                if (!db.objectStoreNames.contains('batches')) {
+                    const batchesStore = db.createObjectStore('batches', { keyPath: 'batchSyncID' });
+                    batchesStore.createIndex('stocktakeId', 'stocktakeId', { unique: false });
+                    batchesStore.createIndex('imported', 'imported', { unique: false });
+                    batchesStore.createIndex('recipeID', 'recipeID', { unique: false });
+                }
+
+                // Store for template cache (new for bar templating feature)
+                if (!db.objectStoreNames.contains('templateCache')) {
+                    const templateCacheStore = db.createObjectStore('templateCache', { keyPath: 'templateID' });
+                    templateCacheStore.createIndex('location', 'location', { unique: false });
+                    templateCacheStore.createIndex('status', 'status', { unique: false });
+                }
+
+                // Store for recipe cache (new for batch counting feature)
+                if (!db.objectStoreNames.contains('recipeCache')) {
+                    const recipeCacheStore = db.createObjectStore('recipeCache', { keyPath: 'recipeID' });
+                    recipeCacheStore.createIndex('location', 'location', { unique: false });
+                }
+
+                // Store for all products cache (new for template/batch features)
+                if (!db.objectStoreNames.contains('allProductsCache')) {
+                    const allProductsCacheStore = db.createObjectStore('allProductsCache', { keyPath: 'barcode' });
+                    allProductsCacheStore.createIndex('product', 'product', { unique: false });
+                    allProductsCacheStore.createIndex('category', 'category', { unique: false });
                 }
             };
         });
@@ -492,6 +520,240 @@ class IndexedDBService {
             };
             request.onerror = () => reject(request.error);
         });
+    }
+
+    // ============================================
+    // BATCHES
+    // ============================================
+
+    async saveBatch(batch) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['batches'], 'readwrite');
+        const store = tx.objectStore('batches');
+        await store.put(batch);
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async getBatches(stocktakeId = null, importedFilter = null) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['batches'], 'readonly');
+        const store = tx.objectStore('batches');
+        const request = store.getAll();
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => {
+                let batches = request.result;
+                if (stocktakeId) {
+                    batches = batches.filter(b => b.stocktakeId === stocktakeId);
+                }
+                if (importedFilter !== null) {
+                    batches = batches.filter(b => b.imported === importedFilter);
+                }
+                resolve(batches);
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async deleteBatch(batchSyncID) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['batches'], 'readwrite');
+        const store = tx.objectStore('batches');
+        await store.delete(batchSyncID);
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async markBatchImported(batchSyncID, imported = true) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['batches'], 'readwrite');
+        const store = tx.objectStore('batches');
+        const request = store.get(batchSyncID);
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => {
+                const batch = request.result;
+                if (batch) {
+                    batch.imported = imported;
+                    store.put(batch);
+                }
+                tx.oncomplete = () => resolve();
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // ============================================
+    // TEMPLATE CACHE
+    // ============================================
+
+    async saveTemplate(template) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['templateCache'], 'readwrite');
+        const store = tx.objectStore('templateCache');
+        await store.put({
+            ...template,
+            lastUpdated: new Date().toISOString()
+        });
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async getTemplates(location = null, status = null) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['templateCache'], 'readonly');
+        const store = tx.objectStore('templateCache');
+        const request = store.getAll();
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => {
+                let templates = request.result;
+                if (location) {
+                    templates = templates.filter(t => t.location === location);
+                }
+                if (status) {
+                    templates = templates.filter(t => t.status === status);
+                }
+                resolve(templates);
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getTemplate(templateID) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['templateCache'], 'readonly');
+        const store = tx.objectStore('templateCache');
+        const request = store.get(templateID);
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async deleteTemplate(templateID) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['templateCache'], 'readwrite');
+        const store = tx.objectStore('templateCache');
+        await store.delete(templateID);
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    // ============================================
+    // RECIPE CACHE
+    // ============================================
+
+    async saveRecipe(recipe) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['recipeCache'], 'readwrite');
+        const store = tx.objectStore('recipeCache');
+        await store.put({
+            ...recipe,
+            lastUpdated: new Date().toISOString()
+        });
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async getRecipes(location = null) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['recipeCache'], 'readonly');
+        const store = tx.objectStore('recipeCache');
+        const request = store.getAll();
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => {
+                let recipes = request.result;
+                if (location) {
+                    recipes = recipes.filter(r => r.location === location);
+                }
+                resolve(recipes);
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getRecipe(recipeID) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['recipeCache'], 'readonly');
+        const store = tx.objectStore('recipeCache');
+        const request = store.get(recipeID);
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async deleteRecipe(recipeID) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['recipeCache'], 'readwrite');
+        const store = tx.objectStore('recipeCache');
+        await store.delete(recipeID);
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    // ============================================
+    // ALL PRODUCTS CACHE
+    // ============================================
+
+    async saveAllProducts(products) {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['allProductsCache'], 'readwrite');
+        const store = tx.objectStore('allProductsCache');
+        await store.clear();
+
+        for (const product of products) {
+            await store.put({
+                ...product,
+                lastUpdated: new Date().toISOString()
+            });
+        }
+
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async getAllProducts() {
+        if (!this.db) throw new Error('Database not initialized');
+        const tx = this.db.transaction(['allProductsCache'], 'readonly');
+        const store = tx.objectStore('allProductsCache');
+        const request = store.getAll();
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async searchAllProducts(query) {
+        if (!this.db) throw new Error('Database not initialized');
+        const products = await this.getAllProducts();
+        const lowerQuery = query.toLowerCase();
+
+        return products.filter(p =>
+            p.product?.toLowerCase().includes(lowerQuery) ||
+            p.barcode?.toLowerCase().includes(lowerQuery) ||
+            p.category?.toLowerCase().includes(lowerQuery)
+        );
     }
 }
 

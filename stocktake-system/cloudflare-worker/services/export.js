@@ -65,12 +65,24 @@ export class ExportService {
         return excelBuffer;
     }
     
-    static generateManualEntryList(theoretical, barcodeMapping) {
+    static generateManualEntryList(theoretical, barcodeMapping, kegs = []) {
         // Get items that don't have barcodes
         const manualItems = theoretical.filter(item => {
-            const productCode = item.productCode || item.description;
-            return !barcodeMapping.has(productCode);
+            // Barcode mapping uses product description as key, not product code
+            const description = item.description || item.productCode;
+            return !barcodeMapping.has(description);
         });
+
+        // Add kegs to manual items (kegs typically don't have barcodes)
+        const kegItems = kegs.map(keg => ({
+            category: 'Kegs',
+            description: keg.name || keg.product || keg.description || 'Unknown Keg',
+            productCode: keg.name || keg.product || keg.description || 'N/A',
+            unit: 'KEG',
+            theoreticalQty: 0 // Kegs are manually counted, no theoretical
+        }));
+
+        manualItems.push(...kegItems);
         
         if (manualItems.length === 0) {
             return 'No items require manual entry - all items have barcodes.';
@@ -110,37 +122,41 @@ export class ExportService {
     }
     
     static generateDatFile(varianceData, barcodeMapping) {
-        // Create reverse mapping (productCode -> barcode)
-        const productToBarcodeMap = new Map();
-        for (const [productCode, barcode] of barcodeMapping) {
-            productToBarcodeMap.set(productCode, barcode);
-        }
-        
+        // Create mapping (description -> barcode)
+        // Note: barcodeMapping uses product description as key, not product code
+        const descriptionToBarcodeMap = new Map(barcodeMapping);
+
         let datContent = '';
-        
+
         // Only include items with:
         // 1. A barcode
         // 2. Non-zero counted quantity
         varianceData.items.forEach(item => {
-            const productCode = item.productCode || item.description;
-            const barcode = productToBarcodeMap.get(productCode);
-            
+            // Try to find barcode using description (primary key in mapping)
+            const description = item.description || item.productCode;
+            let barcode = descriptionToBarcodeMap.get(description);
+
+            // Fallback: try with productCode if description didn't work
+            if (!barcode) {
+                barcode = descriptionToBarcodeMap.get(item.productCode);
+            }
+
             // Skip items without barcodes or with zero count
             if (!barcode || item.countedQty === 0) {
                 return;
             }
-            
+
             // Format: barcode starting at position 1, count starting at position 17
             // Barcode is left-aligned, then spaces to pad to position 17
             const barcodeStr = barcode.toString();
             const countStr = item.countedQty.toFixed(1);
-            
+
             // Pad barcode to 16 characters (so count starts at position 17)
             const paddedLine = barcodeStr.padEnd(16, ' ') + countStr;
-            
+
             datContent += paddedLine + '\n';
         });
-        
+
         return datContent;
     }
     

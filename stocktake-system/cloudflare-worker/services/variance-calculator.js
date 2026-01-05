@@ -127,7 +127,8 @@ export class VarianceCalculator {
                 qtyVariance,
                 dollarVariance,
                 variancePercent,
-                hasBarcode: barcodeMapping.has(productCode)
+                // Barcode mapping uses description as key, not product code
+                hasBarcode: barcodeMapping.has(item.description) || barcodeMapping.has(productCode)
             };
         });
         

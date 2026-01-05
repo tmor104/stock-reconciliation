@@ -976,26 +976,33 @@ router.get('/export/variance/:stocktakeId', async (request, env) => {
 router.get('/export/manual/:stocktakeId', async (request, env) => {
     const authError = await requireAuth(request, env);
     if (authError) return authError;
-    
+
     try {
         const { stocktakeId } = request.params;
         const currentStocktake = await env.STOCKTAKE_KV.get('current_stocktake', { type: 'json' });
-        
+
         if (!currentStocktake || currentStocktake.id !== stocktakeId) {
             return new Response('Stocktake not found', { status: 404, headers: corsHeaders });
         }
-        
+
         const theoretical = await GoogleSheetsAPI.getTheoreticalData(
             currentStocktake.spreadsheetId,
             env
         );
         const barcodeMapping = await GoogleSheetsAPI.getBarcodeMapping(env);
-        
+
+        // Fetch kegs from the Kegs sheet
+        const kegs = await GoogleSheetsAPI.getKegsFromStocktake(
+            currentStocktake.spreadsheetId,
+            env
+        );
+
         const manualList = ExportService.generateManualEntryList(
             theoretical,
-            barcodeMapping
+            barcodeMapping,
+            kegs
         );
-        
+
         return new Response(manualList, {
             headers: {
                 ...corsHeaders,

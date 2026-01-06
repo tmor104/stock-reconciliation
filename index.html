@@ -601,6 +601,7 @@
     </div>
 
     <!-- Template Manager Screen -->
+    <!-- Template Manager Screen -->
     <div id="template-manager-screen" class="screen">
         <div class="header">
             <div class="header-logo-section">
@@ -613,54 +614,45 @@
                 </div>
             </div>
             <div class="header-actions">
+                <button id="create-template-btn" class="btn-primary">+ Create Template</button>
                 <button id="template-manager-back-btn" class="btn-secondary">← Apps</button>
                 <button id="template-manager-logout-btn" class="btn-secondary">Logout</button>
             </div>
         </div>
 
         <div class="template-manager-content">
-            <div class="section-card">
-                <h2>Locations</h2>
-                <p class="info-text">Select a location to manage templates</p>
-                <div id="template-locations-list" class="locations-grid">
-                    <p class="loading-text">Loading locations...</p>
+            <div id="template-table-container" class="variance-table-container">
+                <div class="table-header">
+                    <h2>All Templates</h2>
+                    <div class="table-filters">
+                        <input type="text" id="template-search" placeholder="Search templates...">
+                        <select id="template-location-filter">
+                            <option value="">All Locations</option>
+                        </select>
+                        <select id="template-status-filter">
+                            <option value="">All Status</option>
+                            <option value="Live">Live</option>
+                            <option value="Draft">Draft</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Template Detail Screen -->
-    <div id="template-detail-screen" class="screen">
-        <div class="header">
-            <div class="header-logo-section">
-                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo">
-                <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
-                <div>
-                    <h1 class="header-title">📋 <span id="template-location-name">Template</span></h1>
-                    <p id="template-detail-user-info" class="user-info"></p>
-                </div>
-            </div>
-            <div class="header-actions">
-                <button id="template-detail-back-btn" class="btn-secondary">← Locations</button>
-            </div>
-        </div>
-
-        <div class="template-detail-content">
-            <div class="section-card">
-                <h3>Live Template</h3>
-                <div id="live-template-info">
-                    <p class="info-text">No live template for this location</p>
-                </div>
-                <div class="card-actions">
-                    <button id="edit-live-template-btn" class="btn-primary" style="display: none;">Edit Live Template</button>
-                    <button id="create-template-btn" class="btn-primary">Create New Draft</button>
-                </div>
-            </div>
-
-            <div class="section-card">
-                <h3>Draft Templates</h3>
-                <div id="draft-templates-list">
-                    <p class="info-text">No draft templates</p>
+                <div id="template-table-wrapper" class="table-wrapper">
+                    <table id="template-table" class="variance-table">
+                        <thead>
+                            <tr>
+                                <th>Template Name</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th>Products</th>
+                                <th>Created By</th>
+                                <th>Last Modified</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="template-table-body">
+                            <tr><td colspan="7" style="text-align: center; padding: 20px;">Loading templates...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -678,19 +670,37 @@
                 </div>
             </div>
             <div class="header-actions">
+                <button id="create-recipe-btn" class="btn-primary">+ Create Recipe</button>
                 <button id="batch-manager-back-btn" class="btn-secondary">← Apps</button>
                 <button id="batch-manager-logout-btn" class="btn-secondary">Logout</button>
             </div>
         </div>
 
         <div class="batch-manager-content">
-            <div class="section-card">
-                <h2>Recipes</h2>
-                <div class="card-actions">
-                    <button id="create-recipe-btn" class="btn-primary">+ Create New Recipe</button>
+            <div id="recipe-table-container" class="variance-table-container">
+                <div class="table-header">
+                    <h2>All Recipes</h2>
+                    <div class="table-filters">
+                        <input type="text" id="recipe-search" placeholder="Search recipes...">
+                        <select id="recipe-location-filter">
+                            <option value="">All Locations</option>
+                        </select>
+                    </div>
                 </div>
-                <div id="recipes-list" class="recipes-list">
-                    <p class="loading-text">Loading recipes...</p>
+                <div id="recipe-table-wrapper" class="table-wrapper">
+                    <table id="recipe-table" class="variance-table">
+                        <thead>
+                            <tr>
+                                <th>Recipe Name</th>
+                                <th>Location</th>
+                                <th style="min-width: 300px;">Ingredients</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recipe-table-body">
+                            <tr><td colspan="4" style="text-align: center; padding: 20px;">Loading recipes...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -754,9 +764,10 @@
         </div>
     </div>
 
-    <!-- Template Editor Modal -->
-    <div id="template-editor-modal" class="modal">
-        <div class="modal-content modal-fullscreen">
+    <!-- Template Editor Side Panel -->
+    <div id="template-editor-panel" class="side-panel">
+        <div class="side-panel-overlay"></div>
+        <div class="side-panel-content">
             <div class="modal-header-compact">
                 <div>
                     <h2 id="template-editor-title" style="display: inline; margin-right: 20px;">Create Template</h2>
@@ -801,9 +812,10 @@
         </div>
     </div>
 
-    <!-- Recipe Editor Modal -->
-    <div id="recipe-editor-modal" class="modal">
-        <div class="modal-content modal-fullscreen">
+    <!-- Recipe Editor Side Panel -->
+    <div id="recipe-editor-panel" class="side-panel">
+        <div class="side-panel-overlay"></div>
+        <div class="side-panel-content">
             <div class="modal-header-compact">
                 <div>
                     <h2 id="recipe-editor-title" style="display: inline; margin-right: 20px;">Create Recipe</h2>

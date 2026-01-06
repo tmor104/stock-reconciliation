@@ -36,12 +36,61 @@
         </div>
     </div>
 
+    <!-- App Selection Screen (New - Landing page after login) -->
+    <div id="app-selection-screen" class="screen">
+        <div class="header">
+            <div class="header-logo-section">
+                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo"
+                     onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                     onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
+                <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
+                <div>
+                    <h1 class="header-title">STOCK <span class="logo-wizard">WIZARD</span></h1>
+                    <p id="app-selection-user-info" class="user-info"></p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="app-selection-admin-btn" class="btn-secondary" style="display: none;">⚙️ Admin</button>
+                <button id="app-selection-logout-btn" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+
+        <div class="app-selection-content">
+            <h2 style="text-align: center; margin-bottom: 32px; color: var(--slate-700);">Select an Application</h2>
+            <div class="app-cards-grid">
+                <button class="app-card" id="counting-app-card">
+                    <div class="app-card-icon">📦</div>
+                    <h3>Stock Counting</h3>
+                    <p>Count stock, scan barcodes, and manage stocktakes</p>
+                </button>
+
+                <button class="app-card" id="template-manager-app-card" style="display: none;">
+                    <div class="app-card-icon">📋</div>
+                    <h3>Template Manager</h3>
+                    <p>Create and manage location-specific product templates</p>
+                </button>
+
+                <button class="app-card" id="batch-manager-app-card" style="display: none;">
+                    <div class="app-card-icon">🍸</div>
+                    <h3>Batch Manager</h3>
+                    <p>Manage cocktail recipes and batch counting</p>
+                </button>
+
+                <button class="app-card" id="settings-app-card">
+                    <div class="app-card-icon">⚙️</div>
+                    <h3>Settings</h3>
+                    <p>Configure counting mode, sync interval, and preferences</p>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Home Screen (Select/Create Stocktake) -->
     <div id="home-screen" class="screen">
         <div class="header">
             <div class="header-logo-section">
                 <!-- Logo - supports logo.png, logo.jpg, or logo.jpeg in assets/images/ -->
-                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo" 
+                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo"
                      onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
                      onload="console.log('Logo loaded successfully:', this.src); this.nextElementSibling.style.display='none';">
                 <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
@@ -51,6 +100,7 @@
                 </div>
             </div>
             <div class="header-actions">
+                <button id="back-to-app-selection-btn" class="btn-secondary">← Apps</button>
                 <button id="admin-panel-btn" class="btn-secondary" style="display: none;">⚙️ Admin</button>
                 <button id="logout-btn" class="btn-secondary">Logout</button>
             </div>
@@ -549,8 +599,332 @@
         </div>
     </div>
 
+    <!-- Template Manager Screen -->
+    <div id="template-manager-screen" class="screen">
+        <div class="header">
+            <div class="header-logo-section">
+                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo"
+                     onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+                <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
+                <div>
+                    <h1 class="header-title">📋 Template Manager</h1>
+                    <p id="template-manager-user-info" class="user-info"></p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="template-manager-back-btn" class="btn-secondary">← Apps</button>
+                <button id="template-manager-logout-btn" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+
+        <div class="template-manager-content">
+            <div class="section-card">
+                <h2>Locations</h2>
+                <p class="info-text">Select a location to manage templates</p>
+                <div id="template-locations-list" class="locations-grid">
+                    <p class="loading-text">Loading locations...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Detail Screen -->
+    <div id="template-detail-screen" class="screen">
+        <div class="header">
+            <div class="header-logo-section">
+                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo">
+                <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
+                <div>
+                    <h1 class="header-title">📋 <span id="template-location-name">Template</span></h1>
+                    <p id="template-detail-user-info" class="user-info"></p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="template-detail-back-btn" class="btn-secondary">← Locations</button>
+            </div>
+        </div>
+
+        <div class="template-detail-content">
+            <div class="section-card">
+                <h3>Live Template</h3>
+                <div id="live-template-info">
+                    <p class="info-text">No live template for this location</p>
+                </div>
+                <div class="card-actions">
+                    <button id="edit-live-template-btn" class="btn-primary" style="display: none;">Edit Live Template</button>
+                    <button id="create-template-btn" class="btn-primary">Create New Draft</button>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <h3>Draft Templates</h3>
+                <div id="draft-templates-list">
+                    <p class="info-text">No draft templates</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Manager Screen -->
+    <div id="batch-manager-screen" class="screen">
+        <div class="header">
+            <div class="header-logo-section">
+                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo">
+                <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
+                <div>
+                    <h1 class="header-title">🍸 Batch Manager</h1>
+                    <p id="batch-manager-user-info" class="user-info"></p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="batch-manager-back-btn" class="btn-secondary">← Apps</button>
+                <button id="batch-manager-logout-btn" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+
+        <div class="batch-manager-content">
+            <div class="section-card">
+                <h2>Recipes</h2>
+                <div class="card-actions">
+                    <button id="create-recipe-btn" class="btn-primary">+ Create New Recipe</button>
+                </div>
+                <div id="recipes-list" class="recipes-list">
+                    <p class="loading-text">Loading recipes...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Screen -->
+    <div id="settings-screen" class="screen">
+        <div class="header">
+            <div class="header-logo-section">
+                <img src="./assets/images/logo.jpg" alt="Logo" class="header-logo">
+                <span class="header-logo" style="font-size: 32px; display: none;">📦</span>
+                <div>
+                    <h1 class="header-title">⚙️ Settings</h1>
+                    <p id="settings-user-info" class="user-info"></p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="settings-back-btn" class="btn-secondary">← Apps</button>
+                <button id="settings-logout-btn" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+
+        <div class="settings-content">
+            <div class="section-card">
+                <h2>Counting Mode Settings</h2>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="lock-counting-mode-checkbox">
+                        Lock Counting Mode
+                    </label>
+                    <p class="info-text">When enabled, app returns directly to counting screen on reopen</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="default-location-select">Default Location</label>
+                    <select id="default-location-select">
+                        <option value="">None (remember last used)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="auto-sync-interval-select">Auto-Sync Interval</label>
+                    <select id="auto-sync-interval-select">
+                        <option value="5">Every 5 scans</option>
+                        <option value="10" selected>Every 10 scans</option>
+                        <option value="20">Every 20 scans</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="offline-mode-indicator-checkbox" checked>
+                        Show Offline Mode Indicator
+                    </label>
+                </div>
+
+                <div class="card-actions">
+                    <button id="save-settings-btn" class="btn-primary">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Editor Modal -->
+    <div id="template-editor-modal" class="modal">
+        <div class="modal-content modal-large">
+            <h2 id="template-editor-title">Create Template</h2>
+            <div class="form-group">
+                <label for="template-name-input">Template Name</label>
+                <input type="text" id="template-name-input" placeholder="e.g., Winter Menu">
+            </div>
+            <div class="form-group">
+                <label>Location</label>
+                <p id="template-editor-location" style="font-weight: bold;">-</p>
+            </div>
+            <div class="form-group">
+                <label>Products</label>
+                <div class="input-actions">
+                    <input type="text" id="template-product-search" placeholder="Search products to add...">
+                    <button id="add-section-header-btn" class="btn-secondary">+ Add Section</button>
+                </div>
+                <div id="template-product-results" class="search-results" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+            <div class="form-group">
+                <label>Template Products (drag to reorder)</label>
+                <div id="template-products-table" class="template-table">
+                    <p class="info-text">No products added yet</p>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button id="cancel-template-btn" class="btn-secondary">Cancel</button>
+                <button id="save-template-draft-btn" class="btn-secondary">Save as Draft</button>
+                <button id="push-template-live-btn" class="btn-primary">Push to Live</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Load Review Modal -->
+    <div id="template-load-modal" class="modal">
+        <div class="modal-content modal-large">
+            <h2>Load Template: <span id="template-load-name">-</span></h2>
+            <p class="info-text">Review and adjust quantities before loading</p>
+            <div id="template-review-table" class="template-review-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Par Level</th>
+                            <th>Adjust Qty</th>
+                            <th>Partial?</th>
+                        </tr>
+                    </thead>
+                    <tbody id="template-review-tbody"></tbody>
+                </table>
+            </div>
+            <div class="form-actions">
+                <button id="cancel-template-load-btn" class="btn-secondary">Cancel</button>
+                <button id="submit-template-btn" class="btn-primary">Submit Template</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recipe Editor Modal -->
+    <div id="recipe-editor-modal" class="modal">
+        <div class="modal-content modal-large">
+            <h2 id="recipe-editor-title">Create Recipe</h2>
+            <div class="form-group">
+                <label for="recipe-name-input">Recipe Name</label>
+                <input type="text" id="recipe-name-input" placeholder="e.g., Margarita" required>
+            </div>
+            <div class="form-group">
+                <label for="recipe-location-select">Location</label>
+                <select id="recipe-location-select" required>
+                    <option value="">Select location...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Ingredients</label>
+                <input type="text" id="recipe-ingredient-search" placeholder="Search products to add as ingredients...">
+                <div id="recipe-ingredient-results" class="search-results" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+            <div class="form-group">
+                <label>Recipe Ingredients</label>
+                <div id="recipe-ingredients-table" class="ingredients-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Serve Size (ml)</th>
+                                <th>Bottle Size (ml)</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="recipe-ingredients-tbody">
+                            <tr>
+                                <td colspan="4" class="info-text">No ingredients added yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="recipe-filler-items-input">Filler Items (not tracked)</label>
+                <input type="text" id="recipe-filler-items-input" placeholder="e.g., Sugar, Ice, Garnish (comma-separated)">
+            </div>
+            <div class="form-actions">
+                <button id="cancel-recipe-btn" class="btn-secondary">Cancel</button>
+                <button id="save-recipe-btn" class="btn-primary">Save Recipe</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Count Modal -->
+    <div id="batch-count-modal" class="modal">
+        <div class="modal-content">
+            <h2>Count Batch: <span id="batch-recipe-name">-</span></h2>
+            <div class="form-group">
+                <label for="batch-bottle-size-input">Batch Bottle Size (ml)</label>
+                <input type="number" id="batch-bottle-size-input" step="1" min="1" placeholder="e.g., 700" required>
+            </div>
+            <div class="form-group">
+                <label for="batch-bottle-count-input">Bottle Count</label>
+                <input type="number" id="batch-bottle-count-input" step="0.01" min="0.01" placeholder="e.g., 15" required>
+            </div>
+            <div id="batch-calculation-results" style="display: none; margin-top: 16px; padding: 12px; background: var(--blue-50); border-radius: 8px;">
+                <h4>Calculated Ingredient Usage:</h4>
+                <table id="batch-calculation-table" style="width: 100%; margin-top: 8px;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left;">Ingredient</th>
+                            <th style="text-align: right;">Quantity (bottles)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="batch-calculation-tbody"></tbody>
+                </table>
+            </div>
+            <div class="form-actions">
+                <button id="cancel-batch-count-btn" class="btn-secondary">Cancel</button>
+                <button id="calculate-batch-btn" class="btn-secondary">Calculate</button>
+                <button id="save-batch-btn" class="btn-primary" disabled>Save Batch</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Import Modal -->
+    <div id="batch-import-modal" class="modal">
+        <div class="modal-content modal-large">
+            <h2>Import Batch Counts</h2>
+            <p class="info-text">Select which batches to import into reconciliation</p>
+            <div id="batch-import-table-wrapper" style="max-height: 400px; overflow-y: auto;">
+                <table id="batch-import-table" class="variance-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="batch-import-select-all"></th>
+                            <th>Recipe</th>
+                            <th>Location</th>
+                            <th>Bottles</th>
+                            <th>Ingredients</th>
+                            <th>User</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody id="batch-import-tbody"></tbody>
+                </table>
+            </div>
+            <div class="form-actions">
+                <button id="cancel-batch-import-btn" class="btn-secondary">Cancel</button>
+                <button id="import-selected-batches-btn" class="btn-primary" disabled>Import Selected</button>
+            </div>
+        </div>
+    </div>
+
     <script src="indexeddb-service.js"></script>
     <script src="api-service.js"></script>
+    <script src="template-batch-app.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

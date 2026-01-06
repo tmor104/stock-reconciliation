@@ -1844,3 +1844,405 @@ body {
     to { transform: rotate(360deg); }
 }
 
+
+/* ============================================
+   APP SELECTION SCREEN
+   ============================================ */
+
+.app-selection-content {
+    padding: 32px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.app-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-top: 32px;
+}
+
+.app-card {
+    background: white;
+    border: 2px solid var(--slate-200);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.app-card:hover {
+    border-color: var(--blue-500);
+    box-shadow: 0 8px 16px rgba(59, 130, 246, 0.1);
+    transform: translateY(-4px);
+}
+
+.app-card-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+.app-card h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--slate-800);
+    margin: 0 0 8px 0;
+}
+
+.app-card p {
+    font-size: 14px;
+    color: var(--slate-600);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* ============================================
+   TEMPLATE MANAGER
+   ============================================ */
+
+.template-manager-content,
+.template-detail-content {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.locations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.location-card {
+    background: white;
+    border: 2px solid var(--slate-200);
+    border-radius: 8px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.location-card:hover {
+    border-color: var(--blue-500);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.location-card h4 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    color: var(--slate-800);
+}
+
+.location-card p {
+    margin: 4px 0;
+    font-size: 14px;
+    color: var(--slate-600);
+}
+
+.template-table,
+.template-review-table {
+    width: 100%;
+    margin-top: 16px;
+}
+
+.template-table table,
+.template-review-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.template-table th,
+.template-review-table th {
+    text-align: left;
+    padding: 12px;
+    background: var(--slate-100);
+    border-bottom: 2px solid var(--slate-300);
+    font-weight: 600;
+}
+
+.template-table td,
+.template-review-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--slate-200);
+}
+
+.template-row-section {
+    font-weight: bold;
+    color: var(--blue-700);
+    background: var(--blue-50) !important;
+}
+
+.template-row-draggable {
+    cursor: move;
+}
+
+.template-row-dragging {
+    opacity: 0.5;
+}
+
+/* ============================================
+   BATCH MANAGER
+   ============================================ */
+
+.batch-manager-content {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.recipes-list {
+    margin-top: 16px;
+}
+
+.recipe-card {
+    background: white;
+    border: 2px solid var(--slate-200);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.recipe-card-info h4 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    color: var(--slate-800);
+}
+
+.recipe-card-info p {
+    margin: 4px 0;
+    font-size: 14px;
+    color: var(--slate-600);
+}
+
+.recipe-card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ingredients-table {
+    width: 100%;
+    margin-top: 16px;
+}
+
+.ingredients-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ingredients-table th {
+    text-align: left;
+    padding: 12px;
+    background: var(--slate-100);
+    border-bottom: 2px solid var(--slate-300);
+    font-weight: 600;
+}
+
+.ingredients-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--slate-200);
+}
+
+.ingredients-table input[type="number"] {
+    width: 100px;
+}
+
+/* ============================================
+   SETTINGS SCREEN
+   ============================================ */
+
+.settings-content {
+    padding: 24px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.settings-content .form-group {
+    margin-bottom: 24px;
+}
+
+.settings-content label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: var(--slate-700);
+}
+
+.settings-content input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+/* ============================================
+   MODAL VARIANTS
+   ============================================ */
+
+.modal-large .modal-content {
+    max-width: 900px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+}
+
+/* ============================================
+   BATCH COUNTING UI
+   ============================================ */
+
+.batch-mode-section {
+    margin: 24px 0;
+    padding: 20px;
+    background: var(--purple-50);
+    border: 2px solid var(--purple-300);
+    border-radius: 8px;
+}
+
+.batch-mode-section h3 {
+    margin: 0 0 16px 0;
+    color: var(--purple-800);
+}
+
+.batch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.batch-item {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--slate-200);
+}
+
+.batch-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.batch-item-header h4 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--slate-800);
+}
+
+.batch-item-meta {
+    font-size: 14px;
+    color: var(--slate-600);
+}
+
+/* ============================================
+   COUNTING SCREEN ENHANCEMENTS
+   ============================================ */
+
+.location-selector-enhanced {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.location-selector-enhanced label {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.location-selector-enhanced select {
+    flex: 1;
+    font-size: 16px;
+    padding: 12px;
+}
+
+.template-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.lock-mode-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 100;
+    background: var(--blue-600);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 56px;
+    height: 56px;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.lock-mode-toggle:hover {
+    background: var(--blue-700);
+    transform: scale(1.1);
+}
+
+.lock-mode-toggle.locked {
+    background: var(--emerald-600);
+}
+
+/* ============================================
+   RECONCILIATION SCREEN ENHANCEMENTS
+   ============================================ */
+
+.batch-import-section {
+    margin-top: 24px;
+    padding: 20px;
+    background: var(--purple-50);
+    border: 2px solid var(--purple-300);
+    border-radius: 8px;
+}
+
+.batch-import-section h3 {
+    margin: 0 0 12px 0;
+    color: var(--purple-800);
+}
+
+.batch-import-section .btn-primary {
+    background: var(--purple-600);
+}
+
+.batch-import-section .btn-primary:hover {
+    background: var(--purple-700);
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 768px) {
+    .app-cards-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .locations-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-large .modal-content {
+        max-width: 95%;
+        padding: 16px;
+    }
+
+    .template-table td,
+    .template-review-table td,
+    .ingredients-table td {
+        padding: 8px;
+        font-size: 14px;
+    }
+}

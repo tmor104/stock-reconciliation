@@ -191,9 +191,17 @@ async function init() {
                     await checkForIssues(state.currentStocktake.id, state.user.username);
                 }
                 
-                // Show home screen
-                showScreen('home-screen');
-                await loadHomeScreen();
+                // Check lock counting mode
+                const lockMode = await dbService.getState('lockCountingMode');
+                if (lockMode && state.currentStocktake) {
+                    // Go directly to counting screen if locked
+                    showScreen('counting-screen');
+                    await loadCountingScreen();
+                } else {
+                    // Show app selection screen
+                    showScreen('app-selection-screen');
+                    await loadAppSelectionScreen();
+                }
             } catch (error) {
                 // Token is invalid or expired - clear it and show login
                 console.warn('Token validation failed, clearing saved state:', error);
@@ -3782,6 +3790,170 @@ async function handleCompleteStocktake() {
         alert('Failed to complete stocktake: ' + error.message);
         console.error('Complete stocktake error:', error);
     }
+}
+
+// ============================================
+// APP SELECTION & NEW FEATURES
+// ============================================
+
+async function loadAppSelectionScreen() {
+    // Set user info
+    const userInfo = document.getElementById('app-selection-user-info');
+    if (userInfo && state.user) {
+        userInfo.textContent = `Logged in as ${state.user.username}${state.user.role ? ` (${state.user.role})` : ''}`;
+    }
+
+    // Show/hide app cards based on permissions
+    // For now, show all cards - permissions can be added later
+    document.getElementById('template-manager-app-card').style.display = 'block';
+    document.getElementById('batch-manager-app-card').style.display = 'block';
+
+    // Add event listeners for app cards
+    document.getElementById('counting-app-card').addEventListener('click', () => {
+        showScreen('home-screen');
+        loadHomeScreen();
+    });
+
+    document.getElementById('template-manager-app-card').addEventListener('click', () => {
+        showScreen('template-manager-screen');
+        loadTemplateManagerScreen();
+    });
+
+    document.getElementById('batch-manager-app-card').addEventListener('click', () => {
+        showScreen('batch-manager-screen');
+        loadBatchManagerScreen();
+    });
+
+    document.getElementById('settings-app-card').addEventListener('click', () => {
+        showScreen('settings-screen');
+        loadSettingsScreen();
+    });
+
+    // Logout button
+    document.getElementById('app-selection-logout-btn').addEventListener('click', handleLogout);
+}
+
+async function loadTemplateManagerScreen() {
+    // Set user info
+    const userInfo = document.getElementById('template-manager-user-info');
+    if (userInfo && state.user) {
+        userInfo.textContent = `Logged in as ${state.user.username}`;
+    }
+
+    // Load templates using templateManager
+    await templateManager.loadLocations();
+
+    // Back button
+    document.getElementById('template-manager-back-btn').addEventListener('click', () => {
+        showScreen('app-selection-screen');
+    });
+
+    // Back to locations button
+    document.getElementById('template-detail-back-btn').addEventListener('click', () => {
+        showScreen('template-manager-screen');
+        templateManager.loadLocations();
+    });
+
+    // Create template button
+    document.getElementById('create-template-btn').addEventListener('click', () => {
+        templateManager.createNewTemplate();
+    });
+
+    // Template editor modal buttons
+    document.getElementById('cancel-template-btn').addEventListener('click', () => {
+        hideModal('template-editor-modal');
+    });
+
+    document.getElementById('save-template-draft-btn').addEventListener('click', () => {
+        templateManager.saveTemplate('Draft');
+    });
+
+    document.getElementById('push-template-live-btn').addEventListener('click', () => {
+        templateManager.saveTemplate('Live');
+    });
+
+    document.getElementById('template-manager-logout-btn').addEventListener('click', handleLogout);
+}
+
+async function loadBatchManagerScreen() {
+    // Set user info
+    const userInfo = document.getElementById('batch-manager-user-info');
+    if (userInfo && state.user) {
+        userInfo.textContent = `Logged in as ${state.user.username}`;
+    }
+
+    // Load recipes using batchManager
+    await batchManager.loadRecipes();
+
+    // Back button
+    document.getElementById('batch-manager-back-btn').addEventListener('click', () => {
+        showScreen('app-selection-screen');
+    });
+
+    // Create recipe button
+    document.getElementById('create-recipe-btn').addEventListener('click', () => {
+        batchManager.createNewRecipe();
+    });
+
+    // Recipe editor modal buttons
+    document.getElementById('cancel-recipe-btn').addEventListener('click', () => {
+        hideModal('recipe-editor-modal');
+    });
+
+    document.getElementById('save-recipe-btn').addEventListener('click', () => {
+        batchManager.saveRecipe();
+    });
+
+    document.getElementById('batch-manager-logout-btn').addEventListener('click', handleLogout);
+}
+
+async function loadSettingsScreen() {
+    // Set user info
+    const userInfo = document.getElementById('settings-user-info');
+    if (userInfo && state.user) {
+        userInfo.textContent = `Logged in as ${state.user.username}`;
+    }
+
+    // Load settings
+    const lockMode = await dbService.getState('lockCountingMode');
+    const autoSyncInterval = await dbService.getState('autoSyncInterval');
+    const showOffline = await dbService.getState('showOfflineIndicator');
+
+    document.getElementById('lock-counting-mode-checkbox').checked = lockMode || false;
+    document.getElementById('auto-sync-interval-select').value = autoSyncInterval || '10';
+    document.getElementById('offline-mode-indicator-checkbox').checked = showOffline !== false;
+
+    // Populate default location
+    const defaultLocationSelect = document.getElementById('default-location-select');
+    defaultLocationSelect.innerHTML = '<option value="">None (remember last used)</option>' +
+        state.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+
+    const savedDefaultLocation = await dbService.getState('defaultLocation');
+    if (savedDefaultLocation) {
+        defaultLocationSelect.value = savedDefaultLocation;
+    }
+
+    // Back button
+    document.getElementById('settings-back-btn').addEventListener('click', () => {
+        showScreen('app-selection-screen');
+    });
+
+    // Save settings button
+    document.getElementById('save-settings-btn').addEventListener('click', async () => {
+        const lockMode = document.getElementById('lock-counting-mode-checkbox').checked;
+        const autoSyncInterval = document.getElementById('auto-sync-interval-select').value;
+        const showOffline = document.getElementById('offline-mode-indicator-checkbox').checked;
+        const defaultLocation = document.getElementById('default-location-select').value;
+
+        await dbService.saveState('lockCountingMode', lockMode);
+        await dbService.saveState('autoSyncInterval', parseInt(autoSyncInterval));
+        await dbService.saveState('showOfflineIndicator', showOffline);
+        await dbService.saveState('defaultLocation', defaultLocation);
+
+        showMessage('Settings saved', 'success');
+    });
+
+    document.getElementById('settings-logout-btn').addEventListener('click', handleLogout);
 }
 
 // ============================================

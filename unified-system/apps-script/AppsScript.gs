@@ -49,7 +49,15 @@ function doPost(e) {
       deleteScans: () => deleteScans(request, requestId),
       loadUserScans: () => loadUserScans(request, requestId),
       syncKegs: () => syncKegs(request, requestId),
-      syncManualEntries: () => syncManualEntries(request, requestId)
+      syncManualEntries: () => syncManualEntries(request, requestId),
+      getTemplates: () => getTemplates(request, requestId),
+      saveTemplate: () => saveTemplate(request, requestId),
+      deleteTemplate: () => deleteTemplate(request, requestId),
+      getRecipes: () => getRecipes(request, requestId),
+      saveRecipe: () => saveRecipe(request, requestId),
+      deleteRecipe: () => deleteRecipe(request, requestId),
+      syncBatches: () => syncBatches(request, requestId),
+      loadBatches: () => loadBatches(request, requestId)
     };
     
     const handler = handlers[request.action];
@@ -791,5 +799,419 @@ function syncManualEntries(request, requestId) {
     }, requestId);
   } catch (error) {
     return errorResponse('Error syncing manual entries: ' + error.toString(), 'syncManualEntries', requestId);
+  }
+}
+
+// ============================================
+// TEMPLATES (Bar Templating Feature)
+// ============================================
+
+function getTemplates(request, requestId) {
+  try {
+    const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+    let sheet = ss.getSheetByName('Templates');
+
+    // Create Templates sheet if it doesn't exist
+    if (!sheet) {
+      sheet = ss.insertSheet('Templates');
+      sheet.getRange('A1:H1').setValues([['Template ID', 'Location', 'Name', 'Status', 'Products', 'Created By', 'Created Date', 'Last Updated']]);
+      formatHeader(sheet.getRange('A1:H1'));
+      return successResponse('Templates loaded', { templates: [] }, requestId);
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return successResponse('No templates found', { templates: [] }, requestId);
+    }
+
+    const data = sheet.getRange('A2:H' + lastRow).getValues();
+    const templates = data.map(row => ({
+      templateID: String(row[0] || ''),
+      location: String(row[1] || ''),
+      name: String(row[2] || ''),
+      status: String(row[3] || 'Draft'),
+      products: row[4] ? JSON.parse(row[4]) : [],
+      createdBy: String(row[5] || ''),
+      createdDate: String(row[6] || ''),
+      lastUpdated: String(row[7] || '')
+    }));
+
+    // Filter by location if requested
+    let filtered = templates;
+    if (request.location) {
+      filtered = templates.filter(t => t.location === request.location);
+    }
+
+    return successResponse('Templates loaded', { templates: filtered }, requestId);
+  } catch (error) {
+    return errorResponse('Error loading templates: ' + error.toString(), 'getTemplates', requestId);
+  }
+}
+
+function saveTemplate(request, requestId) {
+  try {
+    if (!request.template) {
+      return errorResponse('Missing template data', 'saveTemplate', requestId);
+    }
+
+    const template = request.template;
+    if (!template.templateID || !template.location) {
+      return errorResponse('Missing templateID or location', 'saveTemplate', requestId);
+    }
+
+    const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+    let sheet = ss.getSheetByName('Templates');
+
+    // Create sheet if it doesn't exist
+    if (!sheet) {
+      sheet = ss.insertSheet('Templates');
+      sheet.getRange('A1:H1').setValues([['Template ID', 'Location', 'Name', 'Status', 'Products', 'Created By', 'Created Date', 'Last Updated']]);
+      formatHeader(sheet.getRange('A1:H1'));
+    }
+
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+    const productsJSON = JSON.stringify(template.products || []);
+
+    // Check if template exists
+    const lastRow = sheet.getLastRow();
+    let rowIndex = null;
+
+    if (lastRow > 1) {
+      const ids = sheet.getRange('A2:A' + lastRow).getValues();
+      for (let i = 0; i < ids.length; i++) {
+        if (ids[i][0] === template.templateID) {
+          rowIndex = i + 2;
+          break;
+        }
+      }
+    }
+
+    // If pushing to Live, demote existing Live template for this location to Draft
+    if (template.status === 'Live' && lastRow > 1) {
+      const data = sheet.getRange('A2:D' + lastRow).getValues();
+      data.forEach((row, i) => {
+        if (row[1] === template.location && row[3] === 'Live' && row[0] !== template.templateID) {
+          sheet.getRange(i + 2, 4).setValue('Draft');
+        }
+      });
+    }
+
+    const row = [
+      template.templateID,
+      template.location,
+      template.name || '',
+      template.status || 'Draft',
+      productsJSON,
+      template.createdBy || '',
+      template.createdDate || timestamp,
+      timestamp
+    ];
+
+    if (rowIndex) {
+      // Update existing
+      sheet.getRange(rowIndex, 1, 1, 8).setValues([row]);
+    } else {
+      // Insert new
+      sheet.getRange(lastRow + 1, 1, 1, 8).setValues([row]);
+    }
+
+    return successResponse('Template saved', { templateID: template.templateID }, requestId);
+  } catch (error) {
+    return errorResponse('Error saving template: ' + error.toString(), 'saveTemplate', requestId);
+  }
+}
+
+function deleteTemplate(request, requestId) {
+  try {
+    if (!request.templateID) {
+      return errorResponse('Missing templateID', 'deleteTemplate', requestId);
+    }
+
+    const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+    const sheet = ss.getSheetByName('Templates');
+
+    if (!sheet) {
+      return errorResponse('Templates sheet not found', 'deleteTemplate', requestId);
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return errorResponse('Template not found', 'deleteTemplate', requestId);
+    }
+
+    const ids = sheet.getRange('A2:A' + lastRow).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      if (ids[i][0] === request.templateID) {
+        sheet.deleteRow(i + 2);
+        return successResponse('Template deleted', { templateID: request.templateID }, requestId);
+      }
+    }
+
+    return errorResponse('Template not found', 'deleteTemplate', requestId);
+  } catch (error) {
+    return errorResponse('Error deleting template: ' + error.toString(), 'deleteTemplate', requestId);
+  }
+}
+
+// ============================================
+// RECIPES (Batch Counting Feature)
+// ============================================
+
+function getRecipes(request, requestId) {
+  try {
+    const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+    let sheet = ss.getSheetByName('Recipes');
+
+    // Create Recipes sheet if it doesn't exist
+    if (!sheet) {
+      sheet = ss.insertSheet('Recipes');
+      sheet.getRange('A1:G1').setValues([['Recipe ID', 'Name', 'Location', 'Ingredients', 'Filler Items', 'Created By', 'Last Updated']]);
+      formatHeader(sheet.getRange('A1:G1'));
+      return successResponse('Recipes loaded', { recipes: [] }, requestId);
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return successResponse('No recipes found', { recipes: [] }, requestId);
+    }
+
+    const data = sheet.getRange('A2:G' + lastRow).getValues();
+    const recipes = data.map(row => ({
+      recipeID: String(row[0] || ''),
+      name: String(row[1] || ''),
+      location: String(row[2] || ''),
+      ingredients: row[3] ? JSON.parse(row[3]) : [],
+      fillerItems: String(row[4] || ''),
+      createdBy: String(row[5] || ''),
+      lastUpdated: String(row[6] || '')
+    }));
+
+    // Filter by location if requested
+    let filtered = recipes;
+    if (request.location) {
+      filtered = recipes.filter(r => r.location === request.location);
+    }
+
+    return successResponse('Recipes loaded', { recipes: filtered }, requestId);
+  } catch (error) {
+    return errorResponse('Error loading recipes: ' + error.toString(), 'getRecipes', requestId);
+  }
+}
+
+function saveRecipe(request, requestId) {
+  try {
+    if (!request.recipe) {
+      return errorResponse('Missing recipe data', 'saveRecipe', requestId);
+    }
+
+    const recipe = request.recipe;
+    if (!recipe.recipeID || !recipe.name) {
+      return errorResponse('Missing recipeID or name', 'saveRecipe', requestId);
+    }
+
+    const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+    let sheet = ss.getSheetByName('Recipes');
+
+    // Create sheet if it doesn't exist
+    if (!sheet) {
+      sheet = ss.insertSheet('Recipes');
+      sheet.getRange('A1:G1').setValues([['Recipe ID', 'Name', 'Location', 'Ingredients', 'Filler Items', 'Created By', 'Last Updated']]);
+      formatHeader(sheet.getRange('A1:G1'));
+    }
+
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+    const ingredientsJSON = JSON.stringify(recipe.ingredients || []);
+
+    // Check if recipe exists
+    const lastRow = sheet.getLastRow();
+    let rowIndex = null;
+
+    if (lastRow > 1) {
+      const ids = sheet.getRange('A2:A' + lastRow).getValues();
+      for (let i = 0; i < ids.length; i++) {
+        if (ids[i][0] === recipe.recipeID) {
+          rowIndex = i + 2;
+          break;
+        }
+      }
+    }
+
+    const row = [
+      recipe.recipeID,
+      recipe.name,
+      recipe.location || '',
+      ingredientsJSON,
+      recipe.fillerItems || '',
+      recipe.createdBy || '',
+      timestamp
+    ];
+
+    if (rowIndex) {
+      // Update existing
+      sheet.getRange(rowIndex, 1, 1, 7).setValues([row]);
+    } else {
+      // Insert new
+      sheet.getRange(lastRow + 1, 1, 1, 7).setValues([row]);
+    }
+
+    return successResponse('Recipe saved', { recipeID: recipe.recipeID }, requestId);
+  } catch (error) {
+    return errorResponse('Error saving recipe: ' + error.toString(), 'saveRecipe', requestId);
+  }
+}
+
+function deleteRecipe(request, requestId) {
+  try {
+    if (!request.recipeID) {
+      return errorResponse('Missing recipeID', 'deleteRecipe', requestId);
+    }
+
+    const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+    const sheet = ss.getSheetByName('Recipes');
+
+    if (!sheet) {
+      return errorResponse('Recipes sheet not found', 'deleteRecipe', requestId);
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return errorResponse('Recipe not found', 'deleteRecipe', requestId);
+    }
+
+    const ids = sheet.getRange('A2:A' + lastRow).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      if (ids[i][0] === request.recipeID) {
+        sheet.deleteRow(i + 2);
+        return successResponse('Recipe deleted', { recipeID: request.recipeID }, requestId);
+      }
+    }
+
+    return errorResponse('Recipe not found', 'deleteRecipe', requestId);
+  } catch (error) {
+    return errorResponse('Error deleting recipe: ' + error.toString(), 'deleteRecipe', requestId);
+  }
+}
+
+// ============================================
+// BATCHES (Batch Counting Feature)
+// ============================================
+
+function syncBatches(request, requestId) {
+  try {
+    if (!request.stocktakeId) {
+      return errorResponse('Missing stocktakeId', 'syncBatches', requestId);
+    }
+    if (!request.batches || !Array.isArray(request.batches) || request.batches.length === 0) {
+      return successResponse('No batches to sync', { syncedCount: 0 }, requestId);
+    }
+
+    const ss = SpreadsheetApp.openById(request.stocktakeId);
+    let sheet = ss.getSheetByName('Batches');
+
+    // Create Batches sheet if it doesn't exist
+    if (!sheet) {
+      sheet = ss.insertSheet('Batches');
+      sheet.getRange('A1:J1').setValues([['Batch Sync ID', 'Recipe ID', 'Recipe Name', 'Batch Size (ml)', 'Bottle Count', 'Ingredients', 'Location', 'User', 'Timestamp', 'Imported']]);
+      formatHeader(sheet.getRange('A1:J1'));
+    }
+
+    // Get existing sync IDs
+    const lastRow = sheet.getLastRow();
+    const existingIds = {};
+    if (lastRow > 1) {
+      const syncIds = sheet.getRange('A2:A' + lastRow).getValues();
+      syncIds.forEach((row, i) => {
+        if (row[0]) existingIds[row[0]] = i + 2;
+      });
+    }
+
+    // Separate updates and inserts
+    const toUpdate = [];
+    const toAdd = [];
+    const syncedIds = [];
+
+    request.batches.forEach(batch => {
+      if (!batch.batchSyncID) return;
+
+      const ingredientsJSON = JSON.stringify(batch.ingredients || []);
+      const row = [
+        batch.batchSyncID,
+        batch.recipeID || '',
+        batch.recipeName || '',
+        batch.batchBottleSizeML || 0,
+        batch.bottleCount || 0,
+        ingredientsJSON,
+        batch.location || '',
+        batch.user || '',
+        batch.timestamp || '',
+        batch.imported ? 'Yes' : 'No'
+      ];
+
+      if (existingIds[batch.batchSyncID]) {
+        toUpdate.push({ rowIndex: existingIds[batch.batchSyncID], row: row });
+      } else {
+        toAdd.push(row);
+      }
+      syncedIds.push(batch.batchSyncID);
+    });
+
+    // Batch update existing rows
+    if (toUpdate.length > 0) {
+      toUpdate.forEach(update => {
+        sheet.getRange(update.rowIndex, 1, 1, 10).setValues([update.row]);
+      });
+    }
+
+    // Batch insert new rows
+    if (toAdd.length > 0) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, toAdd.length, 10).setValues(toAdd);
+    }
+
+    return successResponse('Batches synced', {
+      syncedCount: request.batches.length,
+      syncedIds: syncedIds,
+      newBatches: toAdd.length,
+      updatedBatches: toUpdate.length
+    }, requestId);
+  } catch (error) {
+    return errorResponse('Error syncing batches: ' + error.toString(), 'syncBatches', requestId);
+  }
+}
+
+function loadBatches(request, requestId) {
+  try {
+    if (!request.stocktakeId) {
+      return errorResponse('Missing stocktakeId', 'loadBatches', requestId);
+    }
+
+    const ss = SpreadsheetApp.openById(request.stocktakeId);
+    const sheet = ss.getSheetByName('Batches');
+
+    if (!sheet) {
+      return successResponse('No batches found', { batches: [] }, requestId);
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return successResponse('No batches found', { batches: [] }, requestId);
+    }
+
+    const data = sheet.getRange('A2:J' + lastRow).getValues();
+    const batches = data.map(row => ({
+      batchSyncID: String(row[0] || ''),
+      recipeID: String(row[1] || ''),
+      recipeName: String(row[2] || ''),
+      batchBottleSizeML: parseFloat(row[3]) || 0,
+      bottleCount: parseFloat(row[4]) || 0,
+      ingredients: row[5] ? JSON.parse(row[5]) : [],
+      location: String(row[6] || ''),
+      user: String(row[7] || ''),
+      timestamp: String(row[8] || ''),
+      imported: row[9] === 'Yes' || row[9] === true
+    }));
+
+    return successResponse('Batches loaded', { batches }, requestId);
+  } catch (error) {
+    return errorResponse('Error loading batches: ' + error.toString(), 'loadBatches', requestId);
   }
 }

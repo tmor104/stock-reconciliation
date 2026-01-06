@@ -130,6 +130,24 @@ function formatDate(dateString) {
     return new Date(dateString).toLocaleString();
 }
 
+function showMessage(message, type = 'info') {
+    // For now, use alert - can be enhanced with custom UI later
+    if (type === 'success') {
+        alert('✅ ' + message);
+    } else if (type === 'warning') {
+        alert('⚠️ ' + message);
+    } else {
+        alert(message);
+    }
+}
+
+function updateLockToggles(isLocked) {
+    document.querySelectorAll('.lock-toggle-btn').forEach(btn => {
+        btn.textContent = isLocked ? '🔓' : '🔒';
+        btn.title = isLocked ? 'Unlock (show app selection on login)' : 'Lock (go straight to counting on login)';
+    });
+}
+
 // Note: sha256 is defined in api-service.js, no need to redeclare here
 
 // ============================================
@@ -229,9 +247,13 @@ async function init() {
         });
         
         updateOfflineIndicator();
-        
+
         // Set up event listeners
         setupEventListeners();
+
+        // Initialize lock toggle state
+        const lockMode = await dbService.getState('lockCountingMode');
+        updateLockToggles(lockMode || false);
         
     } catch (error) {
         console.error('Initialization error:', error);
@@ -260,6 +282,26 @@ function setupEventListeners() {
     // Logout buttons
     document.querySelectorAll('#logout-btn, #counting-logout-btn, #reconciliation-logout-btn').forEach(btn => {
         if (btn) btn.addEventListener('click', handleLogout);
+    });
+
+    // Back to app selection button (on counting screen)
+    const backToAppsBtn = document.getElementById('back-to-app-selection-btn');
+    if (backToAppsBtn) {
+        backToAppsBtn.addEventListener('click', async () => {
+            showScreen('app-selection-screen');
+            await loadAppSelectionScreen();
+        });
+    }
+
+    // Lock/unlock toggle buttons
+    document.querySelectorAll('.lock-toggle-btn').forEach(btn => {
+        if (btn) btn.addEventListener('click', async () => {
+            const currentLockState = await dbService.getState('lockCountingMode');
+            const newLockState = !currentLockState;
+            await dbService.saveState('lockCountingMode', newLockState);
+            updateLockToggles(newLockState);
+            showMessage(newLockState ? '🔒 Lock mode enabled - will go straight to counting on login' : '🔓 Lock mode disabled - will show app selection on login', 'success');
+        });
     });
     
     // Home screen
@@ -3872,6 +3914,71 @@ async function loadTemplateManagerScreen() {
         templateManager.saveTemplate('Live');
     });
 
+    // Product search for adding to template
+    const productSearch = document.getElementById('template-product-search');
+    if (productSearch) {
+        productSearch.addEventListener('input', async (e) => {
+            const query = e.target.value.trim().toLowerCase();
+            if (query.length < 2) {
+                document.getElementById('template-search-results').innerHTML = '';
+                return;
+            }
+
+            // Search in product database
+            const results = state.productDatabase.filter(p =>
+                p.product.toLowerCase().includes(query) ||
+                p.barcode.includes(query)
+            ).slice(0, 10);
+
+            const resultsContainer = document.getElementById('template-search-results') ||
+                (() => {
+                    const div = document.createElement('div');
+                    div.id = 'template-search-results';
+                    div.style.cssText = 'max-height: 200px; overflow-y: auto; border: 1px solid var(--slate-200); border-radius: 4px; margin-top: 8px;';
+                    productSearch.parentNode.appendChild(div);
+                    return div;
+                })();
+
+            resultsContainer.innerHTML = results.map(p => `
+                <div class="search-result-item" data-barcode="${p.barcode}" data-product="${p.product}"
+                     style="padding: 8px; cursor: pointer; border-bottom: 1px solid var(--slate-100);">
+                    <strong>${p.product}</strong><br>
+                    <small style="color: var(--slate-600);">${p.barcode}</small>
+                </div>
+            `).join('');
+
+            resultsContainer.querySelectorAll('.search-result-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    templateManager.templateProducts.push({
+                        barcode: item.dataset.barcode,
+                        product: item.dataset.product,
+                        parLevel: 0,
+                        allowPartial: false,
+                        isSection: false
+                    });
+                    templateManager.renderTemplateProducts();
+                    productSearch.value = '';
+                    resultsContainer.innerHTML = '';
+                });
+            });
+        });
+    }
+
+    // Add section header button
+    const addSectionBtn = document.getElementById('add-section-header-btn');
+    if (addSectionBtn) {
+        addSectionBtn.addEventListener('click', () => {
+            const sectionName = prompt('Enter section name (e.g., "Beer", "Spirits", "Wine"):');
+            if (sectionName && sectionName.trim()) {
+                templateManager.templateProducts.push({
+                    name: sectionName.trim(),
+                    isSection: true
+                });
+                templateManager.renderTemplateProducts();
+            }
+        });
+    }
+
     document.getElementById('template-manager-logout-btn').addEventListener('click', handleLogout);
 }
 
@@ -3903,6 +4010,62 @@ async function loadBatchManagerScreen() {
     document.getElementById('save-recipe-btn').addEventListener('click', () => {
         batchManager.saveRecipe();
     });
+
+    // Ingredient search for adding to recipe
+    const ingredientSearch = document.getElementById('recipe-ingredient-search');
+    if (ingredientSearch) {
+        ingredientSearch.addEventListener('input', async (e) => {
+            const query = e.target.value.trim().toLowerCase();
+            if (query.length < 2) {
+                const resultsContainer = document.getElementById('recipe-search-results');
+                if (resultsContainer) resultsContainer.innerHTML = '';
+                return;
+            }
+
+            // Search in product database
+            const results = state.productDatabase.filter(p =>
+                p.product.toLowerCase().includes(query) ||
+                p.barcode.includes(query)
+            ).slice(0, 10);
+
+            const resultsContainer = document.getElementById('recipe-search-results') ||
+                (() => {
+                    const div = document.createElement('div');
+                    div.id = 'recipe-search-results';
+                    div.style.cssText = 'max-height: 200px; overflow-y: auto; border: 1px solid var(--slate-200); border-radius: 4px; margin-top: 8px;';
+                    ingredientSearch.parentNode.appendChild(div);
+                    return div;
+                })();
+
+            resultsContainer.innerHTML = results.map(p => `
+                <div class="search-result-item" data-barcode="${p.barcode}" data-product="${p.product}"
+                     style="padding: 8px; cursor: pointer; border-bottom: 1px solid var(--slate-100);">
+                    <strong>${p.product}</strong><br>
+                    <small style="color: var(--slate-600);">${p.barcode}</small>
+                </div>
+            `).join('');
+
+            resultsContainer.querySelectorAll('.search-result-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    // Prompt for ingredient details
+                    const serveSizeML = parseFloat(prompt('Enter serve size in ml (e.g., 30):', '30'));
+                    const bottleSizeML = parseFloat(prompt('Enter bottle size in ml (e.g., 700):', '700'));
+
+                    if (serveSizeML && bottleSizeML && serveSizeML > 0 && bottleSizeML > 0) {
+                        batchManager.recipeIngredients.push({
+                            barcode: item.dataset.barcode,
+                            product: item.dataset.product,
+                            serveSizeML: serveSizeML,
+                            bottleSizeML: bottleSizeML
+                        });
+                        batchManager.renderRecipeIngredients();
+                        ingredientSearch.value = '';
+                        resultsContainer.innerHTML = '';
+                    }
+                });
+            });
+        });
+    }
 
     document.getElementById('batch-manager-logout-btn').addEventListener('click', handleLogout);
 }

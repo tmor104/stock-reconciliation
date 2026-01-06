@@ -1,0 +1,11 @@
+# Cloudflare Pages - Ignore these files/directories
+node_modules/
+.git/
+.github/
+unified-system/
+stocktake-system/
+*.md
+*.log
+.env
+.env.*
+wrangler.toml

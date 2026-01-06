@@ -3914,36 +3914,129 @@ async function loadTemplateManagerScreen() {
         userInfo.textContent = `Logged in as ${state.user.username}`;
     }
 
-    // Load all templates into table
-    await templateManager.renderAllTemplatesTable();
+    // Get all templates and group by location
+    const allTemplates = await dbService.getTemplates();
+    const locationMap = new Map();
+
+    allTemplates.forEach(template => {
+        const loc = template.location || 'Unknown';
+        if (!locationMap.has(loc)) {
+            locationMap.set(loc, {
+                location: loc,
+                templates: [],
+                liveCount: 0,
+                draftCount: 0
+            });
+        }
+        const data = locationMap.get(loc);
+        data.templates.push(template);
+        if (template.status === 'Live') {
+            data.liveCount++;
+        } else {
+            data.draftCount++;
+        }
+    });
+
+    // Render location cards
+    const locationsGrid = document.getElementById('template-locations-grid');
+    const locations = Array.from(locationMap.values());
+
+    if (locations.length === 0) {
+        locationsGrid.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--slate-500);">No templates found. Create your first template!</div>';
+    } else {
+        locationsGrid.innerHTML = locations.map(loc => `
+            <div class="location-card" data-location="${loc.location}">
+                <div class="location-card-header">
+                    <h3 class="location-card-name">${loc.location}</h3>
+                    <span class="location-card-badge">${loc.templates.length} template${loc.templates.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div class="location-card-stats">
+                    <div class="location-card-stat">
+                        <span class="location-card-stat-label">Live:</span>
+                        <span class="location-card-stat-value" style="color: var(--green-700);">${loc.liveCount}</span>
+                    </div>
+                    <div class="location-card-stat">
+                        <span class="location-card-stat-label">Drafts:</span>
+                        <span class="location-card-stat-value" style="color: var(--slate-600);">${loc.draftCount}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        // Add click handlers to location cards
+        document.querySelectorAll('.location-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const location = card.dataset.location;
+                loadTemplateLocationDetailScreen(location);
+            });
+        });
+    }
+
+    // Location search
+    const locationSearch = document.getElementById('template-location-search');
+    if (locationSearch) {
+        locationSearch.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll('.location-card').forEach(card => {
+                const location = card.dataset.location.toLowerCase();
+                card.style.display = location.includes(query) ? 'flex' : 'none';
+            });
+        });
+    }
+
+    // Back button
+    document.getElementById('template-manager-back-btn').addEventListener('click', () => {
+        showScreen('app-selection-screen');
+    });
+
+    document.getElementById('template-manager-logout-btn').addEventListener('click', handleLogout);
+}
+
+async function loadTemplateLocationDetailScreen(location) {
+    // Show the detail screen
+    showScreen('template-location-detail-screen');
+
+    // Store current location in state
+    state.currentTemplateLocation = location;
+
+    // Set user info
+    const userInfo = document.getElementById('template-detail-user-info');
+    if (userInfo && state.user) {
+        userInfo.textContent = `Logged in as ${state.user.username}`;
+    }
+
+    // Update title
+    const titleEl = document.getElementById('template-detail-location-title');
+    if (titleEl) {
+        titleEl.textContent = `📋 Templates - ${location}`;
+    }
+
+    // Load templates for this location
+    await renderTemplateLocationDetail();
 
     // Search and filter functionality
-    const searchInput = document.getElementById('template-search');
-    const locationFilter = document.getElementById('template-location-filter');
-    const statusFilter = document.getElementById('template-status-filter');
+    const searchInput = document.getElementById('template-detail-search');
+    const statusFilter = document.getElementById('template-detail-status-filter');
 
     const applyFilters = async () => {
         const searchQuery = searchInput?.value.toLowerCase() || '';
-        const locationValue = locationFilter?.value || '';
         const statusValue = statusFilter?.value || '';
 
         const allTemplates = await dbService.getTemplates();
-        const tbody = document.getElementById('template-table-body');
+        const locationTemplates = allTemplates.filter(t => t.location === location);
+        const tbody = document.getElementById('template-detail-table-body');
 
         if (!tbody) return;
 
-        const filtered = allTemplates.filter(template => {
+        const filtered = locationTemplates.filter(template => {
             const matchesSearch = !searchQuery ||
-                (template.templateName && template.templateName.toLowerCase().includes(searchQuery)) ||
-                (template.location && template.location.toLowerCase().includes(searchQuery));
-            const matchesLocation = !locationValue || template.location === locationValue;
+                (template.templateName && template.templateName.toLowerCase().includes(searchQuery));
             const matchesStatus = !statusValue || template.status === statusValue;
-
-            return matchesSearch && matchesLocation && matchesStatus;
+            return matchesSearch && matchesStatus;
         });
 
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--slate-500);">No templates match your filters</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--slate-500);">No templates match your filters</td></tr>';
             return;
         }
 
@@ -3957,7 +4050,6 @@ async function loadTemplateManagerScreen() {
             return `
                 <tr style="cursor: pointer;" class="template-row" data-template-id="${template.templateID}">
                     <td style="padding: 12px;">${template.templateName || 'Unnamed'}</td>
-                    <td style="padding: 12px;">${template.location || '-'}</td>
                     <td style="padding: 12px;">${statusBadge}</td>
                     <td style="padding: 12px;">${productCount}</td>
                     <td style="padding: 12px;">${template.createdBy || '-'}</td>
@@ -3982,21 +4074,19 @@ async function loadTemplateManagerScreen() {
     if (searchInput) {
         searchInput.addEventListener('input', applyFilters);
     }
-    if (locationFilter) {
-        locationFilter.addEventListener('change', applyFilters);
-    }
     if (statusFilter) {
         statusFilter.addEventListener('change', applyFilters);
     }
 
     // Back button
-    document.getElementById('template-manager-back-btn').addEventListener('click', () => {
-        showScreen('app-selection-screen');
+    document.getElementById('template-detail-back-btn').addEventListener('click', () => {
+        showScreen('template-manager-screen');
+        loadTemplateManagerScreen();
     });
 
     // Create template button
-    document.getElementById('create-template-btn').addEventListener('click', () => {
-        templateManager.createNewTemplate();
+    document.getElementById('create-template-detail-btn').addEventListener('click', () => {
+        templateManager.createNewTemplate(location);
     });
 
     // Template editor side panel buttons
@@ -4078,7 +4168,51 @@ async function loadTemplateManagerScreen() {
         });
     }
 
-    document.getElementById('template-manager-logout-btn').addEventListener('click', handleLogout);
+    document.getElementById('template-detail-logout-btn').addEventListener('click', handleLogout);
+}
+
+async function renderTemplateLocationDetail() {
+    const location = state.currentTemplateLocation;
+    const allTemplates = await dbService.getTemplates();
+    const locationTemplates = allTemplates.filter(t => t.location === location);
+    const tbody = document.getElementById('template-detail-table-body');
+
+    if (!tbody) return;
+
+    if (locationTemplates.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--slate-500);">No templates for this location</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = locationTemplates.map(template => {
+        const productCount = Array.isArray(template.products) ? template.products.length : 0;
+        const lastModified = template.lastModified ? new Date(template.lastModified).toLocaleDateString() : '-';
+        const statusBadge = template.status === 'Live' ?
+            '<span style="background: var(--green-100); color: var(--green-800); padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">LIVE</span>' :
+            '<span style="background: var(--slate-100); color: var(--slate-700); padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">DRAFT</span>';
+
+        return `
+            <tr style="cursor: pointer;" class="template-row" data-template-id="${template.templateID}">
+                <td style="padding: 12px;">${template.templateName || 'Unnamed'}</td>
+                <td style="padding: 12px;">${statusBadge}</td>
+                <td style="padding: 12px;">${productCount}</td>
+                <td style="padding: 12px;">${template.createdBy || '-'}</td>
+                <td style="padding: 12px; font-size: 13px; color: var(--slate-600);">${lastModified}</td>
+                <td style="padding: 12px;">
+                    <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="templateManager.editTemplate('${template.templateID}'); event.stopPropagation();">Edit</button>
+                    <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px; margin-left: 8px;" onclick="templateManager.duplicateTemplate('${template.templateID}'); event.stopPropagation();">Duplicate</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    // Add click handlers to rows
+    document.querySelectorAll('.template-row').forEach(row => {
+        row.addEventListener('click', () => {
+            const templateID = row.dataset.templateId;
+            templateManager.editTemplate(templateID);
+        });
+    });
 }
 
 async function loadBatchManagerScreen() {
@@ -4180,61 +4314,8 @@ async function loadBatchManagerScreen() {
         batchManager.saveRecipe();
     });
 
-    // Ingredient search for adding to recipe
-    const ingredientSearch = document.getElementById('recipe-ingredient-search');
-    if (ingredientSearch) {
-        ingredientSearch.addEventListener('input', async (e) => {
-            const query = e.target.value.trim().toLowerCase();
-            if (query.length < 2) {
-                const resultsContainer = document.getElementById('recipe-search-results');
-                if (resultsContainer) resultsContainer.innerHTML = '';
-                return;
-            }
-
-            // Search in product database
-            const results = state.productDatabase.filter(p =>
-                p.product.toLowerCase().includes(query) ||
-                p.barcode.includes(query)
-            ).slice(0, 10);
-
-            const resultsContainer = document.getElementById('recipe-search-results') ||
-                (() => {
-                    const div = document.createElement('div');
-                    div.id = 'recipe-search-results';
-                    div.style.cssText = 'max-height: 200px; overflow-y: auto; border: 1px solid var(--slate-200); border-radius: 4px; margin-top: 8px;';
-                    ingredientSearch.parentNode.appendChild(div);
-                    return div;
-                })();
-
-            resultsContainer.innerHTML = results.map(p => `
-                <div class="search-result-item" data-barcode="${p.barcode}" data-product="${p.product}"
-                     style="padding: 8px; cursor: pointer; border-bottom: 1px solid var(--slate-100);">
-                    <strong>${p.product}</strong><br>
-                    <small style="color: var(--slate-600);">${p.barcode}</small>
-                </div>
-            `).join('');
-
-            resultsContainer.querySelectorAll('.search-result-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    // Prompt for ingredient details
-                    const serveSizeML = parseFloat(prompt('Enter serve size in ml (e.g., 30):', '30'));
-                    const bottleSizeML = parseFloat(prompt('Enter bottle size in ml (e.g., 700):', '700'));
-
-                    if (serveSizeML && bottleSizeML && serveSizeML > 0 && bottleSizeML > 0) {
-                        batchManager.recipeIngredients.push({
-                            barcode: item.dataset.barcode,
-                            product: item.dataset.product,
-                            serveSizeML: serveSizeML,
-                            bottleSizeML: bottleSizeML
-                        });
-                        batchManager.renderRecipeIngredients();
-                        ingredientSearch.value = '';
-                        resultsContainer.innerHTML = '';
-                    }
-                });
-            });
-        });
-    }
+    // Note: Ingredient search event listener is now in batchManager.renderRecipeIngredients()
+    // since the input element is recreated each time
 
     document.getElementById('batch-manager-logout-btn').addEventListener('click', handleLogout);
 }

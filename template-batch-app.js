@@ -517,7 +517,6 @@ const batchManager = {
         document.getElementById('recipe-editor-title').textContent = 'Create Recipe';
         document.getElementById('recipe-name-input').value = '';
         document.getElementById('recipe-location-select').value = '';
-        document.getElementById('recipe-filler-items-input').value = '';
 
         // Populate location dropdown
         const locationSelect = document.getElementById('recipe-location-select');

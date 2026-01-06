@@ -2127,6 +2127,68 @@ body {
 }
 
 /* ============================================
+   SIDE PANEL
+   ============================================ */
+
+.side-panel {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 100%;
+    height: 100%;
+    z-index: 2000;
+    transition: right 0.3s ease-in-out;
+    pointer-events: none;
+}
+
+.side-panel.active {
+    right: 0;
+    pointer-events: auto;
+}
+
+.side-panel-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.side-panel.active .side-panel-overlay {
+    opacity: 1;
+}
+
+.side-panel-content {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 70%;
+    max-width: 1200px;
+    height: 100%;
+    background: white;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s ease-in-out;
+}
+
+.side-panel.active .side-panel-content {
+    transform: translateX(0);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .side-panel-content {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+/* ============================================
    BATCH COUNTING UI
    ============================================ */
 

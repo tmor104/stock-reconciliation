@@ -102,6 +102,67 @@ const templateManager = {
     currentTemplate: null,
     templateProducts: [],
 
+    async renderAllTemplatesTable() {
+        try {
+            const allTemplates = await dbService.getTemplates();
+            const tbody = document.getElementById('template-table-body');
+
+            if (!tbody) return;
+
+            if (allTemplates.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">No templates found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = allTemplates.map(template => {
+                const productCount = Array.isArray(template.products) ? template.products.length : 0;
+                const lastModified = template.lastModified ? new Date(template.lastModified).toLocaleDateString() : '-';
+                const statusBadge = template.status === 'Live' ?
+                    '<span style="background: var(--green-100); color: var(--green-800); padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">LIVE</span>' :
+                    '<span style="background: var(--slate-100); color: var(--slate-700); padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">DRAFT</span>';
+
+                return `
+                    <tr style="cursor: pointer;" class="template-row" data-template-id="${template.templateID}">
+                        <td style="padding: 12px;">${template.templateName || 'Unnamed'}</td>
+                        <td style="padding: 12px;">${template.location || '-'}</td>
+                        <td style="padding: 12px;">${statusBadge}</td>
+                        <td style="padding: 12px;">${productCount}</td>
+                        <td style="padding: 12px;">${template.createdBy || '-'}</td>
+                        <td style="padding: 12px; font-size: 13px; color: var(--slate-600);">${lastModified}</td>
+                        <td style="padding: 12px;">
+                            <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="templateManager.editTemplate('${template.templateID}'); event.stopPropagation();">Edit</button>
+                            <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px; margin-left: 8px;" onclick="templateManager.duplicateTemplate('${template.templateID}'); event.stopPropagation();">Duplicate</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Add click handlers to rows
+            document.querySelectorAll('.template-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const templateID = row.dataset.templateId;
+                    templateManager.editTemplate(templateID);
+                });
+            });
+
+            // Populate location filter
+            const locationFilter = document.getElementById('template-location-filter');
+            if (locationFilter && state.locations) {
+                const currentValue = locationFilter.value;
+                locationFilter.innerHTML = '<option value="">All Locations</option>' +
+                    state.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+                locationFilter.value = currentValue;
+            }
+
+        } catch (error) {
+            console.error('Failed to load templates:', error);
+            const tbody = document.getElementById('template-table-body');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--red-600);">Error loading templates</td></tr>';
+            }
+        }
+    },
+
     async loadLocations() {
         try {
             // Get locations from state or API
@@ -237,7 +298,7 @@ const templateManager = {
         document.getElementById('template-editor-location').textContent = this.currentLocation;
         document.getElementById('template-products-table').innerHTML = '<p class="info-text">No products added yet</p>';
 
-        showModal('template-editor-modal');
+        showPanel('template-editor-panel');
     },
 
     async editTemplate(templateID) {
@@ -255,7 +316,7 @@ const templateManager = {
         document.getElementById('template-editor-location').textContent = template.location;
 
         this.renderTemplateProducts();
-        showModal('template-editor-modal');
+        showPanel('template-editor-panel');
     },
 
     renderTemplateProducts() {
@@ -371,10 +432,10 @@ const templateManager = {
             await apiService.saveTemplate(template);
 
             showMessage(`Template saved as ${status}`, 'success');
-            hideModal('template-editor-modal');
+            hidePanel('template-editor-panel');
 
-            // Refresh location detail
-            await this.showLocationDetail(this.currentLocation);
+            // Refresh template table
+            await this.renderAllTemplatesTable();
 
         } catch (error) {
             console.error('Failed to save template:', error);
@@ -443,7 +504,7 @@ const templateManager = {
 
         await dbService.saveTemplate(newTemplate);
         showMessage('Template duplicated', 'success');
-        await this.showLocationDetail(template.location);
+        await this.renderAllTemplatesTable();
     }
 };
 
@@ -454,6 +515,70 @@ const templateManager = {
 const batchManager = {
     currentRecipe: null,
     recipeIngredients: [],
+
+    async renderAllRecipesTable() {
+        try {
+            const recipes = await dbService.getRecipes();
+            const tbody = document.getElementById('recipe-table-body');
+
+            if (!tbody) return;
+
+            if (recipes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">No recipes found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = recipes.map(recipe => {
+                // Format ingredients list inline
+                let ingredientsList = '';
+                if (recipe.ingredients && recipe.ingredients.length > 0) {
+                    ingredientsList = recipe.ingredients.map((ing, idx) => {
+                        const isFiller = !ing.barcode;
+                        const label = isFiller ?
+                            `<span style="background: var(--yellow-100); padding: 2px 6px; border-radius: 3px; font-size: 11px;">${ing.product} (${ing.serveSizeML}ml)</span>` :
+                            `<span style="background: var(--blue-50); padding: 2px 6px; border-radius: 3px; font-size: 11px;">${ing.product} (${ing.serveSizeML}ml/${ing.bottleSizeML}ml)</span>`;
+                        return label;
+                    }).join(' ');
+                }
+
+                return `
+                    <tr style="cursor: pointer;" class="recipe-row" data-recipe-id="${recipe.recipeID}">
+                        <td style="padding: 12px;">${recipe.name || 'Unnamed'}</td>
+                        <td style="padding: 12px;">${recipe.location || '-'}</td>
+                        <td style="padding: 12px; max-width: 400px;">${ingredientsList || '<em style="color: var(--slate-400);">No ingredients</em>'}</td>
+                        <td style="padding: 12px;">
+                            <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="batchManager.editRecipe('${recipe.recipeID}'); event.stopPropagation();">Edit</button>
+                            <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px; margin-left: 8px;" onclick="batchManager.duplicateRecipe('${recipe.recipeID}'); event.stopPropagation();">Duplicate</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Add click handlers to rows
+            document.querySelectorAll('.recipe-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const recipeID = row.dataset.recipeId;
+                    batchManager.editRecipe(recipeID);
+                });
+            });
+
+            // Populate location filter
+            const locationFilter = document.getElementById('recipe-location-filter');
+            if (locationFilter && state.locations) {
+                const currentValue = locationFilter.value;
+                locationFilter.innerHTML = '<option value="">All Locations</option>' +
+                    state.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+                locationFilter.value = currentValue;
+            }
+
+        } catch (error) {
+            console.error('Failed to load recipes:', error);
+            const tbody = document.getElementById('recipe-table-body');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--red-600);">Error loading recipes</td></tr>';
+            }
+        }
+    },
 
     async loadRecipes() {
         try {
@@ -517,7 +642,6 @@ const batchManager = {
         document.getElementById('recipe-editor-title').textContent = 'Create Recipe';
         document.getElementById('recipe-name-input').value = '';
         document.getElementById('recipe-location-select').value = '';
-        document.getElementById('recipe-filler-items-input').value = '';
 
         // Populate location dropdown
         const locationSelect = document.getElementById('recipe-location-select');
@@ -525,7 +649,7 @@ const batchManager = {
             state.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
 
         this.renderRecipeIngredients();
-        showModal('recipe-editor-modal');
+        showPanel('recipe-editor-panel');
     },
 
     async editRecipe(recipeID) {
@@ -549,7 +673,7 @@ const batchManager = {
         locationSelect.value = recipe.location;
 
         this.renderRecipeIngredients();
-        showModal('recipe-editor-modal');
+        showPanel('recipe-editor-panel');
     },
 
     renderRecipeIngredients() {
@@ -692,8 +816,8 @@ const batchManager = {
             await dbService.saveRecipe(recipe);
             await apiService.saveRecipe(recipe);
             showMessage('Recipe saved', 'success');
-            hideModal('recipe-editor-modal');
-            await this.loadRecipes();
+            hidePanel('recipe-editor-panel');
+            await this.renderAllRecipesTable();
         } catch (error) {
             console.error('Failed to save recipe:', error);
             showMessage('Failed to save recipe: ' + error.message, 'warning');
@@ -727,7 +851,7 @@ const batchManager = {
 
         await dbService.saveRecipe(newRecipe);
         showMessage('Recipe duplicated', 'success');
-        await this.loadRecipes();
+        await this.renderAllRecipesTable();
     }
 };
 

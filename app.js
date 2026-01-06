@@ -3864,6 +3864,9 @@ async function handleCompleteStocktake() {
 // APP SELECTION & NEW FEATURES
 // ============================================
 
+// Track if app card event listeners have been initialized
+let appCardListenersInitialized = false;
+
 async function loadAppSelectionScreen() {
     // Set user info
     const userInfo = document.getElementById('app-selection-user-info');
@@ -3882,32 +3885,44 @@ async function loadAppSelectionScreen() {
     document.getElementById('template-manager-app-card').style.display = 'block';
     document.getElementById('batch-manager-app-card').style.display = 'block';
 
-    // Add event listeners for app cards
-    document.getElementById('counting-app-card').addEventListener('click', () => {
-        showScreen('home-screen');
-        loadHomeScreen();
-    });
+    // Add event listeners for app cards (only once)
+    if (!appCardListenersInitialized) {
+        console.log('Initializing app card event listeners');
 
-    document.getElementById('template-manager-app-card').addEventListener('click', () => {
-        showScreen('template-manager-screen');
-        loadTemplateManagerScreen();
-    });
+        document.getElementById('counting-app-card').addEventListener('click', () => {
+            console.log('Counting app clicked');
+            showScreen('home-screen');
+            loadHomeScreen();
+        });
 
-    document.getElementById('batch-manager-app-card').addEventListener('click', () => {
-        showScreen('batch-manager-screen');
-        loadBatchManagerScreen();
-    });
+        document.getElementById('template-manager-app-card').addEventListener('click', () => {
+            console.log('Template Manager app clicked');
+            showScreen('template-manager-screen');
+            loadTemplateManagerScreen();
+        });
 
-    document.getElementById('settings-app-card').addEventListener('click', () => {
-        showScreen('settings-screen');
-        loadSettingsScreen();
-    });
+        document.getElementById('batch-manager-app-card').addEventListener('click', () => {
+            console.log('Batch Manager app clicked');
+            showScreen('batch-manager-screen');
+            loadBatchManagerScreen();
+        });
+
+        document.getElementById('settings-app-card').addEventListener('click', () => {
+            console.log('Settings app clicked');
+            showScreen('settings-screen');
+            loadSettingsScreen();
+        });
+
+        appCardListenersInitialized = true;
+    }
 
     // Logout button
     document.getElementById('app-selection-logout-btn').addEventListener('click', handleLogout);
 }
 
 async function loadTemplateManagerScreen() {
+    console.log('=== loadTemplateManagerScreen called ===');
+
     // Set user info
     const userInfo = document.getElementById('template-manager-user-info');
     if (userInfo && state.user) {
@@ -3916,6 +3931,7 @@ async function loadTemplateManagerScreen() {
 
     // Get all templates and group by location
     const allTemplates = await dbService.getTemplates();
+    console.log('Templates loaded:', allTemplates.length, 'templates');
     const locationMap = new Map();
 
     allTemplates.forEach(template => {
@@ -3939,11 +3955,21 @@ async function loadTemplateManagerScreen() {
 
     // Render location cards
     const locationsGrid = document.getElementById('template-locations-grid');
+    console.log('Location grid element:', locationsGrid ? 'Found' : 'NOT FOUND');
+
     const locations = Array.from(locationMap.values());
+    console.log('Locations to render:', locations.length, 'locations', locations.map(l => l.location));
+
+    if (!locationsGrid) {
+        console.error('ERROR: template-locations-grid element not found!');
+        return;
+    }
 
     if (locations.length === 0) {
+        console.log('No templates found, showing message');
         locationsGrid.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--slate-500);">No templates found. Create your first template!</div>';
     } else {
+        console.log('Rendering', locations.length, 'location cards');
         locationsGrid.innerHTML = locations.map(loc => `
             <div class="location-card" data-location="${loc.location}">
                 <div class="location-card-header">

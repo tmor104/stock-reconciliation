@@ -2089,6 +2089,39 @@ body {
     overflow-y: auto;
 }
 
+.modal-fullscreen .modal-content {
+    max-width: 95vw;
+    max-height: 95vh;
+    width: 95vw;
+    height: 95vh;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header-compact {
+    padding: 16px 24px;
+    border-bottom: 2px solid var(--slate-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    background: var(--slate-50);
+}
+
+.modal-header-compact .form-actions {
+    display: flex;
+    gap: 10px;
+    margin: 0;
+}
+
+.template-table-fullscreen {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
 .modal-content h2 {
     margin-top: 0;
 }

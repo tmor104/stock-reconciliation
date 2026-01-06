@@ -50,7 +50,6 @@
                 </div>
             </div>
             <div class="header-actions">
-                <button class="lock-toggle-btn btn-secondary" title="Lock/Unlock counting mode">🔒</button>
                 <button id="app-selection-admin-btn" class="btn-secondary" style="display: none;">⚙️ Admin</button>
                 <button id="app-selection-logout-btn" class="btn-secondary">Logout</button>
             </div>
@@ -757,34 +756,22 @@
 
     <!-- Template Editor Modal -->
     <div id="template-editor-modal" class="modal">
-        <div class="modal-content modal-large">
-            <h2 id="template-editor-title">Create Template</h2>
-            <div class="form-group">
-                <label for="template-name-input">Template Name</label>
-                <input type="text" id="template-name-input" placeholder="e.g., Winter Menu">
-            </div>
-            <div class="form-group">
-                <label>Location</label>
-                <p id="template-editor-location" style="font-weight: bold;">-</p>
-            </div>
-            <div class="form-group">
-                <label>Products</label>
-                <div class="input-actions">
-                    <input type="text" id="template-product-search" placeholder="Search products to add...">
-                    <button id="add-section-header-btn" class="btn-secondary">+ Add Section</button>
+        <div class="modal-content modal-fullscreen">
+            <div class="modal-header-compact">
+                <div>
+                    <h2 id="template-editor-title" style="display: inline; margin-right: 20px;">Create Template</h2>
+                    <input type="text" id="template-name-input" placeholder="Template name..." style="width: 250px; margin-right: 20px;">
+                    <span style="margin-right: 10px;">Location:</span>
+                    <strong id="template-editor-location">-</strong>
                 </div>
-                <div id="template-product-results" class="search-results" style="max-height: 200px; overflow-y: auto;"></div>
-            </div>
-            <div class="form-group">
-                <label>Template Products (drag to reorder)</label>
-                <div id="template-products-table" class="template-table">
-                    <p class="info-text">No products added yet</p>
+                <div class="form-actions">
+                    <button id="cancel-template-btn" class="btn-secondary">Cancel</button>
+                    <button id="save-template-draft-btn" class="btn-secondary">Save as Draft</button>
+                    <button id="push-template-live-btn" class="btn-primary">Push to Live</button>
                 </div>
             </div>
-            <div class="form-actions">
-                <button id="cancel-template-btn" class="btn-secondary">Cancel</button>
-                <button id="save-template-draft-btn" class="btn-secondary">Save as Draft</button>
-                <button id="push-template-live-btn" class="btn-primary">Push to Live</button>
+            <div id="template-products-table" class="template-table-fullscreen">
+                <p class="info-text">No products added yet</p>
             </div>
         </div>
     </div>
@@ -816,50 +803,23 @@
 
     <!-- Recipe Editor Modal -->
     <div id="recipe-editor-modal" class="modal">
-        <div class="modal-content modal-large">
-            <h2 id="recipe-editor-title">Create Recipe</h2>
-            <div class="form-group">
-                <label for="recipe-name-input">Recipe Name</label>
-                <input type="text" id="recipe-name-input" placeholder="e.g., Margarita" required>
-            </div>
-            <div class="form-group">
-                <label for="recipe-location-select">Location</label>
-                <select id="recipe-location-select" required>
-                    <option value="">Select location...</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Ingredients</label>
-                <input type="text" id="recipe-ingredient-search" placeholder="Search products to add as ingredients...">
-                <div id="recipe-ingredient-results" class="search-results" style="max-height: 200px; overflow-y: auto;"></div>
-            </div>
-            <div class="form-group">
-                <label>Recipe Ingredients</label>
-                <div id="recipe-ingredients-table" class="ingredients-table">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Serve Size (ml)</th>
-                                <th>Bottle Size (ml)</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="recipe-ingredients-tbody">
-                            <tr>
-                                <td colspan="4" class="info-text">No ingredients added yet</td>
-                            </tr>
-                        </tbody>
-                    </table>
+        <div class="modal-content modal-fullscreen">
+            <div class="modal-header-compact">
+                <div>
+                    <h2 id="recipe-editor-title" style="display: inline; margin-right: 20px;">Create Recipe</h2>
+                    <input type="text" id="recipe-name-input" placeholder="Recipe name..." style="width: 250px; margin-right: 20px;" required>
+                    <span style="margin-right: 10px;">Location:</span>
+                    <select id="recipe-location-select" required style="padding: 6px; border-radius: 4px; border: 1px solid var(--slate-300);">
+                        <option value="">Select location...</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button id="cancel-recipe-btn" class="btn-secondary">Cancel</button>
+                    <button id="save-recipe-btn" class="btn-primary">Save Recipe</button>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="recipe-filler-items-input">Filler Items (not tracked)</label>
-                <input type="text" id="recipe-filler-items-input" placeholder="e.g., Sugar, Ice, Garnish (comma-separated)">
-            </div>
-            <div class="form-actions">
-                <button id="cancel-recipe-btn" class="btn-secondary">Cancel</button>
-                <button id="save-recipe-btn" class="btn-primary">Save Recipe</button>
+            <div id="recipe-ingredients-table" class="template-table-fullscreen">
+                <p class="info-text">No ingredients added yet</p>
             </div>
         </div>
     </div>

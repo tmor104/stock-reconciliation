@@ -260,21 +260,27 @@ const templateManager = {
 
     renderTemplateProducts() {
         const container = document.getElementById('template-products-table');
-        if (this.templateProducts.length === 0) {
-            container.innerHTML = '<p class="info-text">No products added yet</p>';
-            return;
-        }
 
-        // Render as table
+        // Always render table with search bar at top
         container.innerHTML = `
-            <table>
+            <table style="width: 100%; border-collapse: collapse;">
                 <thead>
-                    <tr>
-                        <th>Order</th>
-                        <th>Product</th>
-                        <th>Par Level</th>
-                        <th>Partial?</th>
-                        <th></th>
+                    <tr style="background: var(--slate-100);">
+                        <th colspan="5" style="padding: 12px; border: none;">
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="template-product-search" placeholder="Search products to add..."
+                                       style="flex: 1; padding: 8px; border: 1px solid var(--slate-300); border-radius: 4px;">
+                                <button id="add-section-header-btn" class="btn-secondary" style="white-space: nowrap;">+ Add Section</button>
+                            </div>
+                            <div id="template-search-results" style="margin-top: 8px;"></div>
+                        </th>
+                    </tr>
+                    <tr style="background: var(--slate-200); height: 36px;">
+                        <th style="width: 60px; padding: 8px; font-size: 13px;">#</th>
+                        <th style="padding: 8px; text-align: left; font-size: 13px;">Product</th>
+                        <th style="width: 120px; padding: 8px; font-size: 13px;">Par Level</th>
+                        <th style="width: 80px; padding: 8px; font-size: 13px;">Partial?</th>
+                        <th style="width: 80px; padding: 8px; font-size: 13px;"></th>
                     </tr>
                 </thead>
                 <tbody id="template-products-tbody"></tbody>
@@ -285,24 +291,28 @@ const templateManager = {
         tbody.innerHTML = this.templateProducts.map((item, index) => {
             if (item.isSection) {
                 return `
-                    <tr class="template-row-section">
-                        <td>${index + 1}</td>
-                        <td colspan="3"><strong>SECTION: ${item.name}</strong></td>
-                        <td><button class="btn-secondary" data-remove="${index}">Remove</button></td>
+                    <tr class="template-row-section" style="height: 32px; background: var(--slate-50);">
+                        <td style="padding: 6px 8px; font-size: 12px; border-bottom: 1px solid var(--slate-200);">${index + 1}</td>
+                        <td colspan="3" style="padding: 6px 8px; font-size: 13px; border-bottom: 1px solid var(--slate-200);"><strong>SECTION: ${item.name}</strong></td>
+                        <td style="padding: 6px 8px; font-size: 12px; border-bottom: 1px solid var(--slate-200);"><button class="btn-secondary" data-remove="${index}" style="padding: 4px 8px; font-size: 11px;">Remove</button></td>
                     </tr>
                 `;
             } else {
                 return `
-                    <tr>
-                        <td>${index + 1}</td>
-                        <td>${item.product}</td>
-                        <td><input type="number" step="0.01" min="0" value="${item.parLevel || 0}" data-index="${index}" class="par-level-input"></td>
-                        <td><input type="checkbox" ${item.partial ? 'checked' : ''} data-index="${index}" class="partial-checkbox"></td>
-                        <td><button class="btn-secondary" data-remove="${index}">Remove</button></td>
+                    <tr style="height: 32px;">
+                        <td style="padding: 6px 8px; font-size: 12px; border-bottom: 1px solid var(--slate-200);">${index + 1}</td>
+                        <td style="padding: 6px 8px; font-size: 13px; border-bottom: 1px solid var(--slate-200);">${item.product}</td>
+                        <td style="padding: 6px 8px; border-bottom: 1px solid var(--slate-200);"><input type="number" step="0.01" min="0" value="${item.parLevel || 0}" data-index="${index}" class="par-level-input" style="width: 100%; padding: 4px; font-size: 12px;"></td>
+                        <td style="padding: 6px 8px; text-align: center; border-bottom: 1px solid var(--slate-200);"><input type="checkbox" ${item.partial ? 'checked' : ''} data-index="${index}" class="partial-checkbox"></td>
+                        <td style="padding: 6px 8px; border-bottom: 1px solid var(--slate-200);"><button class="btn-secondary" data-remove="${index}" style="padding: 4px 8px; font-size: 11px;">Remove</button></td>
                     </tr>
                 `;
             }
         }).join('');
+
+        if (this.templateProducts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--slate-500);"><em>No products added yet - search above to add products</em></td></tr>';
+        }
 
         // Add event listeners
         tbody.querySelectorAll('.par-level-input').forEach(input => {
@@ -461,7 +471,7 @@ const batchManager = {
             recipesContainer.innerHTML = recipes.map(recipe => `
                 <div class="recipe-card">
                     <div class="recipe-card-info">
-                        <h4>${recipe.recipeName}</h4>
+                        <h4>${recipe.name}</h4>
                         <p>Location: ${recipe.location}</p>
                         <p>Ingredients: ${recipe.ingredients?.length || 0}</p>
                         ${recipe.fillerItems ? `<p>Fillers: ${recipe.fillerItems}</p>` : ''}
@@ -529,9 +539,8 @@ const batchManager = {
         this.recipeIngredients = recipe.ingredients || [];
 
         document.getElementById('recipe-editor-title').textContent = 'Edit Recipe';
-        document.getElementById('recipe-name-input').value = recipe.recipeName;
+        document.getElementById('recipe-name-input').value = recipe.name;
         document.getElementById('recipe-location-select').value = recipe.location;
-        document.getElementById('recipe-filler-items-input').value = recipe.fillerItems || '';
 
         // Populate location dropdown
         const locationSelect = document.getElementById('recipe-location-select');
@@ -544,21 +553,52 @@ const batchManager = {
     },
 
     renderRecipeIngredients() {
+        const container = document.getElementById('recipe-ingredients-table');
+
+        // Always render table with search bar at top
+        container.innerHTML = `
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: var(--slate-100);">
+                        <th colspan="5" style="padding: 12px; border: none;">
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="recipe-ingredient-search" placeholder="Search products to add as tracked ingredients..."
+                                       style="flex: 1; padding: 8px; border: 1px solid var(--slate-300); border-radius: 4px;">
+                                <button id="add-filler-ingredient-btn" class="btn-secondary" style="white-space: nowrap;">+ Add Filler</button>
+                            </div>
+                            <div id="recipe-ingredient-results" style="margin-top: 8px;"></div>
+                        </th>
+                    </tr>
+                    <tr style="background: var(--slate-200); height: 36px;">
+                        <th style="width: 60px; padding: 8px; font-size: 13px;">#</th>
+                        <th style="padding: 8px; text-align: left; font-size: 13px;">Ingredient</th>
+                        <th style="width: 130px; padding: 8px; font-size: 13px;">Serve Size (ml)</th>
+                        <th style="width: 130px; padding: 8px; font-size: 13px;">Bottle Size (ml)</th>
+                        <th style="width: 80px; padding: 8px; font-size: 13px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="recipe-ingredients-tbody"></tbody>
+            </table>
+        `;
+
         const tbody = document.getElementById('recipe-ingredients-tbody');
+        tbody.innerHTML = this.recipeIngredients.map((ing, index) => {
+            const isFiller = !ing.barcode; // Filler ingredients don't have barcodes
+            const label = isFiller ? `${ing.product} <em>(filler)</em>` : ing.product;
+            return `
+                <tr style="height: 32px; ${isFiller ? 'background: var(--yellow-50);' : ''}">
+                    <td style="padding: 6px 8px; font-size: 12px; border-bottom: 1px solid var(--slate-200);">${index + 1}</td>
+                    <td style="padding: 6px 8px; font-size: 13px; border-bottom: 1px solid var(--slate-200);">${label}</td>
+                    <td style="padding: 6px 8px; border-bottom: 1px solid var(--slate-200);"><input type="number" step="1" min="1" value="${ing.serveSizeML}" data-index="${index}" class="serve-size-input" style="width: 100%; padding: 4px; font-size: 12px;"></td>
+                    <td style="padding: 6px 8px; border-bottom: 1px solid var(--slate-200);"><input type="number" step="1" min="1" value="${ing.bottleSizeML || ''}" data-index="${index}" class="bottle-size-input" style="width: 100%; padding: 4px; font-size: 12px;" ${isFiller ? 'placeholder="N/A for filler" disabled' : ''}></td>
+                    <td style="padding: 6px 8px; border-bottom: 1px solid var(--slate-200);"><button class="btn-secondary" data-remove="${index}" style="padding: 4px 8px; font-size: 11px;">Remove</button></td>
+                </tr>
+            `;
+        }).join('');
 
         if (this.recipeIngredients.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="info-text">No ingredients added yet</td></tr>';
-            return;
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--slate-500);"><em>No ingredients added yet - search above to add tracked ingredients or click Add Filler</em></td></tr>';
         }
-
-        tbody.innerHTML = this.recipeIngredients.map((ing, index) => `
-            <tr>
-                <td>${ing.product}</td>
-                <td><input type="number" step="1" min="1" value="${ing.serveSizeML}" data-index="${index}" class="serve-size-input" style="width: 100px;"></td>
-                <td><input type="number" step="1" min="1" value="${ing.bottleSizeML}" data-index="${index}" class="bottle-size-input" style="width: 100px;"></td>
-                <td><button class="btn-secondary" data-remove="${index}">Remove</button></td>
-            </tr>
-        `).join('');
 
         // Add event listeners
         tbody.querySelectorAll('.serve-size-input').forEach(input => {
@@ -582,12 +622,33 @@ const batchManager = {
                 this.renderRecipeIngredients();
             });
         });
+
+        // Add Filler button
+        const addFillerBtn = document.getElementById('add-filler-ingredient-btn');
+        if (addFillerBtn) {
+            addFillerBtn.addEventListener('click', () => {
+                const fillerName = prompt('Enter filler ingredient name (e.g., "Sugar", "Ice", "Lime Juice"):');
+                if (!fillerName || !fillerName.trim()) return;
+
+                const serveSizeML = parseFloat(prompt('Enter amount used per serve in ml (e.g., 15):', '15'));
+                if (!serveSizeML || serveSizeML <= 0) {
+                    showMessage('Please enter a valid serve size', 'warning');
+                    return;
+                }
+
+                this.recipeIngredients.push({
+                    product: fillerName.trim(),
+                    serveSizeML: serveSizeML,
+                    // No barcode or bottleSizeML for filler items
+                });
+                this.renderRecipeIngredients();
+            });
+        }
     },
 
     async saveRecipe() {
         const recipeName = document.getElementById('recipe-name-input').value.trim();
         const location = document.getElementById('recipe-location-select').value;
-        const fillerItems = document.getElementById('recipe-filler-items-input').value.trim();
 
         if (!recipeName) {
             showMessage('Please enter a recipe name', 'warning');
@@ -606,11 +667,15 @@ const batchManager = {
 
         // Validate all ingredients have valid sizes
         for (const ing of this.recipeIngredients) {
+            const isFiller = !ing.barcode;
+
             if (!ing.serveSizeML || ing.serveSizeML <= 0) {
                 showMessage(`Serve size must be greater than 0 for ${ing.product}`, 'warning');
                 return;
             }
-            if (!ing.bottleSizeML || ing.bottleSizeML <= 0) {
+
+            // Only validate bottle size for tracked ingredients
+            if (!isFiller && (!ing.bottleSizeML || ing.bottleSizeML <= 0)) {
                 showMessage(`Bottle size must be greater than 0 for ${ing.product}`, 'warning');
                 return;
             }
@@ -618,10 +683,9 @@ const batchManager = {
 
         const recipe = {
             recipeID: this.currentRecipe?.recipeID || generateID('rec'),
-            recipeName,
+            name: recipeName,
             location,
-            ingredients: this.recipeIngredients,
-            fillerItems
+            ingredients: this.recipeIngredients
         };
 
         try {
@@ -658,7 +722,7 @@ const batchManager = {
         const newRecipe = {
             ...recipe,
             recipeID: generateID('rec'),
-            recipeName: recipe.recipeName + ' (Copy)'
+            name: recipe.name + ' (Copy)'
         };
 
         await dbService.saveRecipe(newRecipe);

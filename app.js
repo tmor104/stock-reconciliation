@@ -3917,6 +3917,78 @@ async function loadTemplateManagerScreen() {
     // Load all templates into table
     await templateManager.renderAllTemplatesTable();
 
+    // Search and filter functionality
+    const searchInput = document.getElementById('template-search');
+    const locationFilter = document.getElementById('template-location-filter');
+    const statusFilter = document.getElementById('template-status-filter');
+
+    const applyFilters = async () => {
+        const searchQuery = searchInput?.value.toLowerCase() || '';
+        const locationValue = locationFilter?.value || '';
+        const statusValue = statusFilter?.value || '';
+
+        const allTemplates = await dbService.getTemplates();
+        const tbody = document.getElementById('template-table-body');
+
+        if (!tbody) return;
+
+        const filtered = allTemplates.filter(template => {
+            const matchesSearch = !searchQuery ||
+                (template.templateName && template.templateName.toLowerCase().includes(searchQuery)) ||
+                (template.location && template.location.toLowerCase().includes(searchQuery));
+            const matchesLocation = !locationValue || template.location === locationValue;
+            const matchesStatus = !statusValue || template.status === statusValue;
+
+            return matchesSearch && matchesLocation && matchesStatus;
+        });
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--slate-500);">No templates match your filters</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(template => {
+            const productCount = Array.isArray(template.products) ? template.products.length : 0;
+            const lastModified = template.lastModified ? new Date(template.lastModified).toLocaleDateString() : '-';
+            const statusBadge = template.status === 'Live' ?
+                '<span style="background: var(--green-100); color: var(--green-800); padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">LIVE</span>' :
+                '<span style="background: var(--slate-100); color: var(--slate-700); padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">DRAFT</span>';
+
+            return `
+                <tr style="cursor: pointer;" class="template-row" data-template-id="${template.templateID}">
+                    <td style="padding: 12px;">${template.templateName || 'Unnamed'}</td>
+                    <td style="padding: 12px;">${template.location || '-'}</td>
+                    <td style="padding: 12px;">${statusBadge}</td>
+                    <td style="padding: 12px;">${productCount}</td>
+                    <td style="padding: 12px;">${template.createdBy || '-'}</td>
+                    <td style="padding: 12px; font-size: 13px; color: var(--slate-600);">${lastModified}</td>
+                    <td style="padding: 12px;">
+                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="templateManager.editTemplate('${template.templateID}'); event.stopPropagation();">Edit</button>
+                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px; margin-left: 8px;" onclick="templateManager.duplicateTemplate('${template.templateID}'); event.stopPropagation();">Duplicate</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // Re-add click handlers
+        document.querySelectorAll('.template-row').forEach(row => {
+            row.addEventListener('click', () => {
+                const templateID = row.dataset.templateId;
+                templateManager.editTemplate(templateID);
+            });
+        });
+    };
+
+    if (searchInput) {
+        searchInput.addEventListener('input', applyFilters);
+    }
+    if (locationFilter) {
+        locationFilter.addEventListener('change', applyFilters);
+    }
+    if (statusFilter) {
+        statusFilter.addEventListener('change', applyFilters);
+    }
+
     // Back button
     document.getElementById('template-manager-back-btn').addEventListener('click', () => {
         showScreen('app-selection-screen');
@@ -4018,6 +4090,76 @@ async function loadBatchManagerScreen() {
 
     // Load all recipes into table
     await batchManager.renderAllRecipesTable();
+
+    // Search and filter functionality
+    const searchInput = document.getElementById('recipe-search');
+    const locationFilter = document.getElementById('recipe-location-filter');
+
+    const applyFilters = async () => {
+        const searchQuery = searchInput?.value.toLowerCase() || '';
+        const locationValue = locationFilter?.value || '';
+
+        const allRecipes = await dbService.getRecipes();
+        const tbody = document.getElementById('recipe-table-body');
+
+        if (!tbody) return;
+
+        const filtered = allRecipes.filter(recipe => {
+            const matchesSearch = !searchQuery ||
+                (recipe.name && recipe.name.toLowerCase().includes(searchQuery)) ||
+                (recipe.location && recipe.location.toLowerCase().includes(searchQuery)) ||
+                (recipe.ingredients && recipe.ingredients.some(ing => ing.product && ing.product.toLowerCase().includes(searchQuery)));
+            const matchesLocation = !locationValue || recipe.location === locationValue;
+
+            return matchesSearch && matchesLocation;
+        });
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--slate-500);">No recipes match your filters</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(recipe => {
+            // Format ingredients list inline
+            let ingredientsList = '';
+            if (recipe.ingredients && recipe.ingredients.length > 0) {
+                ingredientsList = recipe.ingredients.map((ing, idx) => {
+                    const isFiller = !ing.barcode;
+                    const label = isFiller ?
+                        `<span style="background: var(--yellow-100); padding: 2px 6px; border-radius: 3px; font-size: 11px;">${ing.product} (${ing.serveSizeML}ml)</span>` :
+                        `<span style="background: var(--blue-50); padding: 2px 6px; border-radius: 3px; font-size: 11px;">${ing.product} (${ing.serveSizeML}ml/${ing.bottleSizeML}ml)</span>`;
+                    return label;
+                }).join(' ');
+            }
+
+            return `
+                <tr style="cursor: pointer;" class="recipe-row" data-recipe-id="${recipe.recipeID}">
+                    <td style="padding: 12px;">${recipe.name || 'Unnamed'}</td>
+                    <td style="padding: 12px;">${recipe.location || '-'}</td>
+                    <td style="padding: 12px; max-width: 400px;">${ingredientsList || '<em style="color: var(--slate-400);">No ingredients</em>'}</td>
+                    <td style="padding: 12px;">
+                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="batchManager.editRecipe('${recipe.recipeID}'); event.stopPropagation();">Edit</button>
+                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px; margin-left: 8px;" onclick="batchManager.duplicateRecipe('${recipe.recipeID}'); event.stopPropagation();">Duplicate</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // Re-add click handlers
+        document.querySelectorAll('.recipe-row').forEach(row => {
+            row.addEventListener('click', () => {
+                const recipeID = row.dataset.recipeId;
+                batchManager.editRecipe(recipeID);
+            });
+        });
+    };
+
+    if (searchInput) {
+        searchInput.addEventListener('input', applyFilters);
+    }
+    if (locationFilter) {
+        locationFilter.addEventListener('change', applyFilters);
+    }
 
     // Back button
     document.getElementById('batch-manager-back-btn').addEventListener('click', () => {

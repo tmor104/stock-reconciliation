@@ -143,8 +143,8 @@ function showMessage(message, type = 'info') {
 
 function updateLockToggles(isLocked) {
     document.querySelectorAll('.lock-toggle-btn').forEach(btn => {
-        btn.textContent = isLocked ? '🔓' : '🔒';
-        btn.title = isLocked ? 'Unlock (show app selection on login)' : 'Lock (go straight to counting on login)';
+        btn.textContent = isLocked ? '🔒' : '🔓';
+        btn.title = isLocked ? 'Click to unlock (show app selection on login)' : 'Click to lock (go straight to counting on login)';
     });
 }
 
@@ -318,6 +318,15 @@ function setupEventListeners() {
     const adminPanelBtn = document.getElementById('admin-panel-btn');
     if (adminPanelBtn) {
         adminPanelBtn.addEventListener('click', async () => {
+            showScreen('admin-screen');
+            await loadAdminPanel();
+        });
+    }
+
+    // Admin panel button (on app selection screen)
+    const appSelectionAdminBtn = document.getElementById('app-selection-admin-btn');
+    if (appSelectionAdminBtn) {
+        appSelectionAdminBtn.addEventListener('click', async () => {
             showScreen('admin-screen');
             await loadAdminPanel();
         });
@@ -3845,6 +3854,12 @@ async function loadAppSelectionScreen() {
         userInfo.textContent = `Logged in as ${state.user.username}${state.user.role ? ` (${state.user.role})` : ''}`;
     }
 
+    // Show/hide admin button based on role
+    const appSelectionAdminBtn = document.getElementById('app-selection-admin-btn');
+    if (appSelectionAdminBtn) {
+        appSelectionAdminBtn.style.display = state.user && state.user.role === 'admin' ? 'block' : 'none';
+    }
+
     // Show/hide app cards based on permissions
     // For now, show all cards - permissions can be added later
     document.getElementById('template-manager-app-card').style.display = 'block';
@@ -3920,7 +3935,8 @@ async function loadTemplateManagerScreen() {
         productSearch.addEventListener('input', async (e) => {
             const query = e.target.value.trim().toLowerCase();
             if (query.length < 2) {
-                document.getElementById('template-search-results').innerHTML = '';
+                const resultsEl = document.getElementById('template-search-results');
+                if (resultsEl) resultsEl.innerHTML = '';
                 return;
             }
 

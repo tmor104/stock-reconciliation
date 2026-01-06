@@ -65,6 +65,23 @@ function hideModal(modalId) {
     if (modal) modal.classList.remove('active');
 }
 
+function showPanel(panelId) {
+    const panel = document.getElementById(panelId);
+    if (panel) {
+        panel.classList.add('active');
+        // Close panel when clicking overlay
+        const overlay = panel.querySelector('.side-panel-overlay');
+        if (overlay) {
+            overlay.onclick = () => hidePanel(panelId);
+        }
+    }
+}
+
+function hidePanel(panelId) {
+    const panel = document.getElementById(panelId);
+    if (panel) panel.classList.remove('active');
+}
+
 function showLoading(message = 'Loading...') {
     const overlay = document.getElementById('loading-overlay');
     const messageEl = document.getElementById('loading-message');
@@ -3897,18 +3914,12 @@ async function loadTemplateManagerScreen() {
         userInfo.textContent = `Logged in as ${state.user.username}`;
     }
 
-    // Load templates using templateManager
-    await templateManager.loadLocations();
+    // Load all templates into table
+    await templateManager.renderAllTemplatesTable();
 
     // Back button
     document.getElementById('template-manager-back-btn').addEventListener('click', () => {
         showScreen('app-selection-screen');
-    });
-
-    // Back to locations button
-    document.getElementById('template-detail-back-btn').addEventListener('click', () => {
-        showScreen('template-manager-screen');
-        templateManager.loadLocations();
     });
 
     // Create template button
@@ -3916,9 +3927,9 @@ async function loadTemplateManagerScreen() {
         templateManager.createNewTemplate();
     });
 
-    // Template editor modal buttons
+    // Template editor side panel buttons
     document.getElementById('cancel-template-btn').addEventListener('click', () => {
-        hideModal('template-editor-modal');
+        hidePanel('template-editor-panel');
     });
 
     document.getElementById('save-template-draft-btn').addEventListener('click', () => {
@@ -4005,8 +4016,8 @@ async function loadBatchManagerScreen() {
         userInfo.textContent = `Logged in as ${state.user.username}`;
     }
 
-    // Load recipes using batchManager
-    await batchManager.loadRecipes();
+    // Load all recipes into table
+    await batchManager.renderAllRecipesTable();
 
     // Back button
     document.getElementById('batch-manager-back-btn').addEventListener('click', () => {
@@ -4018,9 +4029,9 @@ async function loadBatchManagerScreen() {
         batchManager.createNewRecipe();
     });
 
-    // Recipe editor modal buttons
+    // Recipe editor side panel buttons
     document.getElementById('cancel-recipe-btn').addEventListener('click', () => {
-        hideModal('recipe-editor-modal');
+        hidePanel('recipe-editor-panel');
     });
 
     document.getElementById('save-recipe-btn').addEventListener('click', () => {

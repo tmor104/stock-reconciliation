@@ -284,12 +284,16 @@ const templateManager = {
         }
     },
 
-    async createNewTemplate() {
-        if (!this.currentLocation) {
+    async createNewTemplate(location) {
+        // Use provided location or fall back to currentLocation
+        const loc = location || this.currentLocation;
+
+        if (!loc) {
             showMessage('No location selected', 'warning');
             return;
         }
 
+        this.currentLocation = loc;
         this.currentTemplate = null;
         this.templateProducts = [];
 
@@ -434,8 +438,10 @@ const templateManager = {
             showMessage(`Template saved as ${status}`, 'success');
             hidePanel('template-editor-panel');
 
-            // Refresh template table
-            await this.renderAllTemplatesTable();
+            // Refresh template detail view if we're on that screen
+            if (typeof renderTemplateLocationDetail === 'function') {
+                await renderTemplateLocationDetail();
+            }
 
         } catch (error) {
             console.error('Failed to save template:', error);
@@ -766,6 +772,61 @@ const batchManager = {
                     // No barcode or bottleSizeML for filler items
                 });
                 this.renderRecipeIngredients();
+            });
+        }
+
+        // Ingredient search for adding tracked ingredients
+        const ingredientSearch = document.getElementById('recipe-ingredient-search');
+        if (ingredientSearch) {
+            ingredientSearch.addEventListener('input', async (e) => {
+                const query = e.target.value.trim().toLowerCase();
+                const resultsContainer = document.getElementById('recipe-ingredient-results');
+
+                if (query.length < 2) {
+                    if (resultsContainer) resultsContainer.innerHTML = '';
+                    return;
+                }
+
+                // Search in product database
+                const results = state.productDatabase.filter(p =>
+                    p.product.toLowerCase().includes(query) ||
+                    p.barcode.includes(query)
+                ).slice(0, 10);
+
+                if (!resultsContainer) return;
+
+                if (results.length === 0) {
+                    resultsContainer.innerHTML = '<div style="padding: 8px; color: var(--slate-500); font-size: 13px;">No products found</div>';
+                    return;
+                }
+
+                resultsContainer.innerHTML = results.map(p => `
+                    <div class="search-result-item" data-barcode="${p.barcode}" data-product="${p.product}"
+                         style="padding: 8px; cursor: pointer; border-bottom: 1px solid var(--slate-100); background: white;">
+                        <strong>${p.product}</strong><br>
+                        <small style="color: var(--slate-600);">${p.barcode}</small>
+                    </div>
+                `).join('');
+
+                resultsContainer.querySelectorAll('.search-result-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        // Prompt for ingredient details
+                        const serveSizeML = parseFloat(prompt('Enter serve size in ml (e.g., 30):', '30'));
+                        const bottleSizeML = parseFloat(prompt('Enter bottle size in ml (e.g., 700):', '700'));
+
+                        if (serveSizeML && bottleSizeML && serveSizeML > 0 && bottleSizeML > 0) {
+                            this.recipeIngredients.push({
+                                barcode: item.dataset.barcode,
+                                product: item.dataset.product,
+                                serveSizeML: serveSizeML,
+                                bottleSizeML: bottleSizeML
+                            });
+                            this.renderRecipeIngredients();
+                            ingredientSearch.value = '';
+                            resultsContainer.innerHTML = '';
+                        }
+                    });
+                });
             });
         }
     },

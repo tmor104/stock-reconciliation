@@ -434,8 +434,8 @@ const templateManager = {
             showMessage(`Template saved as ${status}`, 'success');
             hidePanel('template-editor-panel');
 
-            // Refresh location detail
-            await this.showLocationDetail(this.currentLocation);
+            // Refresh template table
+            await this.renderAllTemplatesTable();
 
         } catch (error) {
             console.error('Failed to save template:', error);
@@ -504,7 +504,7 @@ const templateManager = {
 
         await dbService.saveTemplate(newTemplate);
         showMessage('Template duplicated', 'success');
-        await this.showLocationDetail(template.location);
+        await this.renderAllTemplatesTable();
     }
 };
 
@@ -817,7 +817,7 @@ const batchManager = {
             await apiService.saveRecipe(recipe);
             showMessage('Recipe saved', 'success');
             hidePanel('recipe-editor-panel');
-            await this.loadRecipes();
+            await this.renderAllRecipesTable();
         } catch (error) {
             console.error('Failed to save recipe:', error);
             showMessage('Failed to save recipe: ' + error.message, 'warning');
@@ -851,7 +851,7 @@ const batchManager = {
 
         await dbService.saveRecipe(newRecipe);
         showMessage('Recipe duplicated', 'success');
-        await this.loadRecipes();
+        await this.renderAllRecipesTable();
     }
 };
 

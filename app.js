@@ -3864,6 +3864,9 @@ async function handleCompleteStocktake() {
 // APP SELECTION & NEW FEATURES
 // ============================================
 
+// Track if app card event listeners have been initialized
+let appCardListenersInitialized = false;
+
 async function loadAppSelectionScreen() {
     // Set user info
     const userInfo = document.getElementById('app-selection-user-info');
@@ -3882,32 +3885,44 @@ async function loadAppSelectionScreen() {
     document.getElementById('template-manager-app-card').style.display = 'block';
     document.getElementById('batch-manager-app-card').style.display = 'block';
 
-    // Add event listeners for app cards
-    document.getElementById('counting-app-card').addEventListener('click', () => {
-        showScreen('home-screen');
-        loadHomeScreen();
-    });
+    // Add event listeners for app cards (only once)
+    if (!appCardListenersInitialized) {
+        console.log('Initializing app card event listeners');
 
-    document.getElementById('template-manager-app-card').addEventListener('click', () => {
-        showScreen('template-manager-screen');
-        loadTemplateManagerScreen();
-    });
+        document.getElementById('counting-app-card').addEventListener('click', () => {
+            console.log('Counting app clicked');
+            showScreen('home-screen');
+            loadHomeScreen();
+        });
 
-    document.getElementById('batch-manager-app-card').addEventListener('click', () => {
-        showScreen('batch-manager-screen');
-        loadBatchManagerScreen();
-    });
+        document.getElementById('template-manager-app-card').addEventListener('click', () => {
+            console.log('Template Manager app clicked');
+            showScreen('template-manager-screen');
+            loadTemplateManagerScreen();
+        });
 
-    document.getElementById('settings-app-card').addEventListener('click', () => {
-        showScreen('settings-screen');
-        loadSettingsScreen();
-    });
+        document.getElementById('batch-manager-app-card').addEventListener('click', () => {
+            console.log('Batch Manager app clicked');
+            showScreen('batch-manager-screen');
+            loadBatchManagerScreen();
+        });
+
+        document.getElementById('settings-app-card').addEventListener('click', () => {
+            console.log('Settings app clicked');
+            showScreen('settings-screen');
+            loadSettingsScreen();
+        });
+
+        appCardListenersInitialized = true;
+    }
 
     // Logout button
     document.getElementById('app-selection-logout-btn').addEventListener('click', handleLogout);
 }
 
 async function loadTemplateManagerScreen() {
+    console.log('=== loadTemplateManagerScreen called ===');
+
     // Set user info
     const userInfo = document.getElementById('template-manager-user-info');
     if (userInfo && state.user) {
@@ -3916,6 +3931,7 @@ async function loadTemplateManagerScreen() {
 
     // Get all templates and group by location
     const allTemplates = await dbService.getTemplates();
+    console.log('Templates loaded:', allTemplates.length, 'templates');
     const locationMap = new Map();
 
     allTemplates.forEach(template => {
@@ -3939,11 +3955,27 @@ async function loadTemplateManagerScreen() {
 
     // Render location cards
     const locationsGrid = document.getElementById('template-locations-grid');
+    console.log('Location grid element:', locationsGrid ? 'Found' : 'NOT FOUND');
+
     const locations = Array.from(locationMap.values());
+    console.log('Locations to render:', locations.length, 'locations', locations.map(l => l.location));
+
+    if (!locationsGrid) {
+        console.error('ERROR: template-locations-grid element not found!');
+        return;
+    }
 
     if (locations.length === 0) {
-        locationsGrid.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--slate-500);">No templates found. Create your first template!</div>';
+        console.log('No templates found, showing message');
+        locationsGrid.innerHTML = `
+            <div style="text-align: center; padding: 60px 40px; color: var(--slate-500);">
+                <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+                <h3 style="color: var(--slate-700); margin: 0 0 8px 0;">No templates found</h3>
+                <p style="margin: 0 0 20px 0;">Click the "+ Create Template" button above to create your first template</p>
+            </div>
+        `;
     } else {
+        console.log('Rendering', locations.length, 'location cards');
         locationsGrid.innerHTML = locations.map(loc => `
             <div class="location-card" data-location="${loc.location}">
                 <div class="location-card-header">
@@ -3983,6 +4015,66 @@ async function loadTemplateManagerScreen() {
             });
         });
     }
+
+    // Create template button
+    document.getElementById('create-template-from-main-btn').addEventListener('click', () => {
+        // Prompt for location
+        const locationSelect = document.createElement('select');
+        locationSelect.innerHTML = '<option value="">Select location...</option>' +
+            state.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+
+        // Create modal content
+        const modalDiv = document.createElement('div');
+        modalDiv.innerHTML = `
+            <div style="padding: 20px;">
+                <h3 style="margin-top: 0;">Select Location for New Template</h3>
+                <p style="color: var(--slate-600); font-size: 14px;">Choose which location this template will be for:</p>
+                <div id="location-select-container"></div>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button id="location-cancel-btn" class="btn-secondary">Cancel</button>
+                    <button id="location-confirm-btn" class="btn-primary">Continue</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modalDiv);
+        document.getElementById('location-select-container').appendChild(locationSelect);
+
+        // Style the modal
+        modalDiv.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+            z-index: 9999;
+        `;
+        modalDiv.firstElementChild.style.cssText = `
+            background: white; border-radius: 8px; max-width: 400px; width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        `;
+        locationSelect.style.cssText = `
+            width: 100%; padding: 10px; border: 1px solid var(--slate-300);
+            border-radius: 4px; font-size: 14px;
+        `;
+
+        document.getElementById('location-cancel-btn').addEventListener('click', () => {
+            document.body.removeChild(modalDiv);
+        });
+
+        document.getElementById('location-confirm-btn').addEventListener('click', () => {
+            const selectedLocation = locationSelect.value;
+            if (!selectedLocation) {
+                showMessage('Please select a location', 'warning');
+                return;
+            }
+            document.body.removeChild(modalDiv);
+
+            // Navigate to location detail screen and create template
+            state.currentTemplateLocation = selectedLocation;
+            loadTemplateLocationDetailScreen(selectedLocation);
+            setTimeout(() => {
+                templateManager.createNewTemplate(selectedLocation);
+            }, 100);
+        });
+    });
 
     // Back button
     document.getElementById('template-manager-back-btn').addEventListener('click', () => {

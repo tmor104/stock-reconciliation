@@ -9,8 +9,8 @@
 -- FIX 1: Update function to have fixed search_path
 -- =====================================================
 
-DROP FUNCTION IF EXISTS update_updated_at();
-
+-- Use CREATE OR REPLACE to update function without dropping
+-- (avoids "other objects depend on it" error from triggers)
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql

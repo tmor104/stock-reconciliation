@@ -22,12 +22,17 @@ Your Supabase credentials are already configured in `.env`:
 
 6. You should see: "Success. No rows returned"
 
+7. **Apply Security Fixes**: Create a new query and run `supabase-schema-fixes.sql`
+   - This fixes Supabase linter warnings about security
+   - Click **Run** again
+
 This will create:
 - ✅ 15+ database tables
 - ✅ Row Level Security policies
 - ✅ Automatic triggers
 - ✅ Indexes for performance
 - ✅ Views for complex queries
+- ✅ Security hardened functions and views
 
 ## Step 2: Create Your First Admin User
 
